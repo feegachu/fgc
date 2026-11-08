@@ -822,8 +822,8 @@
         "stepId": "help.4dd62046ec1a00a75773b0eaf47fc379",
         "screenId": "CONT-W02",
         "targetId": "contract.tab.acquisition",
-        "title": "보험계약 상세, 계약체결비용",
-        "instruction": "보험계약 상세 화면의 ‘계약체결비용’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "title": "보험계약 상세, 계약체결비용 · 선지급·유지관리 비용의 한도를 확인합니다.",
+        "instruction": "보험계약 상세 화면의 ‘계약체결비용 · 선지급·유지관리 비용의 한도를 확인합니다.’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -941,8 +941,8 @@
         "stepId": "help.682085dd2cbb413ec8c498f8610e3c80",
         "screenId": "CONT-W02",
         "targetId": "contract.panel.acquisition",
-        "title": "보험계약 상세, 계약체결비용",
-        "instruction": "보험계약 상세 화면의 ‘계약체결비용’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "title": "보험계약 상세, 계약체결비용 · 선지급·유지관리 비용의 한도를 확인합니다.",
+        "instruction": "보험계약 상세 화면의 ‘계약체결비용 · 선지급·유지관리 비용의 한도를 확인합니다.’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -1705,6 +1705,21 @@
         "next": []
       },
       {
+        "stepId": "help.054ca06f2c5748a5553392577f3edbe8",
+        "screenId": "SCHE-W02",
+        "targetId": "components.data-table.input",
+        "title": "예상 스케줄 상세, 현재 페이지 전체 선택",
+        "instruction": "예상 스케줄 상세 화면의 ‘현재 페이지 전체 선택’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.0cec20c8f0ea530f9b9d3a95bb1ab653",
         "screenId": "SCHE-W02",
         "targetId": "features.schedule.schedule-detail-page.link-2",
@@ -1740,6 +1755,21 @@
         "roles": [
           "SYSTEM_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.3031f193249a84642221b8daf19804e0",
+        "screenId": "SCHE-W02",
+        "targetId": "components.data-table.input-2",
+        "title": "예상 스케줄 상세, 선택",
+        "instruction": "예상 스케줄 상세 화면의 ‘선택’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -6491,6 +6521,21 @@
     "workflowId": "ledger.review",
     "steps": [
       {
+        "stepId": "help.0781d56e9affc170250613a822ad1eab",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.section-1",
+        "title": "검증원장, 분개 합계",
+        "instruction": "검증원장 화면의 ‘분개 합계’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.0bab00438028223b07f22a86c843d2c9",
         "screenId": "LEDG-W01",
         "targetId": "features.ledger.ledger-page.button-4",
@@ -6520,6 +6565,21 @@
         "next": []
       },
       {
+        "stepId": "help.136840616531e674d528ededb1a4e70b",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.kpi.credit",
+        "title": "검증원장, 대변 합계",
+        "instruction": "검증원장 화면의 ‘대변 합계’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.21743b8656188f7f3a038e9637e3c53c",
         "screenId": "LEDG-W01",
         "targetId": "features.ledger.ledger-page.button",
@@ -6530,6 +6590,21 @@
           "SYSTEM_ADMIN",
           "GA_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.2687276a66128434d47fe3cf089654bf",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.button-2",
+        "title": "검증원장, 전체 분개 보기",
+        "instruction": "검증원장 화면의 ‘전체 분개 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -6545,6 +6620,20 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.2ef2a7ac9f5659e1fd696e20841b934c",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.reverse",
+        "title": "검증원장, 역분개",
+        "instruction": "검증원장 화면의 ‘역분개’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -6608,11 +6697,41 @@
         "next": []
       },
       {
+        "stepId": "help.515baf536849bf50da9150050326faa1",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.section-2",
+        "title": "검증원장, 계약별 분개 내역",
+        "instruction": "검증원장 화면의 ‘계약별 분개 내역’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.59d364f520b969807bd32490b5ef6f77",
         "screenId": "LEDG-W01",
         "targetId": "components.filter-bar.button-2",
         "title": "검증원장, 초기화",
         "instruction": "검증원장 화면의 ‘초기화’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.5ef2de75016ffbb07554fc9860a096ae",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.contract-tree.button-5",
+        "title": "검증원장, 이전 분개",
+        "instruction": "검증원장 화면의 ‘이전 분개’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -6713,11 +6832,55 @@
         "next": []
       },
       {
+        "stepId": "help.84b29d6df6bc4c23963f61fb1732a504",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.correction",
+        "title": "검증원장, 역분개 + 재기표",
+        "instruction": "검증원장 화면의 ‘역분개 + 재기표’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.929e01c9b819d2c07fc3817d17771846",
         "screenId": "LEDG-W01",
         "targetId": "ledger.filter.select.account",
         "title": "검증원장, 계정과목",
         "instruction": "검증원장 화면의 ‘계정과목’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.99418fa32936b0955c693e59aba6853b",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.contract-tree.button-2",
+        "title": "검증원장, 계약 연결 없음 분개 건",
+        "instruction": "검증원장 화면의 ‘계약 연결 없음 분개 건’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.aaee4f357432e9e7925dc1bfe05d747a",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.kpi.debit",
+        "title": "검증원장, 차변 합계",
+        "instruction": "검증원장 화면의 ‘차변 합계’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -6742,9 +6905,54 @@
         "next": []
       },
       {
+        "stepId": "help.b1e3124c4d6fa806d2b914330f216333",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.contract-tree.button-3",
+        "title": "검증원장, 다시 조회",
+        "instruction": "검증원장 화면의 ‘다시 조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.b3f0de9bb6ed44191a15e838502dab85",
         "screenId": "LEDG-W01",
         "targetId": "features.ledger.ledger-page.section-2",
+        "title": "검증원장, 분개 상세",
+        "instruction": "검증원장 화면의 ‘분개 상세’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.b944d01f0b39e9d58ec920c19a7e4612",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.kpi.balance",
+        "title": "검증원장, 차변 − 대변",
+        "instruction": "검증원장 화면의 ‘차변 − 대변’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ba0d99d8816e8904044c3c06578095e5",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.section-3",
         "title": "검증원장, 분개 상세",
         "instruction": "검증원장 화면의 ‘분개 상세’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
@@ -6786,11 +6994,71 @@
         "next": []
       },
       {
+        "stepId": "help.d907749a3b5b4808a3e50380656ecf9d",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.contract-tree.button-6",
+        "title": "검증원장, 다음 분개",
+        "instruction": "검증원장 화면의 ‘다음 분개’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.da3e1944100911fa853b8db3f0fc4733",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.retry",
+        "title": "검증원장, 다시 조회",
+        "instruction": "검증원장 화면의 ‘다시 조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.e5f48fd7d854c755a4d6e6e43eb811ab",
         "screenId": "LEDG-W01",
         "targetId": "components.pagination.button-2",
         "title": "검증원장, 이전 5페이지 / 이전 페이지",
         "instruction": "검증원장 화면의 ‘이전 5페이지 / 이전 페이지’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f11019dd13b91443b5053767a5448c3d",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.all-entries",
+        "title": "검증원장, 전체 내역",
+        "instruction": "검증원장 화면의 ‘전체 내역’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f722bc82c655c7d37800cb8b70055770",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.button-1",
+        "title": "검증원장, 계약별 보기",
+        "instruction": "검증원장 화면의 ‘계약별 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -7225,6 +7493,21 @@
         "targetId": "features.reconciliation.reconciliation-page.button-2",
         "title": "대사 실행/결과, 조회",
         "instruction": "대사 실행/결과 화면의 ‘조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.a1b0545d5b079025a21477e4336632c2",
+        "screenId": "RECO-W01",
+        "targetId": "hierarchy.button-3",
+        "title": "대사 실행/결과, 트리 보기 / 표 보기",
+        "instruction": "대사 실행/결과 화면의 ‘트리 보기 / 표 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8511,8 +8794,8 @@
         "stepId": "help.a33f9db38a54f017cdd50d5234967d73",
         "screenId": "VRUN-W02",
         "targetId": "features.validation.validation-run-detail-page.section-5",
-        "title": "월 통합검증 상세, ④ 결과 요약",
-        "instruction": "월 통합검증 상세 화면의 ‘④ 결과 요약’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "title": "월 통합검증 상세, 결과 요약 / ④ 결과 요약",
+        "instruction": "월 통합검증 상세 화면의 ‘결과 요약 / ④ 결과 요약’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8526,8 +8809,8 @@
         "stepId": "help.ad86787001de1a2ed7cd6f49f0313c49",
         "screenId": "VRUN-W02",
         "targetId": "features.validation.validation-run-detail-page.section-4",
-        "title": "월 통합검증 상세, ③ 대상 선별 결과",
-        "instruction": "월 통합검증 상세 화면의 ‘③ 대상 선별 결과’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "title": "월 통합검증 상세, 대상 선별 결과 / ③ 대상 선별 결과",
+        "instruction": "월 통합검증 상세 화면의 ‘대상 선별 결과 / ③ 대상 선별 결과’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8541,8 +8824,8 @@
         "stepId": "help.aeb725782fd093a0431ea3c49bd08fd6",
         "screenId": "VRUN-W02",
         "targetId": "features.validation.validation-run-detail-page.section-7",
-        "title": "월 통합검증 상세, ⑤ 확정 조건 (운영정책서 제44조, 8개 전부 통과해야 함)",
-        "instruction": "월 통합검증 상세 화면의 ‘⑤ 확정 조건 (운영정책서 제44조, 8개 전부 통과해야 함)’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "title": "월 통합검증 상세, 확정 전 8단계 점검",
+        "instruction": "월 통합검증 상세 화면의 ‘확정 전 8단계 점검’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8711,8 +8994,8 @@
         "stepId": "help.fc2cee9869b8f02f6312bc6f6fff5aaa",
         "screenId": "VRUN-W02",
         "targetId": "features.validation.validation-run-detail-page.section-8",
-        "title": "월 통합검증 상세, ⑥ 확정",
-        "instruction": "월 통합검증 상세 화면의 ‘⑥ 확정’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "title": "월 통합검증 상세, 검증 결과 확정 / ⑥ 확정",
+        "instruction": "월 통합검증 상세 화면의 ‘검증 결과 확정 / ⑥ 확정’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -9826,6 +10109,21 @@
         "next": []
       },
       {
+        "stepId": "help.0781d56e9affc170250613a822ad1eab",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.section-1",
+        "title": "검증원장, 분개 합계",
+        "instruction": "검증원장 화면의 ‘분개 합계’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.08505729b091c0778bbb64a921b8100f",
         "screenId": "TRAN-W01",
         "targetId": "features.transaction.transaction-list-page.button-3",
@@ -10049,6 +10347,21 @@
         "targetId": "components.pagination.button-4",
         "title": "수수료 지급, 다음 5페이지 / 다음 페이지",
         "instruction": "수수료 지급 화면의 ‘다음 5페이지 / 다음 페이지’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.136840616531e674d528ededb1a4e70b",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.kpi.credit",
+        "title": "검증원장, 대변 합계",
+        "instruction": "검증원장 화면의 ‘대변 합계’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -10340,6 +10653,21 @@
         "next": []
       },
       {
+        "stepId": "help.2687276a66128434d47fe3cf089654bf",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.button-2",
+        "title": "검증원장, 전체 분개 보기",
+        "instruction": "검증원장 화면의 ‘전체 분개 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.274c0a4580d6adbcaf80d37d04e00784",
         "screenId": "CONT-W01",
         "targetId": "contract.filter.retry.insurerid",
@@ -10469,6 +10797,20 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.2ef2a7ac9f5659e1fd696e20841b934c",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.reverse",
+        "title": "검증원장, 역분개",
+        "instruction": "검증원장 화면의 ‘역분개’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -10883,6 +11225,21 @@
         "next": []
       },
       {
+        "stepId": "help.515baf536849bf50da9150050326faa1",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.section-2",
+        "title": "검증원장, 계약별 분개 내역",
+        "instruction": "검증원장 화면의 ‘계약별 분개 내역’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.536d80b9fb46935f4a786f02ef539592",
         "screenId": "EXCP-W01",
         "targetId": "components.pagination.button-5",
@@ -11037,6 +11394,21 @@
         "targetId": "features.reconciliation.compare-modal.link-2",
         "title": "대사 실행/결과, 지급 건 목록",
         "instruction": "대사 실행/결과 화면의 ‘지급 건 목록’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.5ef2de75016ffbb07554fc9860a096ae",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.contract-tree.button-5",
+        "title": "검증원장, 이전 분개",
+        "instruction": "검증원장 화면의 ‘이전 분개’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -11756,6 +12128,20 @@
         "next": []
       },
       {
+        "stepId": "help.84b29d6df6bc4c23963f61fb1732a504",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.correction",
+        "title": "검증원장, 역분개 + 재기표",
+        "instruction": "검증원장 화면의 ‘역분개 + 재기표’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.855a264bf08a9e63d795487e9fa3595d",
         "screenId": "EXCP-W01",
         "targetId": "components.filter-bar.form",
@@ -12055,6 +12441,21 @@
         "next": []
       },
       {
+        "stepId": "help.99418fa32936b0955c693e59aba6853b",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.contract-tree.button-2",
+        "title": "검증원장, 계약 연결 없음 분개 건",
+        "instruction": "검증원장 화면의 ‘계약 연결 없음 분개 건’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.9a4a3260fb871e5b000bf19e46c9ffdd",
         "screenId": "EXCP-W01",
         "targetId": "features.exception.journal-correction-modal.textarea",
@@ -12173,6 +12574,21 @@
         "next": []
       },
       {
+        "stepId": "help.a1b0545d5b079025a21477e4336632c2",
+        "screenId": "RECO-W01",
+        "targetId": "hierarchy.button-3",
+        "title": "대사 실행/결과, 트리 보기 / 표 보기",
+        "instruction": "대사 실행/결과 화면의 ‘트리 보기 / 표 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.a21cfffb04e22f10b129e4ae5c325a8a",
         "screenId": "TRAN-W01",
         "targetId": "features.transaction.transaction-list-page.button",
@@ -12247,6 +12663,21 @@
         "targetId": "components.pagination.button-4",
         "title": "월 통합검증, 다음 5페이지 / 다음 페이지",
         "instruction": "월 통합검증 화면의 ‘다음 5페이지 / 다음 페이지’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.aaee4f357432e9e7925dc1bfe05d747a",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.kpi.debit",
+        "title": "검증원장, 차변 합계",
+        "instruction": "검증원장 화면의 ‘차변 합계’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -12334,6 +12765,21 @@
         "targetId": "components.pagination.button",
         "title": "월 통합검증, 처음",
         "instruction": "월 통합검증 화면의 ‘처음’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.b1e3124c4d6fa806d2b914330f216333",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.contract-tree.button-3",
+        "title": "검증원장, 다시 조회",
+        "instruction": "검증원장 화면의 ‘다시 조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -12433,6 +12879,21 @@
         "next": []
       },
       {
+        "stepId": "help.b944d01f0b39e9d58ec920c19a7e4612",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.kpi.balance",
+        "title": "검증원장, 차변 − 대변",
+        "instruction": "검증원장 화면의 ‘차변 − 대변’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.b9741b7453f0db13c6366f8a508d2b7e",
         "screenId": "EXCP-W01",
         "targetId": "features.exception.journal-correction-modal.input-4",
@@ -12443,6 +12904,21 @@
           "SYSTEM_ADMIN",
           "GA_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ba0d99d8816e8904044c3c06578095e5",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.section-3",
+        "title": "검증원장, 분개 상세",
+        "instruction": "검증원장 화면의 ‘분개 상세’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -12968,11 +13444,41 @@
         "next": []
       },
       {
+        "stepId": "help.d907749a3b5b4808a3e50380656ecf9d",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.contract-tree.button-6",
+        "title": "검증원장, 다음 분개",
+        "instruction": "검증원장 화면의 ‘다음 분개’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.d9d8993e66f847ab6d583647f8b92e3d",
         "screenId": "VRUN-W01",
         "targetId": "components.list-header.select",
         "title": "월 통합검증, 화면 행 수",
         "instruction": "월 통합검증 화면의 ‘화면 행 수’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.da3e1944100911fa853b8db3f0fc4733",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.retry",
+        "title": "검증원장, 다시 조회",
+        "instruction": "검증원장 화면의 ‘다시 조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -13296,6 +13802,21 @@
         "next": []
       },
       {
+        "stepId": "help.f11019dd13b91443b5053767a5448c3d",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.all-entries",
+        "title": "검증원장, 전체 내역",
+        "instruction": "검증원장 화면의 ‘전체 내역’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.f126932b20eb0aac92c13bc6b0cdba7a",
         "screenId": "ARB-W01",
         "targetId": "components.filter-bar.button",
@@ -13359,6 +13880,21 @@
         "targetId": "contract.filter.retry.agentid",
         "title": "보험계약 목록, 모집 설계사",
         "instruction": "보험계약 목록 화면의 ‘모집 설계사’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f722bc82c655c7d37800cb8b70055770",
+        "screenId": "LEDG-W01",
+        "targetId": "ledger.explorer.button-1",
+        "title": "검증원장, 계약별 보기",
+        "instruction": "검증원장 화면의 ‘계약별 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -13826,8 +14362,8 @@
         "stepId": "help.127ee48068f0f3ef473f653062f834ce",
         "screenId": "CLAW-W01",
         "targetId": "clawback.documents.issue",
-        "title": "환수, PDF 생성 중… / 발행 재시도 / 재발행 / PDF 생성",
-        "instruction": "환수 화면의 ‘PDF 생성 중… / 발행 재시도 / 재발행 / PDF 생성’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "title": "환수, PDF 준비 중… / PDF 출력 / PDF 생성 중… / 발행 재시도 / 재발행 / PDF 생성",
+        "instruction": "환수 화면의 ‘PDF 준비 중… / PDF 출력 / PDF 생성 중… / 발행 재시도 / 재발행 / PDF 생성’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -13961,6 +14497,21 @@
         "targetId": "components.pagination.button-4",
         "title": "환수, 다음 5페이지 / 다음 페이지",
         "instruction": "환수 화면의 ‘다음 5페이지 / 다음 페이지’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.58484eeaae1b4ab2ccf70b051ec38984",
+        "screenId": "CLAW-W01",
+        "targetId": "components.modal.button",
+        "title": "환수, 창 닫기",
+        "instruction": "환수 화면의 ‘창 닫기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -14166,8 +14717,8 @@
         "stepId": "help.d9ce44ba4617a9ecf2ee9c2f30006bfb",
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-page.section-2",
-        "title": "환수, ③ 후보 근거, ④ 계산",
-        "instruction": "환수 화면의 ‘③ 후보 근거, ④ 계산’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "title": "환수, 후보 근거 · 환수 계산",
+        "instruction": "환수 화면의 ‘후보 근거 · 환수 계산’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -14644,19 +15195,6 @@
         "targetId": "features.transaction.attribution-editor.select-2",
         "title": "수수료 지급 등록, 귀속 방법",
         "instruction": "수수료 지급 등록 화면의 ‘귀속 방법’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "SYSTEM_ADMIN",
-          "SETTLEMENT"
-        ],
-        "next": []
-      },
-      {
-        "stepId": "help.867c8567aba5587dcba28a132cb9d66e",
-        "screenId": "TRAN-W02",
-        "targetId": "features.transaction.confirmation-panels.section",
-        "title": "수수료 지급 등록, ③ 확정 전 6단계 점검",
-        "instruction": "수수료 지급 등록 화면의 ‘③ 확정 전 6단계 점검’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15255,19 +15793,6 @@
         "next": []
       },
       {
-        "stepId": "help.867c8567aba5587dcba28a132cb9d66e",
-        "screenId": "TRAN-W02",
-        "targetId": "features.transaction.confirmation-panels.section",
-        "title": "수수료 지급 등록, ③ 확정 전 6단계 점검",
-        "instruction": "수수료 지급 등록 화면의 ‘③ 확정 전 6단계 점검’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "SYSTEM_ADMIN",
-          "SETTLEMENT"
-        ],
-        "next": []
-      },
-      {
         "stepId": "help.8999d40bd390c0f622fcf706888e5e98",
         "screenId": "TRAN-W02",
         "targetId": "components.search-select.button",
@@ -15850,19 +16375,6 @@
         "targetId": "features.transaction.attribution-editor.select-2",
         "title": "수수료 지급 등록, 귀속 방법",
         "instruction": "수수료 지급 등록 화면의 ‘귀속 방법’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "SYSTEM_ADMIN",
-          "SETTLEMENT"
-        ],
-        "next": []
-      },
-      {
-        "stepId": "help.867c8567aba5587dcba28a132cb9d66e",
-        "screenId": "TRAN-W02",
-        "targetId": "features.transaction.confirmation-panels.section",
-        "title": "수수료 지급 등록, ③ 확정 전 6단계 점검",
-        "instruction": "수수료 지급 등록 화면의 ‘③ 확정 전 6단계 점검’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",

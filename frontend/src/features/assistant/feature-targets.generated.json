@@ -3100,6 +3100,106 @@
     "element": "select"
   },
   {
+    "id": "hierarchy.button-1",
+    "file": "components/HierarchyTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "hierarchy.button-2",
+    "file": "components/HierarchyTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "hierarchy.button-3",
+    "file": "components/HierarchyTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.contract-tree.button-1",
+    "file": "features/ledger/LedgerContractTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.contract-tree.button-2",
+    "file": "features/ledger/LedgerContractTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.contract-tree.button-3",
+    "file": "features/ledger/LedgerContractTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.contract-tree.button-4",
+    "file": "features/ledger/LedgerContractTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.contract-tree.button-5",
+    "file": "features/ledger/LedgerContractTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.contract-tree.button-6",
+    "file": "features/ledger/LedgerContractTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.explorer.all-entries",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.explorer.button-1",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.explorer.button-2",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.explorer.button-3",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.explorer.correction",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.explorer.retry",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.explorer.reverse",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.explorer.section-1",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "section"
+  },
+  {
+    "id": "ledger.explorer.section-2",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "section"
+  },
+  {
+    "id": "ledger.explorer.section-3",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "section"
+  },
+  {
+    "id": "ledger.explorer.table-1",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "table"
+  },
+  {
     "id": "ledger.filter.input.contractno",
     "file": "features/ledger/LedgerPage.tsx",
     "element": "input"
@@ -3128,6 +3228,21 @@
     "id": "ledger.filter.select.type",
     "file": "features/ledger/LedgerPage.tsx",
     "element": "select"
+  },
+  {
+    "id": "ledger.kpi.balance",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "ledger.kpi.credit",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "ledger.kpi.debit",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "KpiCard"
   },
   {
     "id": "navigation.group.admin",

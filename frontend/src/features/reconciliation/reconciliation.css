@@ -13,7 +13,7 @@
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
 }
-.reco-explorer-grid { grid-template-columns: minmax(250px, 310px) minmax(0, 1fr); align-items: start; }
+.reco-explorer-grid { grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); align-items: start; }
 .reco-explorer-grid > .reco-react-history { grid-column: 1; grid-row: 1; }
 .reco-explorer-grid > .reco-react-results { grid-column: 2; grid-row: 1; }
 .reco-explorer-grid .hierarchy-tree { padding: 8px 4px; max-height: 620px; }
@@ -269,3 +269,20 @@
   width: auto;
   justify-content: flex-end;
 }
+
+/* 실행 이력: 월 통합검증 → 지급 방향 → 실행 카드. 들여쓰기를 줄여 왼쪽에 정렬한다. */
+.reco-react-history .hierarchy-tree { padding:6px; }
+.reco-react-history .hierarchy-tree>ul>li>.hierarchy-row { padding-left:0 !important; font-weight:600; }
+.reco-react-history .hierarchy-tree ul[role='group'] { margin-left:9px; padding-left:5px; border-left:1px solid var(--color-border-subtle); }
+.reco-react-history .hierarchy-tree ul[role='group'] .hierarchy-row { padding-left:0 !important; }
+.reco-react-history .hierarchy-select { min-height:34px; font-size:12px; }
+.reco-react-history .reco-history-leaf { margin:3px 0 5px; border:1px solid transparent; border-radius:7px; }
+.reco-react-history .reco-history-leaf.is-active { border-color:var(--color-border-focus); background:var(--color-action-primary-subtle,var(--color-bg-subtle)); }
+.reco-history-leaf>.hierarchy-toggle { display:none; }
+.reco-history-leaf .hierarchy-select { padding:10px; }
+.reco-history-run { display:flex; flex-direction:column; gap:6px; width:100%; min-width:0; }
+.reco-history-run-title { display:flex; align-items:center; gap:8px; }
+.reco-history-run-title strong { overflow-wrap:anywhere; }
+.reco-history-run-status { display:flex; flex-wrap:wrap; align-items:center; gap:6px; color:var(--color-text-secondary); font-size:11px; }
+.reco-history-run-difference { color:var(--color-text-secondary); font-size:11px; }
+.reco-history-run-difference strong { font-weight:500; }

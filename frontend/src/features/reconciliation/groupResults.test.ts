@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { aggregateSummaries, paginateGroupResults } from './groupResults'
-import { runHistoryGroups } from './RunHistoryTree'
+import { runHistoryGroups } from './runHistoryGroups'
 import type { Result, Run } from './api'
 
 it('combines exact won amounts and keeps unavailable totals unavailable', () => {
@@ -28,6 +28,6 @@ it('groups by real validation run, payment direction, insurer and reconciliation
   const { nodes, groups } = runHistoryGroups(runs)
   expect(nodes.map(node => node.label)).toEqual(['월 통합검증 #1', '개별 대사 #12', '개별 대사 #13'])
   expect(groups.get('validation:999')).toEqual(runs.slice(0, 2))
-  expect(groups.get('validation:999:GA_TO_FC:insurer:1')).toEqual([runs[0]])
-  expect(nodes[0].children![0].children![0].children![0].id).toBe('run:10')
+  expect(groups.get('validation:999:GA_TO_FC')).toEqual([runs[0]])
+  expect(nodes[0].children![0].children![0].id).toBe('run:10')
 })

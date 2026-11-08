@@ -5,6 +5,11 @@ const entries = [1, 2, 3].map(id => ({ journalHeaderId: id, journalNo: `JRN-2026
   debitTotal: id * 100000, creditTotal: id * 100000,
   lines: [{ lineNo: 1, accountCode: 'EXPECTED_FC_EXPENSE', accountName: '예상 지급비용', debitAmount: id * 100000, creditAmount: 0, memo: `${id}회차 스케줄 생성` },
     { lineNo: 2, accountCode: 'EXPECTED_PAYABLE', accountName: '예상 지급채무', debitAmount: 0, creditAmount: id * 100000, memo: `${id}회차 스케줄 생성` }] }))
+const runs = [
+  { reconciliationRunId: 9, validationRunId: 77, validationRunNo: 1, settlementMonth: '2026-11-01', paymentStage: 'INSURER_TO_GA', insurerId: 1, insurerName: '안전가상손해보험', status: 'COMPLETED', targetCount: 1, exceptionCount: 1, differenceTotal: 700000 },
+  { reconciliationRunId: 8, validationRunId: 77, validationRunNo: 1, settlementMonth: '2026-11-01', paymentStage: 'INSURER_TO_GA', insurerId: 2, insurerName: '한빛가상생명', status: 'COMPLETED', targetCount: 3, exceptionCount: 3, differenceTotal: -24000 },
+  { reconciliationRunId: 7, validationRunId: 77, validationRunNo: 1, settlementMonth: '2026-11-01', paymentStage: 'GA_TO_FC', insurerId: 3, insurerName: '미래가상생명', status: 'COMPLETED', targetCount: 8, exceptionCount: 8, differenceTotal: -41000 },
+]
 const org = (id: number, parentId: number | null, name: string, type: string) => ({ organizationId: id, parentId, organizationName: name, organizationType: type })
 const members = [1, 2].map(id => ({ agentId: id, agentCode: `FC-${id}`, agentName: `김설계${id}`, branchId: 4, branchName: '강동지사',
   organizationId: 5, organizationName: '강동1팀', rankCode: id === 1 ? 'TEAM_LEADER' : 'FC',
@@ -20,12 +25,18 @@ async function install(page: Page) {
     let data: unknown = pageOf([])
     if (path.endsWith('/auth/refresh')) data = { accessToken: 'fixture-token', tokenType: 'Bearer', expiresIn: 3600 }
     else if (path.endsWith('/auth/me')) data = { loginId: 'restore', userName: '정산 담당자', roleCode: 'GA_ADMIN', canProcess: true, canReverseJournal: true, demoMonth: '2026-11' }
+    else if (path.endsWith('/reconciliations')) data = pageOf(runs)
+    else if (/\/reconciliations\/\d+\/results$/.test(path)) {
+      const id = Number(path.split('/').at(-2))
+      data = { items: pageOf([{ reconciliationResultId: id, contractNo: `RESULT-${id}`, resultType: 'AMOUNT_DIFFERENCE', expectedTotalAmount: 100000, actualTotalAmount: 90000, differenceAmount: 10000 }]),
+        summary: { resultCount: 1, matchedCount: 0, exceptionCount: 1, expectedTotal: 100000, actualTotal: 90000, differenceTotal: 10000 } }
+    }
     else if (path.endsWith('/journals/explorer')) {
       const all = url.searchParams.get('all') === 'true', contractId = url.searchParams.get('contractId') === '2' ? 2 : 1
       const scoped = (all ? entries : entries.filter(entry => contractId === 1 ? entry.journalHeaderId <= 2 : entry.journalHeaderId === 3))
         .filter(entry => !url.searchParams.get('journalId') || entry.journalHeaderId === Number(url.searchParams.get('journalId')))
       const total = scoped.reduce((sum, entry) => sum + entry.debitTotal, 0)
-      data = { contracts: pageOf([{ contractId: 1, contractNo: 'FGC-DEMO-1', journalCount: 2, debitTotal: 300000, creditTotal: 300000, agentName: '이보험', insurerName: '미래가상생명' },
+      data = { contracts: pageOf([{ contractId: 1, contractNo: 'FGC-FGL01-202607-0001', journalCount: 2, debitTotal: 300000, creditTotal: 300000, agentName: '이보험', insurerName: '미래가상생명' },
         { contractId: 2, contractNo: 'FGC-DEMO-2', journalCount: 1, debitTotal: 300000, creditTotal: 300000, agentName: '김정산', insurerName: '미래가상생명' }]),
       journals: pageOf(scoped), selectedContractId: all ? null : contractId, totals: { journalCount: scoped.length, lineCount: scoped.length * 2, debitTotal: total, creditTotal: total } }
     } else if (/\/journals\/\d+$/.test(path)) {
@@ -54,6 +65,13 @@ test('검증원장은 합계·분개별 묶음 표·연결 근거를 표시하�
   const table = page.getByRole('table', { name: '분개별 차변·대변 내역' })
   await expect(table).toBeVisible()
   await expect(table.locator('thead')).toHaveCount(1)
+  const contractRow = page.locator('.ledger-contract-node').first()
+  expect((await contractRow.boundingBox())!.height).toBeLessThanOrEqual(36)
+  await expect(contractRow.locator('.material-symbols-rounded').last()).toHaveText('description')
+  const contractText = await contractRow.locator('strong').evaluate(element => ({ width: element.clientWidth, content: element.scrollWidth }))
+  expect(contractText.content).toBeLessThanOrEqual(contractText.width)
+  await expect(page.locator('.ledger-balance-summary .kpi-card')).toHaveCount(3)
+  expect((await table.locator('tbody').first().boundingBox())!.height).toBeLessThan(120)
   await expect(table.locator('tbody')).toHaveCount(2)
   await expect(table.locator('tbody td[rowspan="2"]')).toHaveCount(2)
   await expect(page.getByRole('region', { name: '분개 합계' })).toContainText('300,000')
@@ -65,9 +83,11 @@ test('검증원장은 합계·분개별 묶음 표·연결 근거를 표시하�
   await expect(table.locator('tbody')).toHaveCount(1)
   await page.getByRole('button', { name: '전체 내역', exact: true }).click()
   await expect(table.locator('tbody')).toHaveCount(2)
-  await page.getByRole('tree', { name: '계약별 분개 목록' }).getByRole('button', { name: /FGC-DEMO-2/ }).click()
+  await page.getByRole('tree', { name: '계약별 분개 목록' }).getByRole('button', { name: 'FGC-DEMO-2 김정산 분개 1건', exact: true }).click()
   await expect(table.locator('tbody')).toHaveCount(1)
   await expect(table).toContainText('JRN-202611-003')
+  await expect(page.locator('.ledger-contract-entries')).toHaveCount(2)
+  await page.screenshot({ path: info.outputPath('ledger-compact-contracts.png'), fullPage: true })
   await page.getByRole('button', { name: '전체 분개 보기', exact: true }).click()
   await expect(table.locator('tbody')).toHaveCount(3)
   expect(writes).toEqual([])
@@ -108,4 +128,31 @@ test('검증 전 대기 아이콘의 세 점이 원의 중앙에 위치한다', 
   await page.screenshot({ path: info.outputPath('validation-waiting.png'), fullPage: true })
   expect(errors).toEqual([])
   await expect(dots).toHaveCount(8)
+})
+
+
+test('대사 이력은 세 단계 카드이며 상위 계층을 선택하면 하위 결과 전체를 조회한다', async ({ page }, info) => {
+  const writes = await install(page)
+  await page.setViewportSize({ width: 1600, height: 1050 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/reconciliations?month=2026-11')
+  const tree = page.getByRole('tree', { name: '월 통합검증별 대사 실행 이력' })
+  await expect(tree).toBeVisible()
+  await expect(tree.locator('.reco-history-run')).toHaveCount(3)
+  await expect(tree).toContainText('700,000원')
+  await expect(tree).toContainText('계산완료')
+  const results = page.locator('.reco-react-result-table')
+  await tree.getByRole('button', { name: '월 통합검증 #1 2026-11', exact: true }).click()
+  await expect(results).toContainText('RESULT-9')
+  await expect(results).toContainText('RESULT-8')
+  await expect(results).toContainText('RESULT-7')
+  await tree.getByRole('button', { name: '원수사→GA', exact: true }).click()
+  await expect(results).toContainText('RESULT-9')
+  await expect(results).toContainText('RESULT-8')
+  await expect(results).not.toContainText('RESULT-7')
+  await tree.getByRole('button', { name: /안전가상손해보험 #9/ }).click()
+  await expect(results).toContainText('RESULT-9')
+  await expect(results).not.toContainText('RESULT-8')
+  await page.screenshot({ path: info.outputPath('reconciliation-run-cards.png'), fullPage: true })
+  expect(writes).toEqual([])
 })
