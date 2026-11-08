@@ -1070,7 +1070,7 @@ public class ScheduleService {
             );
         }
 
-        return contractDate.plusMonths(installmentNo-1);
+        return contractDate.plusMonths(installmentNo-1L);
     }
     /**
      * 설명 : 계약, 지급 단계 및 수수료 규칙을 기준으로 실제 수수료 수령 설계사 ID를 결정한다.

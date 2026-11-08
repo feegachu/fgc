@@ -2,6 +2,7 @@ package com.susukkang.fgc.schedule.controller;
 
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.CsvExportWriter;
 import com.susukkang.fgc.common.web.PageResponse;
@@ -63,7 +64,7 @@ public class ScheduleController {
                     GENERATION_REASON_LABELS.getOrDefault(schedule.getGenerationReason(), schedule.getGenerationReason()), schedule.getGeneratedAt()
             ));
         }
-        String filename = "예상스케줄목록_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
+        String filename = "예상스케줄목록_" + LocalDateTime.now(DateUtil.SEOUL_ZONE).format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build().toString())

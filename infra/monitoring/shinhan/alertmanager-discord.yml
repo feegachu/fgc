@@ -11,12 +11,12 @@ receivers:
     discord_configs:
       - webhook_url_file: /run/secrets/webhook-url
         send_resolved: true
-        title: '[{{ .Status | toUpper }}] FGC 신한 prod · {{ .CommonLabels.alertname }}'
+        title: '[{{ if eq .Status "firing" }}장애 발생{{ else if eq .Status "resolved" }}복구 완료{{ else }}상태 확인 필요{{ end }}] FGC 신한 운영'
         message: |-
           {{ range .Alerts }}
-          **경보:** {{ .Labels.alertname }}
-          **상태:** {{ .Status }} · **등급:** {{ .Labels.severity }}
+          **장애 내용:** {{ .Annotations.summary }}
+          **경보 코드:** {{ .Labels.alertname }}
+          **상태:** {{ if eq .Status "firing" }}장애 발생{{ else if eq .Status "resolved" }}복구 완료{{ else }}상태 확인 필요{{ end }} · **등급:** {{ if eq .Labels.severity "critical" }}긴급{{ else if eq .Labels.severity "warning" }}주의{{ else }}확인 필요 ({{ .Labels.severity }}){{ end }}
           **대상:** {{ .Labels.instance }}
           {{ if .Labels.exported_job }}**배치:** {{ .Labels.exported_job }}{{ end }}
-          **내용:** {{ .Annotations.summary }}
           {{ end }}
