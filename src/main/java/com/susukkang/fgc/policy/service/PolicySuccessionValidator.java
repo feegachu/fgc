@@ -42,7 +42,7 @@ public class PolicySuccessionValidator {
         }
         for (FeeRegimeRuleDraft oldRule : previous.feeRegimeRules()) {
             if (!coversFeeRule(oldRule, replacement.feeRegimeRules())) {
-                throw incomplete("feeRegimeRules", "승계본에 기존 ACTIVE 분급 룰셋의 판매일·기초서류 적용 범위가 빠져 있습니다.");
+                throw incomplete("feeRegimeRules", "승계본에 기존 ACTIVE 분급 규칙의 판매일·기초서류 적용 범위가 빠져 있습니다.");
             }
         }
     }

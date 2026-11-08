@@ -95,7 +95,7 @@ export default function ClawbackPage() {
         }}
         onReset={() => apply(defaultCriteria(month ?? ''))}
         actions={
-          <Button data-guide-feature="features.clawback.clawback-page.button" variant="secondary" disabled={busy} onClick={() => void query.refetch()}>
+          <Button data-guide-feature="features.clawback.clawback-page.button" variant="secondary" disabled={busy} onClick={() => { void query.refetch(); if (selected) void detail.refetch() }}>
             <span className="material-symbols-rounded" aria-hidden="true">
               refresh
             </span>
@@ -228,7 +228,7 @@ export default function ClawbackPage() {
         <section data-guide-feature="features.clawback.clawback-page.section" className="surface claw-list-panel" aria-labelledby="claw-list-title">
           <ListHeader className="claw-panel-header" total={query.data?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title" id="claw-list-title">
-              ② 환수 검토 후보
+              환수 검토 후보
             </h2>
           </ListHeader>
           {busy || query.error ? (
@@ -266,7 +266,7 @@ export default function ClawbackPage() {
         <section data-guide-feature="features.clawback.clawback-page.section-2" className="surface claw-detail-panel" aria-labelledby="claw-detail-title">
           <header className="surface-header claw-panel-header">
             <h2 className="surface-title" id="claw-detail-title">
-              ③ 후보 근거, ④ 계산
+              후보 근거와 계산
             </h2>
             {selected && !query.error ? <CalculationBadge row={selected} /> : null}
           </header>

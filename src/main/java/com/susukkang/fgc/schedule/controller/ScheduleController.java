@@ -27,6 +27,12 @@ import java.util.List;
 @RequestMapping("/api/v1/schedules")
 public class ScheduleController {
 
+    /** frontend/src/features/schedule/labels.ts 의 GENERATION_REASON 과 같다. 사용자가 적은 재생성 사유는 그대로 나간다. */
+    private static final java.util.Map<String, String> GENERATION_REASON_LABELS = java.util.Map.of(
+            "CONTRACT_CREATED", "계약 등록",
+            "CONTRACT_UPDATED", "계약 수정",
+            "CONTRACT_DETAIL_MANUAL", "계약 상세에서 재생성");
+
     private final ScheduleService scheduleService;
     /**
      * 설명 : 검색 조건에 따라 스케줄을 조회한다
@@ -54,7 +60,7 @@ public class ScheduleController {
                     schedule.getSchedulePurposeLabel(), schedule.getStatusLabel(), schedule.getPolicyVersionLabel(),
                     schedule.getScheduleVersionNo(), schedule.getInstallmentCount(), schedule.getExpectedTotal(),
                     Boolean.TRUE.equals(schedule.getActiveYn()) ? "사용중" : "미사용",
-                    schedule.getGenerationReason(), schedule.getGeneratedAt()
+                    GENERATION_REASON_LABELS.getOrDefault(schedule.getGenerationReason(), schedule.getGenerationReason()), schedule.getGeneratedAt()
             ));
         }
         String filename = "예상스케줄목록_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";

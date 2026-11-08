@@ -8,6 +8,7 @@ import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
 import { StatusBadge } from '../../components/StatusBadge'
 import { date, dateTime, errorText, rateText } from '../../lib/format'
+import { monthText } from '../../lib/screenText'
 import { toast } from '../../stores/toasts'
 import { usePermission } from '../auth/useAuth'
 import { Link } from 'react-router'
@@ -21,7 +22,11 @@ import { decisionReasonText } from '../arbitrage/utils'
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 
 function Detail({ item }: { item: ExceptionCase }) {
-  const reference = sourceReference(item.sourceEntityType, item.sourceEntityId, item.contractNo)
+  const reference = sourceReference(item.sourceEntityType, item.contractNo)
+  const runText = (runId?: number | null) => {
+    const run = item.occurrences?.find((occurrence) => occurrence.validationRunId === runId)
+    return run ? `${monthText(run.validationMonth)} ${run.runNo}차 실행` : '-'
+  }
   return (
     <dl className="exception-detail-grid">
       <div>
@@ -68,11 +73,11 @@ function Detail({ item }: { item: ExceptionCase }) {
       </div>
       <div>
         <dt>최초 검출 실행</dt>
-        <dd className="tabular-nums">{item.firstDetectedRunId ?? '-'}</dd>
+        <dd className="tabular-nums">{runText(item.firstDetectedRunId)}</dd>
       </div>
       <div>
         <dt>최근 검출 실행</dt>
-        <dd className="tabular-nums">{item.lastDetectedRunId ?? '-'}</dd>
+        <dd className="tabular-nums">{runText(item.lastDetectedRunId)}</dd>
       </div>
       <div>
         <dt>검출 횟수</dt>
@@ -150,11 +155,11 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
       clearUnsaved()
       let continueGuide: boolean
       try {
-        if (action.actionType !== actionType || action.fromStatus !== item.status || !['NEW', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].includes(action.toStatus ?? '') || !Number.isSafeInteger(action.actionSeq) || Number(action.actionSeq) <= 0) throw new Error('서버 처리 결과의 조치와 상태를 확인하지 못했습니다.')
+        if (action.actionType !== actionType || action.fromStatus !== item.status || !['NEW', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].includes(action.toStatus ?? '') || !Number.isSafeInteger(action.actionSeq) || Number(action.actionSeq) <= 0) throw new Error('처리 결과를 확인하지 못했습니다. 처리 이력을 확인하세요.')
         continueGuide = mounted.current ? await saveGuide.saved(Number(action.actionSeq)) : false
       } catch {
         // The POST already succeeded: never expose a retry for an unverified receipt.
-        const message = '서버 저장 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 저장하지 말고 처리 이력을 확인한 뒤 화면을 다시 여세요.'
+        const message = '저장은 되었지만 결과를 표시하지 못했습니다. 다시 저장하지 말고 처리 이력을 확인한 뒤 화면을 다시 여세요.'
         if (mounted.current) {
           setNeedsRefresh(true)
           saveGuide.fail(message)

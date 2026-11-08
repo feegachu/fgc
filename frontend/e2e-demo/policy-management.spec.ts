@@ -19,7 +19,8 @@ async function newClawback(page: Page, code: string) {
   await dialog.getByLabel('기준금액').selectOption('PAID_ATTRIBUTED_AMOUNT')
   await dialog.getByLabel('환수율 (%)').fill('33.333333')
   await dialog.getByRole('button', { name: /근거 자료/ }).click()
-  await dialog.getByLabel('규정 근거 코드').fill('REG-13,REG-14')
+  await dialog.getByRole('checkbox', { name: '유지관리수수료의 미지급' }).check()
+  await dialog.getByRole('checkbox', { name: '회사별 환수율' }).check()
 }
 
 async function action(page: Page, label: string) {
@@ -248,7 +249,8 @@ test('POL-W01 실제 409 입력 보존·최신 조회와 응답 유실 재시도
 test('POL-W01 CT-P02 실제 제출 근거 누락은 초안의 근거 필드로 이동', async ({ page }, info) => {
   await login(page, 'settle01', route)
   await newClawback(page, 'E2E-722-SOURCE')
-  await page.getByRole('dialog').getByLabel('규정 근거 코드').fill('')
+  await page.getByRole('dialog').getByRole('checkbox', { name: '유지관리수수료의 미지급' }).uncheck()
+  await page.getByRole('dialog').getByRole('checkbox', { name: '회사별 환수율' }).uncheck()
   const create = responseFor(page, '/policies')
   await page.getByRole('button', { name: '초안 저장', exact: true }).click()
   const created = await successful(create)
@@ -262,6 +264,6 @@ test('POL-W01 CT-P02 실제 제출 근거 누락은 초안의 근거 필드로 �
   expect(error.code).toBe('FGC-POL-004')
   expect(error.message).toContain('근거')
   expect(error.message).not.toContain('겹치')
-  await expect(page.getByLabel('출처 근거 코드')).toBeFocused()
+  await expect(page.getByLabel('출처 자료 번호')).toBeFocused()
   await page.screenshot({ path: info.outputPath('09-real-api-missing-source.png'), fullPage: true })
 })

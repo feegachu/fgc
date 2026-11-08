@@ -129,7 +129,7 @@ class ArbitrageManualCheckIntegrationTest {
                   AND pp.parameter_key='ARBITRAGE_EFFECTIVE_CONTRACT_DATE'
                 """);
         assertThat(policy.get("effective_date")).isEqualTo("2026-03-01");
-        assertThat(policy.get("description")).isEqualTo("GA→FC 판정은 이 날짜 이상 체결된 신계약에 적용한다.");
+        assertThat(policy.get("description")).isEqualTo("GA→설계사 판정은 이 날짜 이상 체결된 신계약에 적용합니다.");
     }
 
     private TestReference testReference() {

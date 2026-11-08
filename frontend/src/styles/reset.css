@@ -11,6 +11,10 @@ html {
   text-size-adjust: 100%;
 }
 
+small {
+  font-size: 0.75rem;
+}
+
 body {
   min-height: 100dvh;
   margin: 0;

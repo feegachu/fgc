@@ -35,7 +35,7 @@ public class ScheduleReviewService {
                 contractId,
                 paymentStage,
                 "POLICY_MISSING",
-                "1,200% 룰셋 검토 필요 - " + paymentStage.name(),
+                "1,200% 한도 규칙 검토 필요 - " + paymentStage.name(),
                 description
         );
     }

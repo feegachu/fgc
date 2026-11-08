@@ -47,6 +47,8 @@ export default defineConfig({
     // 개인 .env.local의 AI/시연 opt-in이 시험 모드를 바꾸지 않게 한다. 개별 시험은 vi.stubEnv로 선택한다.
     env: { VITE_ASSISTANT_AI: 'false', VITE_ASSISTANT_DEMO: 'false' },
     environment: 'jsdom',
+    // 커버리지 계측, 병렬 실행, 로컬 bootRun이 겹치면 무거운 화면 시험이 7~11초 걸린다(2026-11-08 노트북 측정). 기본 5초로는 실패한다.
+    testTimeout: 15_000,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     coverage: {

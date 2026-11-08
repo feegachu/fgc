@@ -165,8 +165,8 @@ describe('스텝 규칙', () => {
       '스케줄 회차가 중복되었습니다. | 원장 불균형 1건이 발견되었습니다.',
     )
     expect(failureText('배치가 실패했습니다', 8)).toBe('배치가 실패했습니다')
-    expect(failureText('한도 검증 보류 — 적용 가능한 1,200% 룰셋이 없습니다. 정책을 확인하세요.', 4)).toBe(
-      '한도 검증을 보류합니다. 적용 가능한 1,200% 룰셋이 없습니다. 정책을 확인하세요.',
+    expect(failureText('한도 검증 보류 — 적용 가능한 1,200% 한도 규칙이 없습니다. 정책을 확인하세요.', 4)).toBe(
+      '한도 검증을 보류합니다. 적용 가능한 1,200% 한도 규칙이 없습니다. 정책을 확인하세요.',
     )
     expect(failureText('journal_no 월간 일련번호 상한(99999) 초과, year=2026', 6)).toBe('6단계에서 실패했습니다.')
     expect(failureText('validation_run 5 은 이미 기동됨(status=RUNNING)', 2)).toBe('2단계에서 실패했습니다.')
@@ -204,7 +204,7 @@ describe('VRUN-W01 실행 목록', () => {
     expect(await within(table).findByText('8/10 단계 (80%)')).toBeInTheDocument()
     expect(within(table).getAllByText('배치가 실패했습니다').length).toBeGreaterThan(0)
     expect(within(table).getAllByText('ga01, 2026-07-11 10:00').length).toBeGreaterThan(0)
-    expect(within(table).getByRole('link', { name: '2026-07 2회차 실행 열기' })).toHaveAttribute(
+    expect(within(table).getByRole('link', { name: '2026-07 2차 실행 열기' })).toHaveAttribute(
       'href',
       '/app/validation-runs/7?month=2026-07',
     )
@@ -360,7 +360,7 @@ describe('VRUN-W02 상세·실행·확정', () => {
     expect(calls('POST /api/v1/validation-runs/7/restart')).toHaveLength(1)
   }, 15000)
 
-  it('계약수동 실패는 월 재시작을 할 수 없다', async () => {
+  it('계약별 실패는 월 재시작을 할 수 없다', async () => {
     detailHandlers(run({ status: 'FAILED', runType: 'MANUAL_CONTRACT', currentStep: 3 }))
     renderAt('/app/validation-runs/7')
     expect(await screen.findByRole('button', { name: /실행$/ })).toBeDisabled()
@@ -390,18 +390,18 @@ describe('VRUN-W02 상세·실행·확정', () => {
     expect(screen.queryByText(/이어서 처리할 지점/)).not.toBeInTheDocument()
   })
 
-  it('실패한 계약수동 실행은 재시작 대신 새 실행을 안내하고 월 실행에는 그 안내를 보이지 않는다', async () => {
+  it('실패한 계약별 실행은 재시작 대신 새 실행을 안내하고 월 실행에는 그 안내를 보이지 않는다', async () => {
     detailHandlers(run({ status: 'FAILED', statusLabel: '실패', currentStep: 2, runType: 'MANUAL_CONTRACT' }))
     const { unmount } = renderAt('/app/validation-runs/7')
     expect(
-      await screen.findByText('계약수동 실행은 실패 지점부터 재시작할 수 없습니다. 새 실행을 만드세요.'),
+      await screen.findByText('계약별 실행은 실패 지점부터 재시작할 수 없습니다. 새 실행을 만드세요.'),
     ).toBeVisible()
     expect(screen.queryByRole('button', { name: /실패 지점부터 재시작/ })).not.toBeInTheDocument()
     unmount()
     detailHandlers(run({ status: 'FAILED', statusLabel: '실패', currentStep: 2 }))
     renderAt('/app/validation-runs/7')
     expect(await screen.findByRole('button', { name: /실패 지점부터 재시작/ })).toBeVisible()
-    expect(screen.queryByText(/계약수동 실행은/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/계약별 실행은/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '실행' })).not.toHaveAccessibleDescription()
   })
 
@@ -618,13 +618,13 @@ it('finalize help rejects a non-FINALIZED response and waits for acknowledgement
   expect(attempts).toBe(0)
   expect(modal.getByRole('button', { name: '다음' })).toBeDisabled()
   await actions.click(modal.getByRole('button', { name: '확정' }))
-  await modal.findByText('서버의 최종 확정 상태를 확인하지 못했습니다.')
+  await modal.findByText('최종 확정 상태를 확인하지 못했습니다.')
   expect(modal.getByRole('button', { name: '다음' })).toBeDisabled()
   await actions.click(modal.getByRole('button', { name: '확정' }))
   await waitFor(() => expect(modal.getByRole('button', { name: '다음' })).toBeEnabled())
   expect(screen.queryByRole('dialog', { name: '확정했습니다' })).toBeNull()
   await actions.click(modal.getByRole('button', { name: '다음' }))
-  expect(await modal.findByText('서버 확정 확인 · 가이드 완료')).toBeVisible()
+  expect(await modal.findByText('확정 완료')).toBeVisible()
   await actions.click(modal.getByRole('button', { name: '안내 마치기' }))
   expect(await screen.findByRole('dialog', { name: '확정했습니다' })).toBeVisible()
   expect(keys[0]).toBe(keys[1])
@@ -664,8 +664,8 @@ it('the detail help waits for the real finalization result before completing', a
   await actions.click(within(done).getByRole('button', { name: '확인' }))
   await waitFor(() => expect(next()).toBeEnabled())
   await actions.click(next())
-  expect(await screen.findByText('서버 확정 확인 · 가이드 완료')).toBeVisible()
-}, 10000)
+  expect(await screen.findByText('확정 완료')).toBeVisible()
+})
 
 it('invalidates a created run even if its page unmounts before the response', async () => {
   handlers['GET /api/v1/validation-runs'] = () => listPage([])
@@ -688,7 +688,7 @@ it('does not allow finalizing a partial contract run even with a passed checklis
   detailHandlers()
   handlers['GET /api/v1/validation-runs/7'] = () => detail(run({ runType: 'MANUAL_CONTRACT' }))
   renderAt('/app/validation-runs/7')
-  expect(await screen.findByText('월 전체를 계산한 월간·확정전 실행만 최종 확정할 수 있습니다.')).toBeVisible()
+  expect(await screen.findByText('월 전체를 계산한 월간·확정 전 실행만 최종 확정할 수 있습니다.')).toBeVisible()
   expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
   expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
 })

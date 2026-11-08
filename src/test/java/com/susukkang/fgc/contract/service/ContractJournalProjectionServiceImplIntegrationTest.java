@@ -133,7 +133,7 @@ class ContractJournalProjectionServiceImplIntegrationTest {
         // 이슈 #108 요구사항에 지급단계가 헤더 응답 필드로 명시돼 있다 — line 값이
         // 헤더로 그대로 올라오는지 확인.
         assertThat(response.getPaymentStage()).isEqualTo("INSURER_TO_GA");
-        assertThat(response.getPaymentStageLabel()).isEqualTo("원수사→GA");
+        assertThat(response.getPaymentStageLabel()).isEqualTo("보험회사→GA");
         assertThat(response.getLines()).hasSize(2);
         assertThat(response.getLines()).extracting("lineNo").containsExactly(1, 2);
         assertThat(response.getLines()).extracting("accountCode")

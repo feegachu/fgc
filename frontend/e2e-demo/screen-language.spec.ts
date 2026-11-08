@@ -38,6 +38,10 @@ const forbidden = [
   { label: '스택 추적', pattern: /\bat [\w$.]+\([\w$.]+:\d+\)|\b(?:Type|Reference|Syntax)Error\b/g },
   { label: '내부 번호', pattern: /\b(?:FUN|IF-API|SRC|REG|TER|PER|DAR)-\d+/g },
   { label: '화면 ID', pattern: /\b[A-Z]{2,}-W\d\d\b/g },
+  { label: '팀 내부 말', pattern: /룰셋|원수사|귀속행|상태 사건|계산판|발행판|예정판|스케줄행|매칭키|재검출|정정 묶음|오탐|프로젝트 가정|계약수동|원천유형|공통비 풀|확정전|사람이 수행|업무건|분모 계약|운영정책서|규제조문표|보정판|합성값|데모|시연/g },
+  { label: '구역 번호', pattern: /(?<!조)[①-⑳]/g }, // 제3조① 같은 조문 표기는 통과
+  { label: '표 설명 말', pattern: /화면 \d+행|\d+행\b/g },
+  { label: '개발 용어', pattern: /서버 (?:저장|결과|확정|실행|처리|상태)|서버의|서버에서|서버가/g },
 ]
 
 /** 사용자가 알아보는 대문자 단어. 두 글자(GA, FC, AI)는 코드값 검사에 걸리지 않는다. */
@@ -48,12 +52,10 @@ const businessWords = new Map([
   ['BEST', '포트폴리오 막대 표시, 누구나 읽는 말'],
   ['FAQ', '금융당국 최종 FAQ를 가리키는 정책 근거 문구'],
 ])
-/** 업무 식별자: 정책코드(화면정의서 :2027 필수 업무 코드, 사용자가 입력한다), 판매버전(:614), 표준상품코드(:614). */
-const businessCode = /\b(?:[A-Z][A-Z0-9]*-)+20\d\d(?:-[A-Z0-9]+)*\b|\b20\d\d(?:-[A-Z0-9]+)+\b|\bSTD-[A-Z]+-[A-Z0-9]+\b/g
-/** 코드 열을 요구하는 화면. 기준정보는 조직코드, 항목코드 등을 보여 주는 화면이다(화면정의서 :612~:616). */
+/** 업무 식별자: 판매버전(화면정의서 :614). 정책코드는 입력칸에만 있고 화면 글자로 나오지 않는다. */
+const businessCode = /\b20\d\d(?:-[A-Z0-9]+)+\b/g
+/** 코드 열을 요구하는 화면. 기준정보는 조직코드 등을 보여 주는 화면이다(화면정의서 :612~:616). */
 const codeScreens = new Set(['/base'])
-/** 정책 화면은 "이 요율은 어디서 나왔나"에 답하므로 근거 번호를 보인다(화면정의서 :336, :2001). 다른 화면에는 없어야 한다. */
-const evidenceRef = /\b(?:REG|SRC)-\d+[A-Z]?/g
 
 interface Finding {
   role: string
@@ -81,7 +83,7 @@ const routePattern = (pathname: string) =>
   screens.find((screen) => matchPath({ path: screen.path, end: true }, pathname))?.path ?? pathname
 
 function scan(text: string, role: string, route: string, findings: Finding[]) {
-  const shown = (route.startsWith('/policies') ? text.replace(evidenceRef, ' ') : text).replace(businessCode, ' ')
+  const shown = text.replace(businessCode, ' ')
   for (const { label, pattern } of forbidden) {
     for (const hit of shown.matchAll(pattern)) {
       const match = hit[0]
@@ -368,9 +370,12 @@ plainTest('검사 규칙은 코드를 잡고 업무 표기는 통과시킨다', 
   }
   for (const leak of ['FGC-VRUN-003', 'MANUAL_CONTRACT', 'FINALIZED', 'validationRunId', 'journal_no', 'undefined', '[object Object]', 'IllegalStateException', 'FUN-045', 'IF-API-49', 'REG-08', 'VRUN-W02', '체크포인트', '실행 ID', '202 수락'])
     expect(flagged(`실패: ${leak} 확인`).some((match) => leak.includes(match)), leak).toBe(true)
-  for (const shown of ['FGC-FGL01-202607-0001', 'FGC-B0101', 'A-FC-001', 'JV-2026-07-0010', 'GA→설계사', 'CSV 내보내기', 'GA-CUR-2026-V1', 'CLAW-GA-VIRTUAL-2026', '2026-CURRENT-A', 'STD-SAV-A', '요청번호 20261104-abcdef'])
+  for (const shown of ['FGC-FGL01-202607-0001', 'FGC-B0101', 'A-FC-001', 'JV-2026-07-0010', 'GA→설계사', 'CSV 내보내기', '2026-CURRENT-A', '요청번호 20261104-abcdef'])
     expect(flagged(`표시: ${shown}`), shown).toEqual([])
-  expect(flagged('근거 REG-08, SRC-022', '/policies?policyVersionId=2')).toEqual([])
+  expect(flagged('근거 REG-08, SRC-022', '/policies?policyVersionId=2')).toEqual(expect.arrayContaining(['REG-08', 'SRC-022']))
+  expect(flagged('정책 CLAW-GA-VIRTUAL-2026').length).toBeGreaterThan(0)
+  expect(flagged('부칙 제3조①')).toEqual([])
+  expect(flagged('① 조회 조건')).toEqual(['①'])
   expect(flagged('BASE_COMMISSION', '/base')).toEqual([])
   expect(flagged('validationRunId', '/base')).toEqual(['validationRunId'])
 })
@@ -388,8 +393,7 @@ const guideTexts = (value: unknown, key = ''): string[] =>
 plainTest('화면 도움말과 업무 안내의 모든 단계 문구에 개발 용어가 없다', () => {
   const found: Finding[] = []
   for (const [catalog, content] of Object.entries({ screenHelp, workflowGuides, paymentGuides, workflowHelp }))
-    // 정책 화면 안내는 그 화면의 근거 표시 이름을 그대로 부른다(화면정의서 :336).
-    for (const text of guideTexts(content)) scan(text, catalog, text.startsWith('정책/룰셋') ? '/policies' : catalog, found)
+    for (const text of guideTexts(content)) scan(text, catalog, catalog, found)
   expect(found.map((item) => `${item.route} | ${item.match} | ${item.context}`)).toEqual([])
 })
 
