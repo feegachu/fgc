@@ -31,7 +31,6 @@ import { FinalizeDialogs } from './FinalizeDialogs'
 import { ValidationRestartPanel } from './ValidationRestartPanel'
 import { RunStatusBadge } from './RunStatusBadge'
 import { failureText, MANUAL_STEP_FROM, progressText, STEP_NAMES, STEP_STATE_TEXT, stepState } from './steps'
-import type { StepState } from './steps'
 import { useRestartAttemptDeadline } from './useRestartAttemptDeadline'
 import { useRunPresentation } from './useRunPresentation'
 import { useRunProgressToast } from './useRunProgressToast'
@@ -106,19 +105,20 @@ function DetailBody({
 }) {
   const { month: shellMonth, helpVersion } = useOutletContext<ShellContext>()
   const [guidePreview, setGuidePreview] = useState(false)
-  const [guideFrame, setGuideFrame] = useState(0)
+  const [guideGeneration, setGuideGeneration] = useState(0)
+  const guidePresentation = useRunPresentation('COMPLETED', 8, guideGeneration, guidePreview, false)
   useEffect(() => {
-    const start = () => { setGuideFrame(0); setGuidePreview(true) }
+    const start = () => { setGuideGeneration(value => value + 1); setGuidePreview(true) }
     const stop = () => setGuidePreview(false)
     window.addEventListener('fgc-validation-guide-preview-start', start)
     window.addEventListener('fgc-validation-guide-preview-stop', stop)
     return () => { window.removeEventListener('fgc-validation-guide-preview-start', start); window.removeEventListener('fgc-validation-guide-preview-stop', stop) }
   }, [])
   useEffect(() => {
-    if (!guidePreview) return
-    const timer = window.setInterval(() => setGuideFrame(value => (value + 1) % 9), 900)
-    return () => window.clearInterval(timer)
-  }, [guidePreview])
+    if (!guidePreview || guidePresentation.catchingUp) return
+    const timer = window.setTimeout(() => setGuideGeneration(value => value + 1), 1600)
+    return () => window.clearTimeout(timer)
+  }, [guidePreview, guidePresentation.catchingUp])
   const { user } = useAuth()
   const client = useQueryClient()
   const header = detail.header ?? {}
@@ -221,7 +221,7 @@ function DetailBody({
       setPreviousAttemptId(before?.restarting ? before.attemptId : null)
       setExecuted(true)
       setAttemptWaitGeneration((value) => value + 1)
-      document.querySelector('[data-guide-target="validation.execute"]')?.dispatchEvent(new Event('fgc-validation-execute-accepted'))
+      document.querySelector('[data-guide-target="validation.execute"]')?.dispatchEvent(new Event('fgc-validation-execute-accepted', { bubbles: true }))
       if (!revised) toast('검증 실행을 시작했습니다. 진행률을 2초 간격으로 갱신합니다.', 'info')
     },
     onError: (error) => { executionGuide.fail(errorText(error)); toast(errorText(error), 'error') },
@@ -230,6 +230,15 @@ function DetailBody({
   const progressToastActive = revised && (replaying
     ? displayed.catchingUp
     : execute.isPending || awaitingAttempt || status === 'RUNNING' || displayed.catchingUp)
+  const summariesLoaded = [resultDetail.capSummary?.violationCount, resultDetail.capSummary?.warningCount,
+    resultDetail.arbitrageSummary?.candidateCount, resultDetail.ledgerSummary?.imbalanceCount,
+    resultDetail.reconciliationSummary?.mismatchCount, resultDetail.exceptionSummary?.openWorkItemCount, resultDetail.exceptionSummary?.detectedCount, resultDetail.exceptionSummary?.newCount,
+    resultDetail.exceptionSummary?.recurringCount, resultDetail.exceptionSummary?.reopenedCount, resultDetail.exceptionSummary?.notDetectedCount].every(value => value != null)
+  const guideError = status === 'COMPLETED' && checklist.isError ? '확정 전 점검을 불러오지 못했습니다. 점검 카드에서 다시 시도해 주세요.' : progress.isError ? '진행률 조회에 실패했습니다. 진행 단계에서 새로고침해 주세요.'
+    : startUnconfirmed ? '실행 시작을 확인하지 못했습니다. 진행 단계를 확인해 주세요.'
+      : status === 'FAILED' ? failureText(failureMessage, currentStep) : ''
+  const guideState = guideError ? 'error' : progressToastActive || executed && status === 'CREATED' ? 'running'
+    : ['COMPLETED', 'FINALIZED'].includes(status ?? '') && resultStep >= 8 && summariesLoaded ? 'ready' : 'waiting'
   const progressToastTitle = replaying ? '저장된 결과 화면 재생 중'
     : execute.isPending || awaitingAttempt ? '월 통합검증 시작 중'
       : status === 'RUNNING' ? '월 통합검증 실행 중' : '검증 결과 표시 중'
@@ -239,8 +248,7 @@ function DetailBody({
     { steps: STEP_NAMES, completed: displayed.completed, running: activeStepName ? STEP_NAMES.indexOf(activeStepName) : null, buffering: displayed.buffering })
 
   const link = (path: string) => (shellMonth ? withMonth(path, shellMonth) : path)
-  const progressDisplay = guidePreview ? { completed: guideFrame, buffering: true,
-    state: (step: number): StepState => step <= guideFrame ? 'done' : step === guideFrame + 1 ? 'running' : 'pending' } : displayed
+  const progressDisplay = guidePreview ? guidePresentation : displayed
 
   const executionActions = (<div className="page-header-actions">
             <Button data-guide-feature="features.validation.validation-run-detail-page.button-2"
@@ -344,7 +352,7 @@ function DetailBody({
         </div>
       </section>
 
-      <section data-guide-feature="features.validation.validation-run-detail-page.section-3" data-guide-target="validation.progress" className="surface" aria-labelledby="vrun-stepper-title">
+      <section data-guide-feature="features.validation.validation-run-detail-page.section-3" data-guide-target="validation.progress" data-guide-completed={guideState === 'running' || guideState === 'ready'} className="surface" aria-labelledby="vrun-stepper-title">
         <header className="surface-header">
           <h2 className="surface-title" id="vrun-stepper-title">
             진행 단계
@@ -402,7 +410,7 @@ function DetailBody({
               {progressText(revised ? progressDisplay.completed : currentStep)}
             </span>
           </p>
-          <ol key={replaying ? `replay-${replayGeneration}` : 'live'} className="vrun-stepper" aria-label={replaying ? '저장된 검증 결과 재생' : '월 통합검증 10단계 진행 상태'}>
+          <ol key={guidePreview ? `guide-${guideGeneration}` : replaying ? `replay-${replayGeneration}` : 'live'} className="vrun-stepper" aria-label={replaying ? '저장된 검증 결과 재생' : '월 통합검증 10단계 진행 상태'}>
             {STEP_NAMES.map((name, index) => {
               const state = revised ? progressDisplay.state(index + 1) : stepState(index + 1, status, currentStep)
               return (
@@ -430,10 +438,10 @@ function DetailBody({
         </div>
       </section>
 
-      <div className="vrun-results-layout" data-guide-target="validation.results">
+      <div className="vrun-results-layout" data-guide-target="validation.results" data-guide-validation-state={guideState} data-guide-validation-error={guideError} data-guide-completed={guideState === 'ready'}>
       <div className="vrun-mid-grid">
         <TargetSection key={replaying ? `replay-targets-${replayGeneration}` : `targets-${attemptWaitGeneration}`} detail={resultDetail} revised={revised} ready={!revised || resultStep >= 2} />
-        <SummarySection detail={resultDetail} status={status} completed={revised ? resultStep : undefined} />
+        <SummarySection detail={resultDetail} status={status} completed={revised ? resultStep : undefined} ready={guideState === 'ready'} />
       </div>
 
       <ExceptionSection detail={resultDetail} openLink={link} completed={revised ? resultStep : undefined} />
@@ -570,14 +578,14 @@ function SummaryCard({ label, value, unit, footer }: { label: string; value?: nu
 }
 
 /** ④ 결과 요약 4블록 — 결과 테이블을 실행 스코프로 매번 집계한다(FUN-043). 실행 전(CREATED)에는 값이 없다. */
-function SummarySection({ detail, status, completed }: { detail: ValidationRunDetail; status?: string; completed?: number }) {
+function SummarySection({ detail, status, completed, ready = false }: { detail: ValidationRunDetail; status?: string; completed?: number; ready?: boolean }) {
   const cap = detail.capSummary
   const arb = detail.arbitrageSummary
   const ledger = detail.ledgerSummary
   const reco = detail.reconciliationSummary
   const before = status === 'CREATED'
   return (
-    <section data-guide-feature="features.validation.validation-run-detail-page.section-5" className="surface" aria-labelledby="vrun-summary-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-5" className="surface" aria-labelledby="vrun-summary-title" data-guide-completed={ready}>
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-summary-title">
           {completed !== undefined ? '결과 요약' : '④ 결과 요약'}

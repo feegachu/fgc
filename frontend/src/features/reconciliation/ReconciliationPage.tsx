@@ -406,6 +406,7 @@ export default function ReconciliationPage() {
           </p>
         )}
       </section>
+      <div className="reco-guide-overview">
       <RunSummary summary={results.data?.summary} />
       {running && (
         <p role="status" className="guidance guidance-info reco-react-guidance">
@@ -541,6 +542,7 @@ export default function ReconciliationPage() {
             onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
           />}
         </section>
+      </div>
       </div>
       {resultId && (
         <CompareModal

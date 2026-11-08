@@ -1,12 +1,14 @@
 import { guideFeatureId } from '../assistant/feature-ids'
 import { typeBadgeTone } from '../exception/rules'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
-import { useQuery } from '@tanstack/react-query'
+import { useIsMutating, useQuery } from '@tanstack/react-query'
 import { type CSSProperties, useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
 import { KpiCardContent } from '../../components/KpiCard'
-import { ResizableSplit } from '../../components/ResizableSplit'
+import { Modal } from '../../components/Modal'
+import { Button } from '../../components/Button'
+import { useUnsavedWorkStore } from '../../stores/unsavedWork'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
@@ -61,6 +63,8 @@ export function ExceptionPage() {
   const [params, setParams] = useSearchParams()
   const filters = filtersFromParams(params)
   const selectedId = params.get('selected')
+  const processing = useIsMutating({ mutationKey: ['exception', 'write'] }) > 0
+  const [confirmClose, setConfirmClose] = useState(false)
   const { month, revised = false } = useOutletContext<ShellContext>()
   const search = useQuery(exceptionSearchQueryOptions(filters))
   const options = useQuery(exceptionOptionsQueryOptions())
@@ -90,6 +94,15 @@ export function ExceptionPage() {
       },
       { replace: true },
     )
+  }
+  function dismissDetail() {
+    setConfirmClose(false)
+    setParams(current => { const next = new URLSearchParams(current); next.delete('selected'); return next }, { replace: true })
+  }
+  function closeDetail() {
+    if (processing) return
+    if (Object.keys(useUnsavedWorkStore.getState().owners).length) setConfirmClose(true)
+    else dismissDetail()
   }
   function reset() {
     setParams((current) => {
@@ -274,11 +287,7 @@ export function ExceptionPage() {
           </button>
         </div>
       ) : (
-        <ResizableSplit
-          className="exception-work-grid"
-          storageKey="exceptions-workspace"
-          label="예외 목록과 상세 카드 너비"
-          primary={
+        <>
             <section data-guide-feature="features.exception.exception-page.section-2" className="surface">
               <ListHeader total={data?.totalElements ?? 0} pageSize={20}>
                 <span className="surface-title">예외 목록</span>
@@ -313,8 +322,10 @@ export function ExceptionPage() {
                 </>
               )}
             </section>
-          }
-          secondary={
+          <Modal open={Boolean(selected)} title={`예외 상세 · ${selected?.contractNo ?? selectedId ?? ''}`}
+            className="modal-large exception-detail-modal" onClose={closeDetail} closeOnEscape={!processing}
+            footer={<Button variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button>}>
+            {processing && <p role="status">처리 중입니다. 완료 후 창을 닫을 수 있습니다.</p>}
             <div className="exception-side-panels">
               <section data-guide-feature="features.exception.exception-page.section-3" className="surface">
                 <div className="surface-header">
@@ -350,8 +361,13 @@ export function ExceptionPage() {
                 </div>
               </section>
             </div>
-          }
-        />
+          </Modal>
+          <Modal open={confirmClose} title="작성 중인 내용을 닫을까요?" onClose={() => setConfirmClose(false)}
+            footer={<><Button variant="secondary" onClick={() => setConfirmClose(false)}>계속 작성</Button>
+              <Button onClick={dismissDetail}>입력 버리고 닫기</Button></>}>
+            <p>아직 저장하지 않은 처리 내용이 있습니다. 닫으면 작성 중인 내용이 사라집니다.</p>
+          </Modal>
+        </>
       )}
     </div>
   )

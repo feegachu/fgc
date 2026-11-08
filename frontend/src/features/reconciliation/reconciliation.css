@@ -1,4 +1,5 @@
-.reco-react-page {
+.reco-react-page,
+.reco-guide-overview {
   display: grid;
   gap: var(--space-4);
   min-width: 0;

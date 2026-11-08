@@ -205,6 +205,7 @@ function CorrectionBody({
   useEffect(() => { saveGuide.update(input, valid) }, [saveGuide, input, valid])
 
   const mutation = useMutation({
+    mutationKey: ['exception', 'write', item.exceptionCaseId],
     mutationFn: () =>
       postJournalCorrection(item.exceptionCaseId!, {
         reason: reason.trim(),

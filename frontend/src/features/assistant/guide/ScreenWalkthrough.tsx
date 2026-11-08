@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import type { Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '../../../components/Button'
@@ -9,6 +9,7 @@ import { useSpotlight } from './useSpotlight'
 import { useGuideSequence, useGuideStep } from './useGuideSequence'
 import { GuideFieldPicker } from './GuideFieldPicker'
 import { GuideStepContent } from './GuideStepContent'
+import { useValidationPlaybackGuide } from '../settlement/useValidationPlaybackGuide'
 
 const identify = (step: ScreenHelpStep) => step.targetId
 
@@ -39,9 +40,29 @@ function resolveTarget(trigger: HTMLElement, step: ScreenHelpStep) {
 }
 
 /** Explanation only: advancing a step never activates a save guide or a business control. */
-export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
-  title: string; steps: readonly ScreenHelpStep[]; disabled?: boolean; triggerRef?: Ref<HTMLButtonElement>
+export function ScreenWalkthrough({ title, steps, disabled, triggerRef, autoStart, onFollow }: {
+  title: string; steps: readonly ScreenHelpStep[]; disabled?: boolean; triggerRef?: Ref<HTMLButtonElement>; autoStart?: boolean; onFollow?: (follow: NonNullable<ScreenHelpStep['follow']>) => void
 }) {
+  const autoTrigger = useRef<HTMLButtonElement | null>(null)
+  useImperativeHandle(triggerRef, () => autoTrigger.current!)
+  const autoStarted = useRef(false)
+  useEffect(() => {
+    if (!autoStart || autoStarted.current) return
+    let frame = 0
+    const start = () => {
+      const trigger = autoTrigger.current
+      if (!trigger || trigger.disabled || steps[0] && !resolveTarget(trigger, steps[0])) return
+      autoStarted.current = true
+      observer.disconnect()
+      trigger.click()
+    }
+    const refresh = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(start) }
+    // Destination data can arrive after navigation. Keep the first section in the tour.
+    const observer = new MutationObserver(refresh)
+    observer.observe(document.getElementById('main-content') ?? document.body, { childList: true, subtree: true })
+    refresh()
+    return () => { observer.disconnect(); cancelAnimationFrame(frame) }
+  }, [autoStart, steps])
   const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null)
   const [ownerDialog, setOwnerDialog] = useState<HTMLElement | null>(null)
   const card = useRef<HTMLElement | null>(null)
@@ -52,6 +73,7 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
   const [covered, setCovered] = useState(false)
   const sequence = useGuideSequence(session ?? [], String(sessionId), identify)
   const { index, step } = sequence
+  const playback = useValidationPlaybackGuide(Boolean(session && !covered && !folded), step?.targetId, sequence.next)
   const position = useSpotlight(session && !covered && !folded ? target : null, card, true, step?.presentation)
   const close = () => { setSession(null); trigger?.focus() }
 
@@ -65,6 +87,18 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
     const unsubscribe = subscribeSettlementEntry(() => { if (settlementEntry()) setSession(null) })
     return () => { document.removeEventListener('fgc-screen-help-open', other); unsubscribe() }
   }, [trigger])
+
+  useEffect(() => {
+    if (!session || covered || folded || !step?.follow || !target || !onFollow) return
+    const follow = step.follow
+    const click = (event: MouseEvent) => {
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || !target.contains(event.target as Node)) return
+      event.preventDefault(); event.stopPropagation()
+      setSession(null); onFollow(follow)
+    }
+    document.addEventListener('click', click, true)
+    return () => document.removeEventListener('click', click, true)
+  }, [session, covered, folded, step, target, onFollow])
 
   useLayoutEffect(() => {
     if (card.current) card.current.scrollTop = 0
@@ -102,14 +136,14 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
 
   return <>
     <button type="button" className="button button-secondary screen-help-trigger" disabled={disabled} aria-expanded={Boolean(session)}
-      ref={triggerRef}
+      ref={autoTrigger}
       onClick={event => {
         if (session) { close(); return }
         const current = event.currentTarget
         setTrigger(current); setOwnerDialog(current.closest('[role="dialog"]'))
         document.dispatchEvent(new CustomEvent('fgc-screen-help-open', { detail: current }))
         closeSettlementGuide()
-        const available = steps.filter(item => resolveTarget(current, item))
+        const available = steps.filter(item => item.scope === 'shell' && item.follow || resolveTarget(current, item))
         setSessionId(value => value + 1); setFolded(false); setCovered(false); setSession(available)
         setTarget(available[0] ? resolveTarget(current, available[0]) : null)
       }}>
@@ -118,11 +152,11 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
     </button>
     {session && !covered && createPortal(<>
       {!folded && step?.openControl && <GuideFieldPicker key={step.targetId} target={target} />}
-      {!folded && position.box && <div className="payment-guide-spotlight screen-step-spotlight" style={position.box} aria-hidden="true" />}
+      {!folded && !playback.hidden && position.box && <div className="payment-guide-spotlight screen-step-spotlight" style={position.box} aria-hidden="true" />}
       <section ref={card} className="payment-guide-card screen-step-guide" aria-label={`${title} 도움말`}
         data-help-presentation={Boolean(step?.presentation)}
         data-help-target={step?.targetId} data-guide-anchored={Boolean((target || position.box) && !folded)}
-        style={{ maxHeight: 'min(560px, 65dvh)', overflowY: 'auto', ...position.card }}>
+        style={{ maxHeight: 'min(560px, 65dvh)', overflowY: 'auto', ...position.card, visibility: playback.hidden ? 'hidden' : undefined }}>
         <header className="payment-guide-header">
           <img className="payment-guide-mascot" src={guideMascot} width="40" height="40" alt="" />
           <span className="screen-step-count">화면 요소 안내{session.length > 0 && ` · ${index + 1}/${session.length}`}</span>
@@ -133,11 +167,12 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
           <GuideStepContent step={step} index={index} total={session.length}>
             {!target && <p role="status">화면 구성이 바뀌어 이 요소가 숨겨졌습니다. 다음 설명을 보거나, 필요한 탭·상세를 연 뒤 도움말을 다시 열어 주세요.</p>}
           </GuideStepContent>
+          {playback.error && <p role="alert">{playback.error}</p>}
           {!step.concise && index === 0 && <p className="screen-step-context">현재 표시된 요소를 안내합니다. 다른 탭이나 상세에서도 도움말을 다시 열어 보세요.</p>}
           <div className="payment-guide-actions">
             <Button variant="secondary" disabled={index === 0} onClick={sequence.previous}>이전</Button>
-            <Button className="screen-step-next" disabled={step.requireAction && target?.getAttribute('data-guide-completed') !== 'true'}
-              onClick={() => sequence.last ? close() : sequence.next()}>{step.requireAction && target?.getAttribute('data-guide-completed') !== 'true' ? '실행 버튼을 눌러주세요' : sequence.last ? '안내 마치기' : '다음'}</Button>
+            <Button className="screen-step-next" disabled={!!step.follow || step.requireAction && target?.getAttribute('data-guide-completed') !== 'true'}
+              onClick={() => sequence.last ? close() : sequence.next()}>{step.requireAction && target?.getAttribute('data-guide-completed') !== 'true' ? '실행 버튼을 눌러주세요' : step.follow ? '강조된 메뉴를 눌러주세요' : sequence.last ? '안내 마치기' : '다음'}</Button>
           </div>
         </> : <>
           <h2>안내할 화면을 준비하고 있어요</h2>

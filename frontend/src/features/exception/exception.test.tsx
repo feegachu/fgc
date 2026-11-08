@@ -221,6 +221,7 @@ describe('EXCP-W01 예외함', () => {
     })
     const { router, actions } = renderPage('/app/exceptions?month=2026-07&contractNo=C-0001&page=4&selected=11')
     const list = await table()
+    await actions.click(within(await screen.findByRole('dialog', { name: /^예외 상세/ })).getByRole('button', { name: '닫기' }))
     const lastQuery = () => new URLSearchParams(searchPaths().at(-1)!.split('?')[1])
     // 순서 기준이 없는 유형·상태 컬럼은 정렬 버튼이 없다.
     expect(within(list).queryByRole('button', { name: '상태' })).toBeNull()
@@ -271,6 +272,7 @@ describe('EXCP-W01 예외함', () => {
       '/app/exceptions?month=2026-07&validationMonth=2026-07&type=CAP_VIOLATION&status=OPEN&contractNo=C-0001&page=4&selected=11',
     )
     await screen.findByText('4 / 12 페이지')
+    await actions.click(within(await screen.findByRole('dialog', { name: /^예외 상세/ })).getByRole('button', { name: '닫기' }))
     const pagination = () => screen.getByRole('navigation', { name: '예외 목록 페이지 선택' })
     const controls = () => within(pagination())
     expect(controls().queryByRole('button', { name: '처음' })).toBeNull()
@@ -550,7 +552,7 @@ describe('EXCP-W01 예외함', () => {
     expect(within(actionSelect).queryByRole('option', { name: '해결' })).toBeNull()
     expect(within(actionSelect).getByRole('option', { name: '예외 아님' })).toBeInTheDocument()
     await actions.click(screen.getByRole('button', { name: '원장 정정 계속' }))
-    const dialog = await screen.findByRole('dialog')
+    const dialog = await screen.findByRole('dialog', { name: '원분개 역분개, 신규 재기표' })
     expect(await within(dialog).findByText(/J-0070/)).toBeInTheDocument()
     expect(within(dialog).getByText('차변/대변 검증 통과')).toBeInTheDocument()
     // 계정과목은 한글명만 보이고 내부 코드는 병기하지 않는다
@@ -613,7 +615,7 @@ it('양수였던 금액을 지워 두 금액이 모두 0이 되면 요청을 보
   const { actions } = renderPage()
   await actions.click(within(await table()).getByRole('button', { name: '12' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
-  const dialog = await screen.findByRole('dialog')
+  const dialog = await screen.findByRole('dialog', { name: '원분개 역분개, 신규 재기표' })
   await within(dialog).findByText(/J-0070/)
   await actions.type(within(dialog).getByLabelText(/정정 사유/), '사유')
   const debit = within(dialog).getAllByLabelText(/차변/)[0]
@@ -634,9 +636,10 @@ it('action help requires a real action sequence and preserves input for a failed
     return { exceptionActionId: undefined, actionSeq: 1, actionType: 'START_REVIEW', actionTypeLabel: '검토 시작', fromStatus: 'NEW', toStatus: 'IN_REVIEW', toStatusLabel: '검토중', reason: '원천 확인' }
   }
   const { actions } = renderPage()
+  await table()
+  await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await actions.click(within(await table()).getByRole('button', { name: '11' }))
   const form = within(await screen.findByRole('form', { name: '예외 처리' }))
-  await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await actions.click(form.getByRole('button', { name: '도움말' }))
   expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
   await actions.selectOptions(form.getByLabelText(/조치/), 'START_REVIEW')
@@ -662,7 +665,7 @@ it('resolved journal corrections expose read-only results without a write guide'
   const { actions } = renderPage()
   await actions.click(within(await table()).getByRole('button', { name: '12' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 확인' }))
-  const dialog = await screen.findByRole('dialog')
+  const dialog = await screen.findByRole('dialog', { name: '원분개 역분개, 신규 재기표' })
   await within(dialog).findByText(/J-0070/)
   expect(within(dialog).queryByRole('button', { name: '도움말' })).not.toBeInTheDocument()
   expect(within(dialog).queryByRole('button', { name: '정정 실행' })).not.toBeInTheDocument()
@@ -704,7 +707,7 @@ it.each([
   const { actions } = renderPage()
   await actions.click(within(await table()).getByRole('button', { name: '12' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
-  const dialog = await screen.findByRole('dialog')
+  const dialog = await screen.findByRole('dialog', { name: '원분개 역분개, 신규 재기표' })
   await within(dialog).findByText(/J-0070/)
   await actions.type(within(dialog).getByLabelText(/정정 사유/), '계정 오류 정정')
   const reads = searchPaths().length
@@ -732,12 +735,13 @@ it.each([[false, 1], [true, 1], [false, 0]] as const)('updates or refreshes a co
   let finish!: (value: unknown) => void
   postResponse = () => new Promise(resolve => { finish = resolve })
   const { actions, unmount } = renderPage()
+  await table()
+  if (guided) await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await actions.click(within(await table()).getByRole('button', { name: '11' }))
   const form = within(await screen.findByRole('form', { name: '예외 처리' }))
   await actions.selectOptions(form.getByLabelText(/조치/), 'START_REVIEW')
   await actions.type(form.getByLabelText(/처리 사유/), '원천 확인')
   if (guided) {
-    await actions.click(screen.getByRole('radio', { name: '수정 전' }))
     await actions.click(form.getByRole('button', { name: '도움말' }))
     await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
     await actions.click(screen.getByRole('button', { name: '다음' }))
@@ -764,10 +768,11 @@ it('invalidates a completed correction when help is unmounted before acknowledge
   searchResponse = () => search([correctionCase])
   postResponse = () => ({ actionSeq: 2, actionType: 'CORRECT', fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, repostedJournalHeaderId: 72 })
   const { actions, unmount } = renderPage()
-  await actions.click(within(await table()).getByRole('button', { name: '12' }))
+  await table()
   await actions.click(screen.getByRole('radio', { name: '수정 전' }))
+  await actions.click(within(await table()).getByRole('button', { name: '12' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
-  const dialog = within(await screen.findByRole('dialog'))
+  const dialog = within(await screen.findByRole('dialog', { name: '원분개 역분개, 신규 재기표' }))
   await dialog.findByText(/J-0070/)
   await actions.type(dialog.getByLabelText(/정정 사유/), '계정 오류 정정')
   await actions.click(dialog.getByRole('button', { name: '도움말' }))

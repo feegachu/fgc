@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode, Ref } from 'react'
 import { createPortal } from 'react-dom'
-import { useInRouterContext, useLocation, useOutletContext } from 'react-router'
+import { useInRouterContext, useLocation, useNavigate, useOutletContext } from 'react-router'
 import type { ShellContext } from '../../../app/shell/AppShell'
 import { Button } from '../../../components/Button'
 import { closeSettlementGuide, settlementEntry, subscribeSettlementEntry } from '../settlement/entry'
@@ -29,6 +29,7 @@ export interface ScreenHelpStep {
   firstMatch?: boolean
   anchor?: 'start'
   concise?: boolean
+  follow?: { path: string; label: string }
   /** Read the current preview's one-line explanation without changing the step. */
   liveDescriptionSelector?: string
   presentation?: SpotlightPresentation
@@ -68,26 +69,32 @@ export function ScreenHelp({ walkthrough, legacyTrigger, disabled, triggerRef, .
   const definition = definitions.find((entry) => entry.screenId === screenId && entry.variant === variant)
   if (!definition) return <button type="button" className="button button-secondary screen-help-trigger" disabled title="등록된 도움말 버전을 찾을 수 없습니다."><HelpIcon />도움말</button>
   if (helpVersion === 'after') {
-    const tour = <ScreenWalkthrough title={definition.title} steps={walkthrough ?? getScreenWalkthrough(screenId, variant)} disabled={disabled} triggerRef={triggerRef} />
-    return routed ? <RoutedWalkthrough screenId={screenId}>{tour}</RoutedWalkthrough> : tour
+    const tourProps = { title: definition.title, steps: walkthrough ?? getScreenWalkthrough(screenId, variant), disabled, triggerRef }
+    return routed ? <RoutedWalkthrough screenId={screenId} tourProps={tourProps} /> : <ScreenWalkthrough {...tourProps} />
   }
   return <Fragment key={helpVersion}>
     {legacyTrigger ?? (routed ? <RoutedScreenHelp {...props} /> : <ScreenHelpSession {...props} />)}
   </Fragment>
 }
 
-function RoutedWalkthrough({ screenId, children }: { screenId: string; children: ReactNode }) {
+function RoutedWalkthrough({ screenId, tourProps }: { screenId: string; tourProps: Parameters<typeof ScreenWalkthrough>[0] }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const context = new URLSearchParams(location.search)
   const selectionParams: Record<string, string[]> = {
     'CONT-W02': ['tab', 'capCheckId'], 'EXCP-W01': ['selected'], 'AUDT-W01': ['selected'],
     'CAP-W01': ['capCheckId'], 'POL-W01': ['policyVersionId', 'tab', 'section'],
     'TRAN-W01': ['selectedId'], 'SCHE-W01': ['selectedId'], 'RPT-W02': ['entryKey'],
-    'LEDG-W01': ['selected'], 'RECO-W01': ['resultId'], 'RECO-W02': ['resultId'],
+    'LEDG-W01': ['selected', 'contractId', 'journalPage', 'evidence'], 'RECO-W01': ['resultId', 'runId', 'runMonth', 'page', 'resultPage'], 'RECO-W02': ['resultId'],
   }
   selectionParams[screenId]?.forEach(key => context.delete(key))
   context.sort()
-  return <Fragment key={`${location.pathname}?${context}`}>{children}</Fragment>
+  return <ScreenWalkthrough key={`${location.pathname}?${context}`} {...tourProps}
+    autoStart={location.state?.screenGuide === location.pathname}
+    onFollow={follow => {
+      const month = new URLSearchParams(location.search).get('month')
+      void navigate(follow.path + (month ? `?month=${encodeURIComponent(month)}` : ''), { state: { screenGuide: follow.path } })
+    }} />
 }
 
 function RoutedScreenHelp(props: HelpProps) {

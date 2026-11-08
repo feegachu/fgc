@@ -149,6 +149,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
   useEffect(() => { saveGuide.update(context, valid) }, [saveGuide, context, valid])
   const clearUnsaved = useUnsavedWork(Boolean(actionType || reason || evidenceRef), JSON.stringify([actionType, reason, evidenceRef]))
   const mutation = useMutation({
+    mutationKey: ['exception', 'write', item.exceptionCaseId],
     mutationFn: () => { saveGuide.begin(); return postAction(item.exceptionCaseId!, { actionType, reason, evidenceRef }) },
     meta: { errorToast: false },
     onSuccess: async (action) => {

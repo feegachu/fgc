@@ -5,7 +5,7 @@ import type { ScreenHelpStep } from '../guide/ScreenHelp'
 import { getScreenWalkthrough, guideSelector } from '../guide/page-guides'
 import { useSidebarStore } from '../../../stores/sidebar'
 
-export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'presentation' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent' | 'requireAction' | 'onEnter' | 'interaction' | 'concise' | 'liveDescriptionSelector'>> {
+export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'follow' | 'presentation' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent' | 'requireAction' | 'onEnter' | 'interaction' | 'concise' | 'liveDescriptionSelector'>> {
   id: string
   selector: string
   title: string
@@ -115,6 +115,11 @@ function workflowInstructions(stage: SettlementStep, path: string, selectedExcep
 
 /** The pipeline calls each page's guide, adding only workflow-specific checks and handoffs. */
 export function workflowWalkthrough(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false, reuseContractDetail = true, batchPayment = false): WorkflowExplanation[] {
+  if (reuseContractDetail && stage === 'reconciliation.review') {
+    if (path === '/reconciliations') return sharedSteps('RECO-W01')
+    if (path === '/journals') return sharedSteps('LEDG-W01')
+    if (path === '/exceptions') return sharedSteps('EXCP-W01')
+  }
   if (reuseContractDetail && stage === 'contract.create' && /^\/contracts\/\d+$/.test(path)) {
     return [...getScreenWalkthrough('CONT-W02').map(entry => ({
       ...entry, id: entry.targetId, selector: guideSelector(entry),
@@ -154,6 +159,10 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
       presentation: { side: 'right' },
     }]
   }
+  if (reuseContractDetail && stage === 'validation.execute' && /^\/validation-runs\/\d+$/.test(path)) {
+    return [...sharedSteps('VRUN-W02').filter(entry => entry.id !== 'validation.openReconciliation'),
+      menuHandoff('validation.openReconciliation', 'reco-w01', '대사 실행/결과', 'reconciliation')]
+  }
   const instructions = workflowInstructions(stage, path, selectedException, correctionPending)
   if (stage === 'contract.create') return instructions
   const screenId = path.startsWith('/contracts/') ? 'CONT-W02'
@@ -188,7 +197,7 @@ function menuHandoff(id: string, screen: string, label: string, destination: Wor
     presentation: { side: 'right' },
     onEnter: () => {
       useSidebarStore.getState().setCollapsed(false, false)
-      useSidebarStore.getState().setSection(screen === 'vrun-w01' ? 'compliance' : 'contracts', true)
+      useSidebarStore.getState().setSection(screen === 'vrun-w01' ? 'compliance' : screen === 'reco-w01' ? 'ledger' : 'contracts', true)
     },
   }
 }

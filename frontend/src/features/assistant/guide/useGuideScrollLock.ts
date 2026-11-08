@@ -1,11 +1,11 @@
 import { useEffect, type RefObject } from 'react'
 
 /** Keep the page fixed while a guide is visible; allow reading inside the coach or an open dialog. */
-export function useGuideScrollLock(card: RefObject<HTMLElement | null>) {
+export function useGuideScrollLock(card: RefObject<HTMLElement | null>, allowPageScroll = false) {
   useEffect(() => {
     const lock = (event: WheelEvent) => {
       const guide = card.current
-      if (!guide?.isConnected || !guide.getClientRects().length || event.ctrlKey) return
+      if (allowPageScroll || !guide?.isConnected || !guide.getClientRects().length || getComputedStyle(guide).visibility === 'hidden' || event.ctrlKey) return
       const target = event.target instanceof Element ? event.target : null
       const reader = target?.closest<HTMLElement>('.payment-guide-card, .settlement-guide, [role="dialog"], .guide-field-picker, .search-select-popup')
       if (reader) {
@@ -20,5 +20,5 @@ export function useGuideScrollLock(card: RefObject<HTMLElement | null>) {
     }
     document.addEventListener('wheel', lock, { passive: false, capture: true })
     return () => document.removeEventListener('wheel', lock, true)
-  }, [card])
+  }, [card, allowPageScroll])
 }

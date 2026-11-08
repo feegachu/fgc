@@ -7,18 +7,20 @@ export interface SpotlightPresentation {
   side?: 'right' | 'left' | 'above' | 'below' | 'either'
   includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean; rowLimit?: number
   fixedCard?: boolean | 'left' | 'right'; scrollToTop?: boolean
+  cardAnchor?: string; preventScroll?: boolean; allowPageScroll?: boolean; scrollTargetTop?: boolean
 }
 
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>, detailed = false,
   presentation?: SpotlightPresentation) {
-  useGuideScrollLock(card)
+  useGuideScrollLock(card, presentation?.allowPageScroll)
   const full = Boolean(presentation), preferredSide = presentation?.side
   const includeLabel = presentation?.includeLabel
   const sideBoundary = presentation?.sideBoundary
   const preserveCardPosition = presentation?.preserveCardPosition
   const rowLimit = presentation?.rowLimit
   const fixedCard = presentation?.fixedCard
-  const scrollToTop = presentation?.scrollToTop
+  const scrollToTop = presentation?.scrollToTop, scrollTargetTop = presentation?.scrollTargetTop
+  const cardAnchor = presentation?.cardAnchor, preventScroll = presentation?.preventScroll
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
     card: CSSProperties
@@ -134,10 +136,12 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         if (fixedCard === 'left' || fixedCard === 'right') {
           const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
           const topBoundary = headerBottom + 16
-          const cardWidth = Math.min(420, Math.max(0, workspaceRight - cardLeftBoundary - 24))
-          const cardHeight = Math.max(0, Math.min(360, height - topBoundary - 16))
-          const cardLeft = fixedCard === 'right' ? workspaceRight - cardWidth - 12 : cardLeftBoundary + 12
-          const cardTop = height - cardHeight - 16
+          const anchor = cardAnchor ? document.querySelector(cardAnchor)?.getBoundingClientRect() : null
+          const cardWidth = Math.min(420, anchor ? Math.max(224, anchor.width - 24) : Infinity, Math.max(0, workspaceRight - cardLeftBoundary - 24))
+          const cardHeight = Math.max(0, Math.min(360, anchor ? Math.max(240, anchor.height - 24) : Infinity, height - topBoundary - 16))
+          const cardLeft = anchor ? Math.max(cardLeftBoundary + 12, Math.min(anchor.left + 12, workspaceRight - cardWidth - 12))
+            : fixedCard === 'right' ? workspaceRight - cardWidth - 12 : cardLeftBoundary + 12
+          const cardTop = anchor ? Math.max(topBoundary, Math.min(anchor.top + 12, height - cardHeight - 16)) : height - cardHeight - 16
           const rect = target?.isConnected ? targetRect() : null
           setPosition({
             box: rect ? {
@@ -148,7 +152,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
             } : null,
             card: { left: cardLeft, top: cardTop, right: 'auto', bottom: 'auto', width: cardWidth, height: cardHeight, maxHeight: cardHeight, overflowY: 'auto' },
           })
-          if (rect && preparedPresentation !== `${width}:${height}` && !targetInHeader) {
+          if (rect && preparedPresentation !== `${width}:${height}` && !targetInHeader && !preventScroll) {
             preparedPresentation = `${width}:${height}`
             const overlapsCard = rect.left < cardLeft + cardWidth && rect.right > cardLeft
             const bottom = overlapsCard ? cardTop - 24 : height - 16
@@ -156,7 +160,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
               : rect.bottom > bottom ? Math.max(0, Math.min(rect.bottom - bottom, rect.top - topBoundary)) : 0
             const modalBody = target?.closest<HTMLElement>('.modal-body')
             if (modalBody) modalBody.scrollBy?.({ top: offset, behavior: 'instant' })
-            else scrollSmoothly(scrollToTop ? -window.scrollY : offset)
+            else scrollSmoothly(scrollToTop ? -window.scrollY : scrollTargetTop ? rect.top - topBoundary : offset)
           }
           return
         }
@@ -312,6 +316,6 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
     }
-  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary, preserveCardPosition, rowLimit, fixedCard, scrollToTop])
+  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary, preserveCardPosition, rowLimit, fixedCard, scrollToTop, cardAnchor, preventScroll, scrollTargetTop])
   return position
 }

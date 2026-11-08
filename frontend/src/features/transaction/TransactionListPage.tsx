@@ -140,7 +140,7 @@ export default function TransactionListPage() {
       key: 'key',
       label: '지급 관리번호',
       sortable: true,
-      width: '10rem',
+      width: '8rem',
       cellClassName: 'transaction-mono',
       render: (row) => <span title={row.sourceBusinessKey}>{row.sourceBusinessKey || '-'}</span>,
     },
@@ -222,7 +222,7 @@ export default function TransactionListPage() {
       width: '7rem',
       align: 'center',
       render: (row) =>
-        row.commissionTransactionId === -1 ? <div className="transaction-row-actions">
+        row.commissionTransactionId === -1 ? <div className="transaction-row-actions transaction-guide-actions">
           <Button variant="ghost" aria-label="예시 지급 건 수정" onClick={() => toast('수정 기능을 설명하는 예시 행입니다.', 'info')}>수정</Button>
           <Button variant="ghost" aria-label="예시 지급 건 삭제" onClick={() => toast('삭제 기능을 설명하는 예시 행입니다.', 'info')}>삭제</Button>
         </div> : row.status !== 'DRAFT' ? (

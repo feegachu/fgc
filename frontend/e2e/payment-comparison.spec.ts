@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test('지급 등록 비교 안내는 앞 3개 행을 강조하고 안내 카드를 아래에 둔다', async ({ page }, info) => {
+test('지급 등록 비교 안내는 앞 3개 행을 강조하고 안내 카드를 점검표 위에 둔다', async ({ page }, info) => {
   const contract = { contractId: 3, contractNo: 'C-003', productName: '가상 상품', contractDate: '2026-07-01' }
   const item = { commissionItemId: 1, itemCode: 'BASE_COMMISSION', itemName: '초회 수수료', cashflowType: 'PAYMENT' }
   const header = { scheduleHeaderId: 5, activeYn: true, paymentStage: 'GA_TO_FC', scheduleRegime: 'CURRENT', schedulePurpose: 'OPERATIONAL', status: 'CONFIRMED', scheduleVersionNo: 1 }
@@ -30,8 +30,9 @@ test('지급 등록 비교 안내는 앞 3개 행을 강조하고 안내 카드�
   await expect(page.locator('.contract-payment-comparison-overlay')).toBeVisible()
   await expect.poll(async () => {
     const coach = await card.boundingBox()
-    const row = await page.locator('.contract-payment-table tbody > tr').nth(2).boundingBox()
-    return !!coach && !!row && coach.y >= row.y + row.height && coach.y + coach.height <= 900
+    const gates = await page.locator('.contract-payment-gates').boundingBox()
+    const expected = await page.locator('[data-guide-target="payment.batch.expected"]').boundingBox()
+    return !!coach && !!gates && !!expected && coach.x >= gates.x && coach.y >= gates.y && coach.y + coach.height <= expected.y
   }).toBe(true)
   const expected = page.locator('.contract-payment-comparison-overlay > rect.contract-comparison-panel-reveal').nth(1)
   const thirdRow = await page.locator('.contract-payment-preview-list > li').nth(2).boundingBox()

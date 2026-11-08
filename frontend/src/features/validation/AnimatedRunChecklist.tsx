@@ -30,7 +30,7 @@ export function AnimatedRunChecklist({ completed, data, error, retry }: {
     return () => window.clearTimeout(timer)
   }, [next])
   const allShown = CONDITIONS.every((_item, index) => eligible.includes(index + 1) && revealed.includes(index + 1))
-  return <section data-guide-feature="features.validation.validation-run-detail-page.section-7" className="surface" aria-labelledby="vrun-checklist-title">
+  return <section data-guide-feature="features.validation.validation-run-detail-page.section-7" className="surface" aria-labelledby="vrun-checklist-title" data-guide-checklist-ready={allShown}>
     <header className="surface-header">
       <h2 className="surface-title" id="vrun-checklist-title">확정 전 8단계 점검</h2>
       {allShown ? <StatusBadge tone={data?.passed ? 'success' : 'error'}>{data?.passed ? '8개 조건 모두 통과' : '미충족 조건 있음'}</StatusBadge>

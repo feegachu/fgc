@@ -13,7 +13,7 @@ export const titles = [
   '최종 확정',
 ]
 export const FLOW_VERSION = '3.0.1'
-export type WorkflowDestination = 'schedule-list' | 'payment-list' | 'payment-form' | 'validation-list'
+export type WorkflowDestination = 'schedule-list' | 'payment-list' | 'payment-form' | 'validation-list' | 'reconciliation'
 export function destinations(selection: Selection, destination?: WorkflowDestination) {
   const query = (path: string, extra: Record<string, string> = {}) =>
     `${path}?${new URLSearchParams({ month: selection.month, ...extra })}`

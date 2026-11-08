@@ -53,4 +53,6 @@ export const contractPaymentHelp: ScreenHelpStep[] = ([
     interaction: '확인창에서 대상 행과 총액을 확인한 뒤 확정합니다.',
     presentation: { side: 'right', preserveCardPosition: true },
   },
-] satisfies Omit<ScreenHelpStep, 'group' | 'details'>[]).map((step) => ({ ...step, group: '계약별 지급 등록', details: [], concise: true }))
+] satisfies Omit<ScreenHelpStep, 'group' | 'details'>[]).map((step) => ({ ...step, group: '계약별 지급 등록', details: [], concise: true,
+  presentation: { ...step.presentation, fixedCard: 'right' as const, preventScroll: true,
+    cardAnchor: ['payment.batch.contract', 'payment.batch.lines'].includes(step.targetId) ? '.contract-payment-gates' : '[data-guide-target="payment.batch.lines"]' } }))

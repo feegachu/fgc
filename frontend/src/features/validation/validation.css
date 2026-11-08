@@ -674,9 +674,9 @@
   background: var(--color-status-success-solid);
   transform: scaleX(0);
   transform-origin: left center;
-  transition: transform 950ms ease-in-out 300ms;
+  transition: none;
 }
-.vrun-step-connection.is-filled { transform: scaleX(1); }
+.vrun-step-connection.is-filled { transform: scaleX(1); transition: transform 950ms ease-in-out 300ms; }
 .vrun-detail-page[data-presentation='after'] .vrun-stepper-dot {
   z-index: 2;
   transition: background-color 400ms ease, border-color 400ms ease;

@@ -201,3 +201,17 @@ body:has(.screen-step-guide[data-help-presentation='true'][data-guide-anchored='
   box-shadow: 0 0 0 3px #164d861f, 0 0 0 200vmax #17334b38;
   animation: none;
 }
+
+.guide-selection-updated { animation: guide-selection-update 1.2s ease-out; }
+@keyframes guide-selection-update {
+  from { outline: 2px solid var(--color-fgc-blue); outline-offset: 3px; }
+  to { outline: 2px solid transparent; outline-offset: 3px; }
+}
+@media (prefers-reduced-motion: reduce) { .guide-selection-updated { animation-duration: 0s; } }
+
+.guide-tree-controls [role='tree'] > li:first-child > .hierarchy-row > .hierarchy-toggle,
+.guide-tree-controls [role='tree'] > li:first-child > .hierarchy-row > .hierarchy-select .hierarchy-label {
+  outline: 2px solid var(--color-fgc-blue);
+  outline-offset: 3px;
+  border-radius: 4px;
+}

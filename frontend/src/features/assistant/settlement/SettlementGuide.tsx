@@ -30,6 +30,7 @@ import guideMascot from '../assets/pico-guide.png'
 import { useWorkflowGuide } from '../workflow-state'
 import { usePaymentWalkthrough } from './usePaymentWalkthrough'
 import { useWorkflowWalkthrough } from './useWorkflowWalkthrough'
+import { useValidationPlaybackGuide } from './useValidationPlaybackGuide'
 import { useGuideStep } from '../guide/useGuideSequence'
 import { GuideFieldPicker } from '../guide/GuideFieldPicker'
 import '../guide/screen-help.css'
@@ -91,8 +92,12 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
   const coachSide = explanation.step?.id === 'contract.statusHistory'
     || decision?.step === 'contract.create' && location.pathname === '/contracts/new'
       && explanation.step?.presentation?.side === 'left' ? 'left' : 'right'
+  const paymentAnchor = batchPayment && detailedWorkflow && !explanation.step?.destination
+    ? ['payment.batch.contract', 'payment.batch.lines'].includes(explanation.step?.id ?? '')
+      ? '.contract-payment-gates' : '[data-guide-target="payment.batch.lines"]' : undefined
+  const validationPlayback = useValidationPlaybackGuide(after && detailedWorkflow && !collapsed && !busy && decision?.step === 'validation.execute', explanation.step?.id, explanation.next)
   const position = useSpotlight(!collapsed ? activeTarget : null, card, detailedWorkflow,
-    after ? { ...explanation.step?.presentation, fixedCard: coachSide } : detailedWorkflow ? explanation.step?.presentation : undefined)
+    after ? { ...explanation.step?.presentation, fixedCard: coachSide, cardAnchor: paymentAnchor, preventScroll: !!paymentAnchor } : detailedWorkflow ? explanation.step?.presentation : undefined)
   useGuideStep(explanation.step, explanation.target, explanation.next, detailedWorkflow && !collapsed && !busy && !leave)
   const detailedInput = useRef(false)
   useLayoutEffect(() => { detailedInput.current = detailedPayment || detailedWorkflow })
@@ -111,12 +116,15 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
   const followHandoff = useRef<() => void>(() => {})
   useLayoutEffect(() => {
     followHandoff.current = () => {
-      if (selection && !busy) void show(selection, false, decision?.step === 'schedule.review', false, false, explanation.step?.destination)
+      if (selection && !busy) {
+        if (explanation.step?.follow) void navigate(explanation.step.follow.path + '?month=' + selection.month)
+        else void show(selection, false, decision?.step === 'schedule.review', false, false, explanation.step?.destination)
+      }
     }
   })
   useEffect(() => {
     const target = explanation.target
-    if (!detailedWorkflow || collapsed || busy || !target || !explanation.step?.destination) return
+    if (!detailedWorkflow || collapsed || busy || !target || !explanation.step?.destination && !explanation.step?.follow) return
     const click = (event: MouseEvent) => {
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
       if (!(event.target instanceof Node) || !target.contains(event.target)) return
@@ -126,7 +134,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
     }
     document.addEventListener('click', click, true)
     return () => document.removeEventListener('click', click, true)
-  }, [detailedWorkflow, collapsed, busy, explanation.target, explanation.step?.destination])
+  }, [detailedWorkflow, collapsed, busy, explanation.target, explanation.step?.destination, explanation.step?.follow])
   const current = useRef({ location, user, selection })
   useLayoutEffect(() => {
     current.current = { ...current.current, location, user, selection }
@@ -465,12 +473,12 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
   return (
     <>
       {detailedWorkflow && !collapsed && !busy && !leave && explanation.step?.openControl && <GuideFieldPicker key={explanation.step.id} target={explanation.target} />}
-      {!collapsed && position.box && (
+      {!collapsed && !validationPlayback.hidden && position.box && (
         <div className="payment-guide-spotlight settlement-guide-spotlight" aria-hidden="true" style={position.box} />
       )}
       <aside
         ref={card}
-        style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : position.card}
+        style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : { ...position.card, visibility: validationPlayback.hidden ? 'hidden' : undefined }}
         className="settlement-guide"
         data-guide-anchored={Boolean((activeTarget || position.box) && !collapsed)}
         aria-label="전체 업무 가이드"
@@ -681,12 +689,12 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
     <>
       <SettlementOverview open={!selection} busy={busy} error={error} onClose={close} onStart={() => void start()} />
       {detailedWorkflow && !collapsed && !busy && !leave && explanation.step?.openControl && <GuideFieldPicker key={explanation.step.id} target={explanation.target} />}
-      {!collapsed && position.box && (
+      {!collapsed && !validationPlayback.hidden && position.box && (
         <div className="payment-guide-spotlight settlement-guide-spotlight screen-step-spotlight" aria-hidden="true" style={position.box} />
       )}
       {selection && <aside
         ref={card}
-        style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : position.card}
+        style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : { ...position.card, visibility: validationPlayback.hidden ? 'hidden' : undefined }}
         className="settlement-guide payment-guide-card screen-step-guide"
         data-help-presentation={true}
         data-guide-docked={!collapsed}
@@ -742,12 +750,13 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
                   interaction: '번호를 확인하고 다음을 누르세요.' } : explanation.step} index={explanation.index} total={explanation.total} group={`${decision ? titles[STEPS.indexOf(decision.step)] : ''} · ${explanation.index + 1}/${explanation.total}`} />
                 {demoNumberStep && demoNumber.pending && <p role="status">다음 데모 계약번호를 불러오고 있습니다.</p>}
                 {demoNumberStep && demoNumber.error && <div><p role="alert">{demoNumber.error}</p><Button variant="secondary" onClick={demoNumber.retry}>번호 다시 불러오기</Button></div>}
+                {validationPlayback.error && <p role="alert">{validationPlayback.error}</p>}
                 {!explanation.target && explanation.message && <p role="status">{explanation.message}</p>}
                 {explanation.status === 'PAUSED' && <Button variant="secondary" onClick={explanation.retry}>다시 찾기</Button>}
                 <div className="payment-guide-actions">
                   <Button variant="secondary" disabled={busy || explanation.index === 0} onClick={explanation.previous}>이전</Button>
                   <DisabledButtonHint disabled={waitingForContractSave} reason="‘저장하고 예상 스케줄 만들기’를 먼저 눌러주세요.">
-                  <Button className="screen-step-next" disabled={busy || waitingForContractSave || !explanation.ready || !!explanation.step?.destination || !!explanation.step?.requireAction && explanation.target?.getAttribute('data-guide-completed') !== 'true'} onClick={() => explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{explanation.step?.destination ? '강조된 메뉴를 눌러주세요' : explanation.step?.nextLabel ?? (explanation.last ? decision?.step === 'validation.finalize' ? '완료 확인' : '다음 업무' : '다음')}</Button>
+                  <Button className="screen-step-next" disabled={busy || waitingForContractSave || !explanation.ready || !!explanation.step?.destination || !!explanation.step?.follow || !!explanation.step?.requireAction && explanation.target?.getAttribute('data-guide-completed') !== 'true'} onClick={() => explanation.step?.follow ? void navigate(explanation.step.follow.path + '?month=' + selection.month) : explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{explanation.step?.destination || explanation.step?.follow ? '강조된 메뉴를 눌러주세요' : explanation.step?.follow?.label ?? explanation.step?.nextLabel ?? (explanation.last ? decision?.step === 'validation.finalize' ? '완료 확인' : '다음 업무' : '다음')}</Button>
                   </DisabledButtonHint>
                 </div>
               </section>
