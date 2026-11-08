@@ -21,6 +21,8 @@ public interface CommissionPaymentService {
     void deleteDraft(Long paymentId);
 
     CommissionPaymentResponse confirm(Long paymentId, String idempotencyKey);
+    /** 담당자가 예외 원천을 정정할 때 실제 확정 누계와 대체 후보로 재검증한다. */
+    CommissionPaymentResponse confirmExceptionCorrection(Long paymentId, String idempotencyKey);
 
     /** 원장 정정으로 연결된 대체 지급만 기존 확정 게이트로 승인한다. */
     CommissionPaymentResponse confirmJournalCorrection(Long paymentId, String correctionGroupKey);
@@ -30,6 +32,8 @@ public interface CommissionPaymentService {
 
     /** Same preparation and confirmation gates on a SELECT-only candidate projection. */
     TransactionPrecheckResponse precheckCandidate(CommissionPaymentCreateRequest request, Long replacedPaymentId);
+    /** 예외 원인 정정의 읽기 전용 후보 검증. 확정 지급도 원본을 덮어쓰지 않고 대체해 계산한다. */
+    TransactionPrecheckResponse precheckCorrectionCandidate(CommissionPaymentCreateRequest request, Long replacedPaymentId);
 
     PageResponse<CommissionPaymentListResponse> search(CommissionPaymentSearchCondition condition, int page, int size);
 }

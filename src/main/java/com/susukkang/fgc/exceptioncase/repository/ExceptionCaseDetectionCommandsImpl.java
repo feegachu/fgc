@@ -30,7 +30,7 @@ public class ExceptionCaseDetectionCommandsImpl implements ExceptionCaseDetectio
                 CROSS JOIN LATERAL fgc.record_exception_detection(
                 CONCAT('ARBITRAGE_CANDIDATE:', TO_CHAR(vr.validation_month, 'YYYY-MM'),
                 ':CONTRACT:', CAST(:contractId AS bigint), ':', CAST(:paymentStage AS varchar)),
-                'ARBITRAGE_CANDIDATE', 'ARBITRAGE_LIMIT_EXCEEDED', 'HIGH',
+                'ARBITRAGE_CANDIDATE', 'ARBITRAGE_LIMIT_EXCEEDED', 'WARNING',
                 CAST(:validationRunId AS bigint), CAST(:contractId AS bigint), NULL, NULL,
                 'ARBITRAGE_CHECK', CAST(CAST(:arbitrageCheckId AS bigint) AS varchar),
                 '차익거래 검토대상', CAST(:description AS varchar),

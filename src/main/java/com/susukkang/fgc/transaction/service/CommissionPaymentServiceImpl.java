@@ -230,6 +230,17 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     }
 
     private CommissionPaymentResponse confirmPayment(Long paymentId, String idempotencyKey) {
+        return confirmPayment(paymentId, idempotencyKey, false);
+    }
+
+    @Override
+    @Transactional
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public CommissionPaymentResponse confirmExceptionCorrection(Long paymentId, String idempotencyKey) {
+        return confirmPayment(paymentId, idempotencyKey, true);
+    }
+
+    private CommissionPaymentResponse confirmPayment(Long paymentId, String idempotencyKey, boolean correction) {
         // 2026-08-11 yslee - 운영정책서 제31조의 확정 게이트 6단계 순서를 코드에 명시
         // 기존 코드: 실제 확정 로직은 정책 순서를 따르지만 단계별 주석이 없어 문서와 코드의 대응 확인이 어려움
         // 문제: 검증 순서가 변경되어도 리뷰 과정에서 정책 위반을 즉시 식별하기 어려움
@@ -324,7 +335,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     currentIncludedAmount(attributions, data),
                     InclusionDecisionStatus.INCLUDED
             ));
-            CapValidationResult validation = mergeScheduleAndActualValidation(
+            CapValidationResult validation = correction ? correctionValidation(calculation, actualValidation) : mergeScheduleAndActualValidation(
                     calculation,
                     actualValidation,
                     rule.warningUsagePct()
@@ -392,6 +403,23 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
       CommissionPaymentCreateRequest request, Long replacedPaymentId) {
     if (replacedPaymentId != null)
       requireDraft(requireConfirmationData(replacedPaymentId, false).getFirst());
+    return evaluateCandidate(request, replacedPaymentId);
+  }
+
+  @Override
+  @PreAuthorize(Roles.CAN_PROCESS)
+  @Transactional(readOnly = true)
+  public TransactionPrecheckResponse precheckCorrectionCandidate(CommissionPaymentCreateRequest request, Long replacedPaymentId) {
+    if (replacedPaymentId != null && requireConfirmationData(replacedPaymentId, false).getFirst().status() == CommissionPaymentStatus.CANCELLED)
+      throw new FgcBusinessException(FgcErrorCode.TRAN_005);
+    return evaluateCandidate(request, replacedPaymentId, true);
+  }
+
+  private TransactionPrecheckResponse evaluateCandidate(CommissionPaymentCreateRequest request, Long replacedPaymentId) {
+    return evaluateCandidate(request, replacedPaymentId, false);
+  }
+
+  private TransactionPrecheckResponse evaluateCandidate(CommissionPaymentCreateRequest request, Long replacedPaymentId, boolean correction) {
     PreparedPayment prepared =
         buildCommand(
             replacedPaymentId,
@@ -414,11 +442,16 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         PaymentCandidateProjection.from(
             id, prepared.payment(), prepared.attributions(), objectMapper);
     return evaluatePrecheck(
-        id, queryRepository.findCandidateConfirmationData(candidate), candidate);
+        id, queryRepository.findCandidateConfirmationData(candidate), candidate, correction);
   }
 
   private TransactionPrecheckResponse evaluatePrecheck(
       Long paymentId, List<ConfirmationData> attributions, PaymentCandidateProjection candidate) {
+    return evaluatePrecheck(paymentId, attributions, candidate, false);
+  }
+
+  private TransactionPrecheckResponse evaluatePrecheck(
+      Long paymentId, List<ConfirmationData> attributions, PaymentCandidateProjection candidate, boolean correction) {
     if (attributions.isEmpty()) invalid("attributions", "귀속 자료를 확인하세요.");
     ConfirmationData first = attributions.get(0);
     // [의도된 차이] 비DRAFT는 미리보기 대상 자체가 아니라 TRAN_005(409)로 먼저 끊는다.
@@ -452,7 +485,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                           AttributedContractNo::contractId, AttributedContractNo::contractNo));
       for (ConfirmationData data : attributions) {
         evaluatePrecheckAttribution(
-            paymentId, data, attributions, candidate, failures, evaluations);
+            paymentId, data, attributions, candidate, failures, evaluations, correction);
       }
       for (CapEvaluation evaluation : evaluations.values()) {
         previews.add(
@@ -483,7 +516,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
       List<ConfirmationData> attributions,
       PaymentCandidateProjection candidate,
       List<GateFailure> failures,
-      Map<CapGroupKey, CapEvaluation> evaluations) {
+      Map<CapGroupKey, CapEvaluation> evaluations, boolean correction) {
     failures.addAll(attributionFailures(data));
     if (isClawback(data)) return;
     if (isNonContractNewcomerAttribution(data)) {
@@ -512,7 +545,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         || CapCandidateExclusion.hasInvalidPaymentDate(data)) {
       return;
     }
-    evaluatePrecheckCap(paymentId, data, attributions, candidate, failures, evaluations);
+    evaluatePrecheckCap(paymentId, data, attributions, candidate, failures, evaluations, correction);
   }
 
   private void evaluatePrecheckCap(
@@ -521,7 +554,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
       List<ConfirmationData> attributions,
       PaymentCandidateProjection candidate,
       List<GateFailure> failures,
-      Map<CapGroupKey, CapEvaluation> evaluations) {
+      Map<CapGroupKey, CapEvaluation> evaluations, boolean correction) {
     CapRuleSnapshot rule =
         (candidate == null
             ? queryRepository.findCapRuleSnapshot(paymentId, data.transactionAttributionId())
@@ -559,7 +592,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 currentIncludedAmount(attributions, data),
                 InclusionDecisionStatus.INCLUDED));
     CapValidationResult validation =
-        mergeScheduleAndActualValidation(calculation, actualValidation, rule.warningUsagePct());
+        correction ? correctionValidation(calculation, actualValidation) : mergeScheduleAndActualValidation(calculation, actualValidation, rule.warningUsagePct());
     // 룰 판정 불일치·룰셋 불일치(CAP_002) 행은 confirm이 계산에 도달하지 못하는 행이다.
     // CapValidator는 귀속 스냅샷만 보므로 정책 드리프트 시 NORMAL로 계산될 수 있는데,
     // 게이지 수치는 참고용으로 남기되 판정만은 검토필요로 강제해 "정상" 오인을 막는다.
@@ -943,6 +976,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 agentId,
                 settlementMonth,
                 request.attributionDate(),
+                dueDate,
                 paymentStage,
                 request.attributionMethod()
         );
@@ -1092,6 +1126,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long agentId,
             LocalDate settlementMonth,
             LocalDate attributionDate,
+            LocalDate dueDate,
             PaymentStage paymentStage,
             AttributionMethod attributionMethod
     ) {
@@ -1128,9 +1163,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             requireContract(sourceContractId, "contractId");
         }
 
+        // 이연분도 원래 모집월의 신계약·배부 근거를 유지한다. 실제 귀속일을 13차월 이후
+        // 지급예정일로 옮긴 경우에만 모집월 밖의 귀속을 허용한다.
+        boolean deferredSettlementSupport = dueDate != null && dueDate.equals(attributionDate)
+                && !dueDate.isBefore(target.contractDate().plusMonths(12));
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 && (!YearMonth.from(target.contractDate()).equals(YearMonth.from(settlementMonth))
-                || !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)))) {
+                || (!YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)) && !deferredSettlementSupport))) {
             invalid("attributionDate", "정착지원금은 모집월(정산월)의 신계약에 실제 귀속해야 합니다.");
         }
 
@@ -1998,6 +2037,14 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 usagePct,
                 resultStatus
         );
+    }
+
+    /** 정정 후보의 합계는 기존 실제 누계 + 수정액이다. 예정액은 월 검증에서 별도로 판정한다. */
+    private CapValidationResult correctionValidation(CapCalculationResult calculation, CapValidationResult actual) {
+        return calculation.resultStatus() == CapResultStatus.REVIEW_REQUIRED
+                ? new CapValidationResult(actual.limitAmount(), actual.candidateIncludedAmount(), actual.includedAmount(),
+                    actual.remainingAmount(), actual.usagePct(), CapResultStatus.REVIEW_REQUIRED)
+                : actual;
     }
 
     private CapCalculationResult calculateLimit(

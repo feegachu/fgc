@@ -52,6 +52,7 @@ public class JournalCorrectionExceptionActionService {
                     "exceptionCaseId", Map.of("field", "exceptionCaseId", "id", exceptionCaseId), null);
         }
         validateTarget(target);
+        exceptionCaseService.requireReviewer(exceptionCaseRepository.findByIdForUpdate(exceptionCaseId), actionUserId);
 
         Long journalHeaderId = parseJournalHeaderId(target.sourceEntityId());
         JournalRepostCommand command = new JournalRepostCommand(

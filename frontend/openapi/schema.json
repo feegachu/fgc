@@ -1255,6 +1255,62 @@
         },
         "type" : "object"
       },
+      "ApiResponseExceptionPaymentContext" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ExceptionPaymentContext"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseExceptionPaymentCorrectionResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ExceptionPaymentCorrectionResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseExceptionReviewContext" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ExceptionReviewContext"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseExceptionSourceRecheckResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ExceptionSourceRecheckResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseFinalizeChecklistResponse" : {
         "properties" : {
           "data" : {
@@ -1574,23 +1630,6 @@
           "data" : {
             "items" : {
               "$ref" : "#/components/schemas/Retry"
-            },
-            "type" : "array"
-          },
-          "error" : {
-            "$ref" : "#/components/schemas/ApiError"
-          },
-          "requestId" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ApiResponseListScheduleHeaderResponse" : {
-        "properties" : {
-          "data" : {
-            "items" : {
-              "$ref" : "#/components/schemas/ScheduleHeaderResponse"
             },
             "type" : "array"
           },
@@ -5934,6 +5973,11 @@
             "enum" : [ "ASSIGN", "START_REVIEW", "CORRECT", "REDUCE", "CANCEL", "DEFER", "RECONCILE_AGAIN", "FALSE_POSITIVE", "RESOLVE", "REJECT", "REOPEN", "COMMENT" ],
             "type" : "string"
           },
+          "assignedTo" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
           "evidenceRef" : {
             "type" : "string"
           },
@@ -6236,6 +6280,26 @@
         },
         "type" : "object"
       },
+      "ExceptionDuplicateCancelRequest" : {
+        "properties" : {
+          "evidenceRef" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "expectedUpdatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "paymentId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "expectedUpdatedAt", "paymentId" ],
+        "type" : "object"
+      },
       "ExceptionOccurrenceResponse" : {
         "properties" : {
           "detectedAt" : {
@@ -6293,6 +6357,12 @@
       },
       "ExceptionOptionsResponse" : {
         "properties" : {
+          "assignableUsers" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExceptionAssigneeRow"
+            },
+            "type" : "array"
+          },
           "assignees" : {
             "items" : {
               "$ref" : "#/components/schemas/ExceptionAssigneeRow"
@@ -6327,6 +6397,193 @@
         },
         "type" : "object"
       },
+      "ExceptionPaymentContext" : {
+        "properties" : {
+          "canRegisterPayment" : {
+            "type" : "boolean"
+          },
+          "capBasis" : {
+            "$ref" : "#/components/schemas/CapCheckBasisResponse"
+          },
+          "contractLink" : {
+            "type" : "string"
+          },
+          "correctionTarget" : {
+            "type" : "string"
+          },
+          "deferrableFrom" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          },
+          "payments" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CommissionPaymentResponse"
+            },
+            "type" : "array"
+          },
+          "policyLink" : {
+            "type" : "string"
+          },
+          "reconciliationResultType" : {
+            "type" : "string"
+          },
+          "remainingIssues" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExceptionReconciliationIssue"
+            },
+            "type" : "array"
+          },
+          "scheduleLink" : {
+            "type" : "string"
+          },
+          "scheduledBasis" : {
+            "type" : "boolean"
+          },
+          "suggestedPayment" : {
+            "$ref" : "#/components/schemas/CommissionPaymentCreateRequest"
+          }
+        },
+        "type" : "object"
+      },
+      "ExceptionPaymentCorrectionRequest" : {
+        "properties" : {
+          "correctionMode" : {
+            "pattern" : "RECORD_ONLY|SETTLEMENT_COMPLETED",
+            "type" : "string"
+          },
+          "deferredAmount" : {
+            "minimum" : 0.0,
+            "type" : "number"
+          },
+          "deferredPaymentDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "expectedUpdatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "payment" : {
+            "$ref" : "#/components/schemas/CommissionPaymentCreateRequest"
+          },
+          "paymentId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "plannedAction" : {
+            "pattern" : "REDUCE|DEFER",
+            "type" : "string"
+          },
+          "settlementEvidence" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "payment" ],
+        "type" : "object"
+      },
+      "ExceptionPaymentCorrectionResponse" : {
+        "properties" : {
+          "action" : {
+            "$ref" : "#/components/schemas/ExceptionActionResponse"
+          },
+          "deferredPayment" : {
+            "$ref" : "#/components/schemas/CommissionPaymentResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "payment" : {
+            "$ref" : "#/components/schemas/CommissionPaymentResponse"
+          },
+          "remainingIssues" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExceptionReconciliationIssue"
+            },
+            "type" : "array"
+          },
+          "resolved" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ExceptionReconciliationIssue" : {
+        "properties" : {
+          "actualAgent" : {
+            "type" : "string"
+          },
+          "actualAmount" : {
+            "type" : "number"
+          },
+          "differenceAmount" : {
+            "type" : "number"
+          },
+          "expectedAgent" : {
+            "type" : "string"
+          },
+          "expectedAmount" : {
+            "type" : "number"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "resultId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "resultLabel" : {
+            "type" : "string"
+          },
+          "resultType" : {
+            "type" : "string"
+          },
+          "sourceLink" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ExceptionReviewContext" : {
+        "properties" : {
+          "administratorReviewRequired" : {
+            "type" : "boolean"
+          },
+          "contractDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "contractStatus" : {
+            "type" : "string"
+          },
+          "guidance" : {
+            "type" : "string"
+          },
+          "links" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Link"
+            },
+            "type" : "array"
+          },
+          "offeringMismatch" : {
+            "type" : "boolean"
+          },
+          "recheckAvailable" : {
+            "type" : "boolean"
+          },
+          "rejectionRequiresEvidence" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ExceptionSeverityCountResponse" : {
         "properties" : {
           "count" : {
@@ -6339,6 +6596,23 @@
           },
           "severityLabel" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ExceptionSourceRecheckResponse" : {
+        "properties" : {
+          "action" : {
+            "$ref" : "#/components/schemas/ExceptionActionResponse"
+          },
+          "capBasis" : {
+            "$ref" : "#/components/schemas/CapCheckBasisResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "resolved" : {
+            "type" : "boolean"
           }
         },
         "type" : "object"
@@ -7383,6 +7657,17 @@
             "type" : "integer"
           },
           "memo" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Link" : {
+        "properties" : {
+          "href" : {
+            "type" : "string"
+          },
+          "label" : {
             "type" : "string"
           }
         },
@@ -14085,6 +14370,223 @@
           }
         },
         "tags" : [ "exception-case-controller" ]
+      }
+    },
+    "/api/v1/exceptions/{id}/payment-correction" : {
+      "get" : {
+        "operationId" : "context",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExceptionPaymentContext"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "exception-payment-correction-controller" ]
+      },
+      "post" : {
+        "operationId" : "correct",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExceptionPaymentCorrectionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExceptionPaymentCorrectionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "exception-payment-correction-controller" ]
+      }
+    },
+    "/api/v1/exceptions/{id}/payment-correction/cancel-duplicate" : {
+      "post" : {
+        "operationId" : "cancelDuplicate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExceptionDuplicateCancelRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExceptionPaymentCorrectionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "exception-payment-correction-controller" ]
+      }
+    },
+    "/api/v1/exceptions/{id}/payment-correction/precheck" : {
+      "post" : {
+        "operationId" : "preview",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExceptionPaymentCorrectionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseTransactionPrecheckResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "exception-payment-correction-controller" ]
+      }
+    },
+    "/api/v1/exceptions/{id}/payment-correction/recheck" : {
+      "post" : {
+        "operationId" : "recheck_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExceptionSourceRecheckResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "exception-payment-correction-controller" ]
+      }
+    },
+    "/api/v1/exceptions/{id}/review" : {
+      "get" : {
+        "operationId" : "context_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExceptionReviewContext"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "exception-source-review-controller" ]
+      }
+    },
+    "/api/v1/exceptions/{id}/review/recheck" : {
+      "post" : {
+        "operationId" : "recheck",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExceptionSourceRecheckResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "exception-source-review-controller" ]
       }
     },
     "/api/v1/home/summary" : {

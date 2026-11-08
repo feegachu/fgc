@@ -63,7 +63,14 @@ public class PaymentJournalCorrectionService {
         CommissionPaymentResponse replacement = null;
         if (draft != null) {
             var a = old.attributions().getFirst();
-            replacement = payments.create(new CommissionPaymentCreateRequest(
+            CommissionPaymentCreateRequest requested = draft.getReplacementPayment();
+            if (requested != null && (requested.paymentStage() != old.paymentStage()
+                    || !Objects.equals(requested.contractId(), old.contractId() == null ? a.contractId() : old.contractId())
+                    || !Objects.equals(requested.agentId(), old.agentId())
+                    || !Objects.equals(requested.commissionItemId(), old.commissionItemId())
+                    || !Objects.equals(requested.cashflowType(), old.cashflowType())
+                    || requested.amount().compareTo(correctedAmount) != 0)) throw invalid("paymentCorrectionSource");
+            replacement = payments.create(requested == null ? new CommissionPaymentCreateRequest(
                     "GA_MANUAL_PAYMENT", "JOURNAL_CORRECTION:" + groupKey, old.contractId(), old.agentId(),
                     old.commissionItemId(), correctedAmount, old.settlementMonth(), old.cashflowType(),
                     old.scheduledPaymentDate(), old.paymentStage(), old.allocationPolicyVersion(),
@@ -71,11 +78,17 @@ public class PaymentJournalCorrectionService {
                             correctedAmount, a.inclusionDecisionStatus(), a.exclusionType(),
                             (a.inclusionDecisionReason() == null || a.inclusionDecisionReason().isBlank())
                                     ? reason : a.inclusionDecisionReason(), a.allocationBasis(), a.evidenceRef(), a.attributionMethod())),
-                    evidence == null ? old.evidenceRef() : evidence, reason));
+                    evidence == null ? old.evidenceRef() : evidence, reason) : requested);
             repository.copySourceMetadata(paymentId, replacement.paymentId());
+            if (requested != null && !Objects.equals(old.scheduledPaymentDate(), requested.scheduledPaymentDate())) {
+                repository.correctPaymentDate(replacement.paymentId(), requested.scheduledPaymentDate());
+            }
         }
         repository.insertLink(groupKey, paymentId, replacement == null ? null : replacement.paymentId());
-        if (replacement != null) payments.confirmJournalCorrection(replacement.paymentId(), groupKey);
+        if (replacement != null) {
+            if (draft.getReplacementPayment() != null) payments.confirmExceptionCorrection(replacement.paymentId(), "EXCP-JC-" + groupKey);
+            else payments.confirmJournalCorrection(replacement.paymentId(), groupKey);
+        }
         audit.record(AuditLogService.AuditEvent.builder().actionCode("PAYMENT_CANCELLED")
                 .entityType("COMMISSION_TRANSACTION").entityId(paymentId.toString()).userId(actor)
                 .before(old).after(Map.of("status", "CANCELLED", "correctionGroupKey", groupKey,
@@ -114,6 +127,12 @@ public class PaymentJournalCorrectionService {
     }
 
     private FgcBusinessException invalid(String field) {
-        return new FgcBusinessException(FgcErrorCode.COMMON_002, Map.of("field", field));
+        String reason = switch (field) {
+            case "paymentCorrectionSource" -> "기표된 지급은 기존 계약·수령인·수수료 항목을 유지하고 금액 또는 귀속일을 수정하세요.";
+            case "paymentCorrectionAttribution" -> "기존 원장의 계약·수령인·항목과 지급 귀속이 다릅니다. 원장 정정에서 귀속 정보를 확인하세요.";
+            case "paymentCorrectionAmount" -> "정정할 지급 금액은 0원보다 큰 원 단위 금액이어야 합니다.";
+            default -> "수정할 지급 건과 원장 연결 정보를 확인하세요.";
+        };
+        return new FgcBusinessException(FgcErrorCode.COMMON_002, Map.of("field", field, "reason", reason));
     }
 }

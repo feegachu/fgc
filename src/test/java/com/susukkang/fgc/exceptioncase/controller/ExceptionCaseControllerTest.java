@@ -210,7 +210,8 @@ class ExceptionCaseControllerTest {
                 List.of(new ExceptionOptionsResponse.Option("AMOUNT_DIFFERENCE", "금액 불일치")),
                 List.of(new ExceptionOptionsResponse.Option("HIGH", "높음")),
                 List.of(new ExceptionAssigneeRow(7L, "settle01")),
-                List.of(LocalDate.of(2026, 7, 1))));
+                List.of(LocalDate.of(2026, 7, 1)),
+                List.of(new ExceptionAssigneeRow(8L, "settle02"))));
 
         mockMvc.perform(get("/api/v1/exceptions/options")
                         .with(user(principal(3L, "audit01", "COMPLIANCE"))))
@@ -220,6 +221,7 @@ class ExceptionCaseControllerTest {
                 .andExpect(jsonPath("$.data.reasons[0].label").value("금액 불일치"))
                 .andExpect(jsonPath("$.data.severities[0].code").value("HIGH"))
                 .andExpect(jsonPath("$.data.assignees[0].loginId").value("settle01"))
+                .andExpect(jsonPath("$.data.assignableUsers[0].loginId").value("settle02"))
                 .andExpect(jsonPath("$.data.validationMonths[0]").value("2026-07-01"));
     }
 
@@ -237,7 +239,7 @@ class ExceptionCaseControllerTest {
                 null, 1, ExceptionStatus.NEW, ExceptionStatus.IN_REVIEW,
                 "START_REVIEW", request.reason(), request.evidenceRef(),
                 1L, "settle01", OffsetDateTime.now());
-        given(exceptionCaseService.action(eq(10L), any(ExceptionActionRequest.class),
+        given(exceptionCaseService.userAction(eq(10L), any(ExceptionActionRequest.class),
                 eq(1L), eq("settle01"))).willReturn(response);
 
         mockMvc.perform(post("/api/v1/exceptions/10/actions")
@@ -249,7 +251,7 @@ class ExceptionCaseControllerTest {
                 .andExpect(jsonPath("$.data.fromStatus").value("NEW"))
                 .andExpect(jsonPath("$.data.toStatus").value("IN_REVIEW"));
 
-        verify(exceptionCaseService).action(
+        verify(exceptionCaseService).userAction(
                 eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
     }
 
@@ -385,7 +387,7 @@ class ExceptionCaseControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
 
-        verify(exceptionCaseService, never()).action(any(), any(), any(), any());
+        verify(exceptionCaseService, never()).userAction(any(), any(), any(), any());
     }
 
     @Test
@@ -395,7 +397,7 @@ class ExceptionCaseControllerTest {
                 """;
         willThrow(new FgcBusinessException(FgcErrorCode.EXCP_001))
                 .given(exceptionCaseService)
-                .action(eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
+                .userAction(eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
 
         mockMvc.perform(post("/api/v1/exceptions/10/actions")
                         .with(user(principal(1L, "settle01", "SETTLEMENT"))).with(csrf())
@@ -404,7 +406,7 @@ class ExceptionCaseControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("FGC-EXCP-001"));
 
-        verify(exceptionCaseService).action(
+        verify(exceptionCaseService).userAction(
                 eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
     }
 
@@ -417,7 +419,7 @@ class ExceptionCaseControllerTest {
                 null, 1, ExceptionStatus.NEW, ExceptionStatus.IN_REVIEW,
                 "START_REVIEW", "검토를 시작합니다.", null,
                 1L, "settle01", OffsetDateTime.now());
-        given(exceptionCaseService.action(eq(10L), any(ExceptionActionRequest.class),
+        given(exceptionCaseService.userAction(eq(10L), any(ExceptionActionRequest.class),
                 eq(1L), eq("settle01"))).willReturn(response);
 
         mockMvc.perform(post("/api/v1/exceptions/10/actions")
@@ -428,7 +430,7 @@ class ExceptionCaseControllerTest {
                 .andExpect(jsonPath("$.data.actionSeq").value(1))
                 .andExpect(jsonPath("$.data.evidenceRef").doesNotExist());
 
-        verify(exceptionCaseService).action(
+        verify(exceptionCaseService).userAction(
                 eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
     }
 
@@ -447,7 +449,7 @@ class ExceptionCaseControllerTest {
                 .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
                 .andExpect(jsonPath("$.error.field").value("reason"));
 
-        verify(exceptionCaseService, never()).action(any(), any(), any(), any());
+        verify(exceptionCaseService, never()).userAction(any(), any(), any(), any());
     }
 
     @Test
@@ -460,7 +462,7 @@ class ExceptionCaseControllerTest {
                 FgcErrorCode.EXCP_003,
                 java.util.Map.of("status", "NEW", "actionType", "RESOLVE")))
                 .given(exceptionCaseService)
-                .action(eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
+                .userAction(eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
 
         mockMvc.perform(post("/api/v1/exceptions/10/actions")
                         .with(user(principal(1L, "settle01", "SETTLEMENT"))).with(csrf())
@@ -469,7 +471,7 @@ class ExceptionCaseControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("FGC-EXCP-003"));
 
-        verify(exceptionCaseService).action(
+        verify(exceptionCaseService).userAction(
                 eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
     }
 

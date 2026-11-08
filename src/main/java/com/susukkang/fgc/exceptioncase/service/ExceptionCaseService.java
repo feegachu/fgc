@@ -161,7 +161,8 @@ public class ExceptionCaseService {
                         .map(severity -> new ExceptionOptionsResponse.Option(severity.name(), severity.label()))
                         .toList(),
                 assignees(),
-                validationMonths());
+                validationMonths(),
+                exceptionCaseQueryRepository.findAssignableUsers());
     }
 
     private Map<Long, List<ExceptionActionResponse>> loadActions(
@@ -212,6 +213,55 @@ public class ExceptionCaseService {
             String actionUserLoginId) {
         return actionInternal(
                 exceptionCaseId, request, actionUserId, actionUserLoginId, false);
+    }
+
+    /** 화면의 배정·검토 조치. 실제 원천 수정 없이 금액 정정이나 해결 상태를 기록하지 않는다. */
+    @Transactional
+    public ExceptionActionResponse userAction(Long id, ExceptionActionRequest request, Long actor, String login) {
+        var target = exceptionCaseRepository.findByIdForUpdate(id);
+        if (target == null) throw new FgcBusinessException(FgcErrorCode.COMMON_004,
+                "exceptionCaseId", Map.of("field", "exceptionCaseId", "id", id), null);
+        var type = request.actionType();
+        if (type == ExceptionActionType.ASSIGN) {
+            if (request.assignedTo() == null || request.assignedTo().equals(actor)
+                    || !exceptionCaseQueryRepository.isAssignableUser(request.assignedTo())) throw invalidField("assignedTo");
+        } else if (type == ExceptionActionType.START_REVIEW || type == ExceptionActionType.REOPEN) {
+            if (target.assignedTo() != null && !target.assignedTo().equals(actor)) throw notAllowed(target, type);
+        } else if (type == ExceptionActionType.COMMENT || type == ExceptionActionType.REJECT) {
+            requireReviewer(target, actor);
+            if (request.reason() == null || request.reason().isBlank()) throw invalidField("reason");
+            if (type == ExceptionActionType.REJECT && exceptionCaseQueryRepository.requiresRejectionEvidence(id)
+                    && (request.evidenceRef() == null || request.evidenceRef().isBlank())) throw invalidField("evidenceRef");
+            if (type == ExceptionActionType.REJECT && exceptionCaseQueryRepository.requiresAdministratorReview(id)) {
+                var auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth == null || auth.getAuthorities().stream().noneMatch(a -> List.of("ROLE_GA_ADMIN", "ROLE_SYSTEM_ADMIN").contains(a.getAuthority()))) {
+                    throw new org.springframework.security.access.AccessDeniedException("보험사 지급기준 한도 초과의 반려는 GA관리자 또는 시스템관리자가 근거를 확인해야 합니다.");
+                }
+            }
+        } else {
+            throw notAllowed(target, type);
+        }
+        return actionInternal(id, request, actor, login, false);
+    }
+
+    public void requireReviewer(ExceptionCaseActionTarget target, Long actor) {
+        if (target == null) throw invalidField("exceptionCaseId");
+        if (target.status() != ExceptionStatus.IN_REVIEW || !actor.equals(target.assignedTo())) {
+            throw notAllowed(target, ExceptionActionType.CORRECT);
+        }
+    }
+
+    private FgcBusinessException notAllowed(ExceptionCaseActionTarget target, ExceptionActionType type) {
+        return new FgcBusinessException(FgcErrorCode.EXCP_003,
+                Map.of("status", target.status().name(), "actionType", type.name()));
+    }
+
+    /** 실제 지급은 수정됐지만 원래 검증 원인이 남은 경우에도 감액·이월·정정 이력을 보존한다. */
+    @Transactional
+    public ExceptionActionResponse recordPendingPaymentCorrection(Long id, ExceptionActionRequest request, Long actor, String login) {
+        if (!List.of(ExceptionActionType.REDUCE, ExceptionActionType.DEFER, ExceptionActionType.CORRECT, ExceptionActionType.RECONCILE_AGAIN, ExceptionActionType.CANCEL).contains(request.actionType())) throw invalidField("actionType");
+        requireReviewer(exceptionCaseRepository.findByIdForUpdate(id), actor);
+        return actionInternal(id, request, actor, login, false, true);
     }
 
     /** 실제 원장 reverseAndRepost 성공 뒤 같은 트랜잭션에서만 호출하는 전용 종결 경로. */
@@ -268,10 +318,14 @@ public class ExceptionCaseService {
             Long actionUserId,
             String actionUserLoginId,
             boolean journalCorrectionExecuted) {
+        return actionInternal(exceptionCaseId, request, actionUserId, actionUserLoginId, journalCorrectionExecuted, false);
+    }
 
-        if (request.reason() == null || request.reason().isBlank()) {
-            throw new FgcBusinessException(FgcErrorCode.EXCP_001);
-        }
+    private ExceptionActionResponse actionInternal(Long exceptionCaseId, ExceptionActionRequest request,
+            Long actionUserId, String actionUserLoginId, boolean journalCorrectionExecuted, boolean keepInReview) {
+
+        String reason = request.reason() == null || request.reason().isBlank()
+                ? request.actionType().label() + " 처리" : request.reason();
 
         // 1. 동시에 같은 예외를 처리하지 못하도록 행 잠금
         ExceptionCaseActionTarget target =
@@ -317,7 +371,21 @@ public class ExceptionCaseService {
         }
 
         ExceptionStatus toStatus =
-                actionType.nextStatus(fromStatus);
+                keepInReview ? ExceptionStatus.IN_REVIEW : actionType.nextStatus(fromStatus);
+
+        Long assignedTo = target.assignedTo();
+        if (actionType == ExceptionActionType.ASSIGN) {
+            // assignedTo가 없는 기존 요청은 본인 배정으로 처리한다.
+            assignedTo = request.assignedTo() == null ? actionUserId : request.assignedTo();
+            if (request.assignedTo() != null && !exceptionCaseQueryRepository.isAssignableUser(assignedTo)) {
+                throw invalidField("assignedTo");
+            }
+        } else if (actionType == ExceptionActionType.START_REVIEW || actionType == ExceptionActionType.REOPEN) {
+            if (request.assignedTo() != null) throw invalidField("assignedTo");
+            assignedTo = actionUserId;
+        } else if (request.assignedTo() != null) {
+            throw invalidField("assignedTo");
+        }
 
         // 3. 잠금을 획득한 상태에서 다음 이력 순번 계산
         int nextActionSeq =
@@ -337,16 +405,13 @@ public class ExceptionCaseService {
                         .fromStatus(fromStatus)
                         .toStatus(toStatus)
                         .actionType(actionType)
-                        .reason(request.reason())
+                        .reason(reason)
                         .evidenceRef(request.evidenceRef())
                         .actionBy(actionUserId)
                         .actionAt(actionAt)
                         .build());
 
         // 5. exception_case의 현재 상태 UPDATE
-        Long assignedTo = actionType == ExceptionActionType.ASSIGN
-                ? actionUserId
-                : target.assignedTo();
         OffsetDateTime resolvedAt = isClosed(toStatus) ? actionAt : null;
         int updated = exceptionCaseRepository.updateCaseAfterAction(
                 exceptionCaseId,
@@ -368,7 +433,7 @@ public class ExceptionCaseService {
                 String.valueOf(exceptionCaseId),
                 toJson(new ExceptionAuditValue(fromStatus, target.assignedTo(), null, null)),
                 toJson(new ExceptionAuditValue(toStatus, assignedTo, actionType, request.evidenceRef())),
-                request.reason(), RequestIdContext.current(), null, null);
+                reason, RequestIdContext.current(), null, null);
         auditLogRepository.saveAndFlush(auditLog);
 
         return new ExceptionActionResponse(
@@ -377,7 +442,7 @@ public class ExceptionCaseService {
                 fromStatus,
                 toStatus,
                 actionType.name(),
-                request.reason(),
+                reason,
                 request.evidenceRef(),
                 actionUserId,
                 actionUserLoginId,

@@ -56,6 +56,10 @@ public class PaymentCorrectionReconciliationService {
     }
 
     public void refresh(List<Long> runIds, String groupKey, Long actor) {
+        refresh(runIds, groupKey, actor, null);
+    }
+
+    public void refresh(List<Long> runIds, String groupKey, Long actor, String correctionReason) {
         for (Long oldId : runIds) {
             var old = runs.findById(oldId);
             if (repository.supersede(oldId) != 1) {
@@ -74,22 +78,26 @@ public class PaymentCorrectionReconciliationService {
             execution.executeInTransaction(new ReconciliationExecutionRequest(newId, old.getValidationRunId(),
                     old.getSettlementMonth(), row.getPaymentStage(), old.getInsurerId(), actor));
             if (old.getValidationRunId() != null) detection.bulkCreate(newId);
-            resolveMatchedExceptions(oldId, newId, groupKey, actor);
+            resolveMatchedExceptions(oldId, newId, groupKey, actor, correctionReason);
         }
     }
 
-    private void resolveMatchedExceptions(Long oldId, Long newId, String groupKey, Long actor) {
+    private void resolveMatchedExceptions(Long oldId, Long newId, String groupKey, Long actor, String correctionReason) {
         // 동일한 업무 매칭키가 새 실행에서 MATCHED가 된 예외만 잠금 후 종결한다.
         // 다른 불일치나 원장 정정 요청 예외는 일괄 종결하지 않는다.
         List<?> ids = repository.lockMatchedExceptions(oldId, newId);
         String login = repository.loginId(actor);
-        String reason = "원장 정정 후 재대사 일치 확인 (" + groupKey + ", 대사 " + newId + ")";
+        String reason = (groupKey.startsWith("EXCP-SCHEDULE-") ? "스케줄·계약 정정" : "원장 정정") + " 후 재대사 일치 확인 (" + groupKey + ", 대사 " + newId + ")";
+        if (correctionReason != null && !correctionReason.isBlank()) reason += " · " + correctionReason;
         for (Object value : ids) {
             Object[] row = (Object[]) value;
             Long id = ((Number) row[0]).longValue();
             if ("NEW".equals(row[1])) exceptions.action(id,
                     new ExceptionActionRequest(ExceptionActionType.START_REVIEW, reason, groupKey), actor, login);
-            exceptions.action(id, new ExceptionActionRequest(ExceptionActionType.RESOLVE, reason, groupKey), actor, login);
+            var action = row.length > 2 && "ACTUAL_MISSING".equals(row[2]) ? ExceptionActionType.RECONCILE_AGAIN
+                    : row.length > 2 && "DUPLICATE".equals(row[2]) && correctionReason != null && correctionReason.startsWith("중복 지급 기록 취소")
+                    ? ExceptionActionType.CANCEL : ExceptionActionType.CORRECT;
+            exceptions.action(id, new ExceptionActionRequest(action, reason, groupKey), actor, login);
         }
     }
 }

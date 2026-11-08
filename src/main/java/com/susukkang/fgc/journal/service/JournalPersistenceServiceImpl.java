@@ -21,6 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import com.susukkang.fgc.journal.repository.JournalCorrectionRepository;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -51,6 +54,7 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
     private final AuditLogRepository auditLogRepository;
     private final ConstraintErrorCodeResolver constraintErrorCodeResolver;
     private final TransactionTemplate requiresNewTransactionTemplate;
+    private final JournalCorrectionRepository correctionRepository;
 
     /**
      * 설명 : 분개 저장 의존성과 감사 Repository를 주입하고 REQUIRES_NEW 트랜잭션을 준비한다.
@@ -64,18 +68,31 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
                                           JournalAccountRepository journalAccountRepository,
                                           AuditLogRepository auditLogRepository,
                                           ConstraintErrorCodeResolver constraintErrorCodeResolver,
-                                          PlatformTransactionManager transactionManager) {
+                                          PlatformTransactionManager transactionManager,
+                                          JournalCorrectionRepository correctionRepository) {
         this.journalHeaderRepository = journalHeaderRepository;
         this.journalLineRepository = journalLineRepository;
         this.journalAccountRepository = journalAccountRepository;
         this.auditLogRepository = auditLogRepository;
         this.constraintErrorCodeResolver = constraintErrorCodeResolver;
+        this.correctionRepository = correctionRepository;
         this.requiresNewTransactionTemplate = new TransactionTemplate(transactionManager);
         this.requiresNewTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Override
     public JournalHeaderRow saveDraft(JournalHeaderDraft draft, Long createdBy, String requestId) {
+        return saveDraft(draft, createdBy, requestId, false);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public JournalHeaderRow saveDraftInCurrentTransaction(JournalHeaderDraft draft, Long createdBy, String requestId) {
+        correctionRepository.lockJournalNumbering("journal-no:" + java.time.YearMonth.from(draft.getJournalDate()));
+        return saveDraft(draft, createdBy, requestId, true);
+    }
+
+    private JournalHeaderRow saveDraft(JournalHeaderDraft draft, Long createdBy, String requestId, boolean currentTransaction) {
         // 1. 멱등 체크
         Optional<JournalHeaderRow> existing = journalHeaderRepository.findBySourceKey(
                 draft.getJournalType(), draft.getSourceEntityType(),
@@ -113,6 +130,8 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
             throw new FgcBusinessException(FgcErrorCode.LEDG_001,
                     Map.of("c", debitTotal.subtract(creditTotal).abs()));
         }
+
+        if (currentTransaction) return attemptSave(draft, journalAccountIds, createdBy, requestId);
 
         // 채번 + 헤더/라인 INSERT + 감사로그는 하나의 REQUIRES_NEW 트랜잭션
         // (attemptSave)으로 묶는다. 1~3번 사전 체크와 실제 INSERT 사이에는 DB 잠금이

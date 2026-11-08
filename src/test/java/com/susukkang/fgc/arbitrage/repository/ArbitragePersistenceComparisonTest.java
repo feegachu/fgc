@@ -142,6 +142,7 @@ class ArbitragePersistenceComparisonTest {
         Long id = exceptionRepository.insertArbitrageCandidate(row.getValidationRunId(), row.getContractId(), row.getArbitrageCheckId(), "GA_TO_FC", "검토 근거");
         Long oldId = exceptionRepository.insertArbitrageCandidate(row.getValidationRunId(), row.getContractId(), row.getArbitrageCheckId(), "GA_TO_FC", "검토 근거");
         assertThat(id).isEqualTo(oldId);
+        assertThat(jdbc.queryForObject("SELECT severity FROM fgc.exception_case WHERE exception_case_id=?", String.class, id)).isEqualTo("WARNING");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.exception_occurrence WHERE exception_case_id = ?", Long.class, id)).isEqualTo(1);
         String key = jdbc.queryForObject("SELECT exception_key FROM fgc.exception_case WHERE exception_case_id = ?", String.class, id);
         assertThat(key).isEqualTo("ARBITRAGE_CANDIDATE:2095-07:CONTRACT:" + row.getContractId() + ":GA_TO_FC");

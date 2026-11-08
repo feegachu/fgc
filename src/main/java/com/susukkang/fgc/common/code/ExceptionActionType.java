@@ -31,7 +31,7 @@ public enum ExceptionActionType {
             case ASSIGN, COMMENT ->
                     currentStatus == ExceptionStatus.NEW
                             || currentStatus == ExceptionStatus.IN_REVIEW;
-            case START_REVIEW -> currentStatus == ExceptionStatus.NEW;
+            case START_REVIEW -> currentStatus == ExceptionStatus.NEW || currentStatus == ExceptionStatus.IN_REVIEW;
             case REOPEN -> currentStatus == ExceptionStatus.REJECTED;
             case CORRECT, REDUCE, CANCEL, DEFER, RECONCILE_AGAIN,
                     FALSE_POSITIVE, RESOLVE, REJECT ->
@@ -57,7 +57,8 @@ public enum ExceptionActionType {
             throw new IllegalStateException("현재 상태에서는 해당 예외 조치를 수행할 수 없습니다.");
         }
         return switch (this) {
-            case ASSIGN, COMMENT -> currentStatus;
+            case COMMENT -> currentStatus;
+            case ASSIGN -> ExceptionStatus.IN_REVIEW;
             case START_REVIEW -> ExceptionStatus.IN_REVIEW;
             case REOPEN -> ExceptionStatus.IN_REVIEW;
             case CORRECT, REDUCE, CANCEL, DEFER, RECONCILE_AGAIN, RESOLVE ->
@@ -74,7 +75,7 @@ public enum ExceptionActionType {
             case CORRECT -> "정정";
             case REDUCE -> "감액";
             case CANCEL -> "취소";
-            case DEFER -> "이연";
+            case DEFER -> "이월";
             case RECONCILE_AGAIN -> "재대사";
             case FALSE_POSITIVE -> "예외 아님";
             case RESOLVE -> "해결";

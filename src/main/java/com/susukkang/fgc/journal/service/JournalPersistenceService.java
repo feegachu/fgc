@@ -17,4 +17,7 @@ public interface JournalPersistenceService {
      * @param requestId 저장 성공 시 audit_log.request_id로 남길 요청 식별자
      */
     JournalHeaderRow saveDraft(JournalHeaderDraft draft, Long createdBy, String requestId);
+
+    /** 원천 지급과 분개를 호출자의 트랜잭션에서 함께 커밋하거나 롤백한다. */
+    JournalHeaderRow saveDraftInCurrentTransaction(JournalHeaderDraft draft, Long createdBy, String requestId);
 }

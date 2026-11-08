@@ -76,6 +76,9 @@ class ExceptionGenerationRepositoryIntegrationTest {
                         .containsEntry("exception_type", "CAP_VIOLATION")
                         .containsEntry("severity", "CRITICAL")
                         .containsEntry("source_entity_type", "CAP_CHECK"));
+        assertThat(exceptions).anySatisfy(row -> assertThat(row)
+                .containsEntry("exception_type", "ARBITRAGE_CANDIDATE")
+                .containsEntry("severity", "WARNING"));
 
         assertThat(exceptionCaseRepository.insertFromCapChecks(validationRunId)).isZero();
         assertThat(exceptionCaseRepository.insertFromArbitrageChecks(validationRunId)).isZero();
