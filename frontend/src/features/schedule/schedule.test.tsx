@@ -642,7 +642,6 @@ describe('FUN-037 4년 예정', () => {
     const { actions, router } = renderAt(
       '/schedules/11?returnTo=%2Fschedules%3Fregime%3DFOUR_YEAR_2027%26purpose%3DSIMULATION',
       (url, options) => {
-        if (url.endsWith('/versions')) return [current.header]
         if (url === '/api/v1/schedules/11/regenerate' && options?.method === 'POST') {
           if (++attempts === 1) throw new Error('일시적인 연결 오류')
           return { scheduleHeaderId: 12, versionNo: 2 }

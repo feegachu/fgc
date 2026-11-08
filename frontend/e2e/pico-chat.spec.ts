@@ -12,7 +12,6 @@ test('피코는 답변 준비와 순차 출력을 보여주고 이동 버튼을 
     if (path.endsWith('/auth/refresh')) data = { accessToken: 'pico-chat' }
     else if (path.endsWith('/auth/me')) data = { loginId: 'pico', userName: '담당자', roleCode: 'SETTLEMENT', canProcess: true, demoMonth: '2026-07' }
     else if (path.endsWith('/schedules/5')) data = { header: { scheduleHeaderId: 5, contractId: 3, contractNo: '계약-3', paymentStage: 'GA_TO_FC', scheduleRegime: 'CURRENT', schedulePurpose: 'OPERATIONAL', status: 'PLANNED', activeYn: true, scheduleVersionNo: 1 }, lines: [] }
-    else if (path.endsWith('/schedules/5/versions')) data = []
     else if (path.endsWith('/ai/pico/ask')) {
       await new Promise<void>(resolve => { release = resolve })
       data = { source: 'AI', decision: 'ANSWER_ONLY', message, guideVersion: '1.0', contextRevision: route.request().postDataJSON().clientContextRevision,
