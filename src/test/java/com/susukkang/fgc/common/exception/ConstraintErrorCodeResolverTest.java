@@ -134,7 +134,7 @@ class ConstraintErrorCodeResolverTest {
                 "uq_journal_source_revision"
         );
 
-        assertThat(correctionConstraints).allSatisfy(constraint -> {
+        assertThat(correctionConstraints).isNotEmpty().allSatisfy(constraint -> {
             RuntimeException exception = new RuntimeException(
                     "duplicate key violates constraint " + constraint
             );
