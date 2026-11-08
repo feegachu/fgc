@@ -192,9 +192,8 @@ class CompareAskToolsTest {
         assertThat(tools.verify("1위보다 2위가 나보험 튼튼건강이에요.")).isNull();
     }
 
-    @Test
-    @DisplayName("'한도에 걸렸다'는 말한 상품 모두에 이월이 있어야 맞고, 섞인 주장은 판단하지 않는다")
-    void capStateClaimsNeedEveryMentionedProductToCarryOver() {
+    /** 1위 든든건강(이월 없음), 2위 튼튼건강(이월 100,000), 3위 편한건강(이월 없음)으로 1위 항목을 조회한 도구. */
+    private CompareAskTools capStateTools() {
         CompareRankingResponse base = ranking();
         Item first = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of());
         Item second = new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 100_000, 16_000, 634_000, 80.0, null, List.of());
@@ -203,6 +202,13 @@ class CompareAskToolsTest {
                 base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
                 base.warnings(), null, List.of(first, second, third), List.of(), CompareRankingFilters.NONE));
         tools.run("get_item", RANK_1);
+        return tools;
+    }
+
+    @Test
+    @DisplayName("'한도에 걸렸다'는 말한 상품 모두에 이월이 있어야 맞고, 섞인 주장은 판단하지 않는다")
+    void capStateClaimsNeedEveryMentionedProductToCarryOver() {
+        CompareAskTools tools = capStateTools();
 
         assertThat(tools.verify("모든 상품이 한도에 걸렸어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("가보험 든든건강과 나보험 튼튼건강 모두 한도에 걸렸어요.")).isEqualTo("CAP_STATE_MISMATCH");
@@ -215,6 +221,58 @@ class CompareAskToolsTest {
     }
 
     @Test
+    @DisplayName("도달 표현과 떨어진 부정어는 안전한 쪽으로 거절하고, 못 받은 금액이 있다는 말만 긍정으로 읽는다")
+    void negationsFarFromTheCapVerbAreNotReadAsNegationsOfIt() {
+        CompareAskTools tools = capStateTools();
+
+        // 도달 표현과 무관한 뒤쪽 서술어의 '못'·'없'은 부정이 아니다(#919).
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘어 받지 못한 금액이 있어요.")).isNull();
+        // 부정어가 바로 뒤가 아니면 긍정인지 부정인지 알 수 없어 거절한다(안전한 쪽). 못 받은 금액이 '있다'는 말만 긍정으로 읽는다.
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸려 받지 못하고 다음 달로 넘어가요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸리지 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸리지는 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 초과한 적이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강은 한도를 초과하지 못했어요.")).isNull();
+        // 긍정과 부정을 정규식으로 가를 수 없는 꼴('~해 … 금액이 없어요')은 긍정으로 읽는다. 이월이 없는 상품이면 거절(안전한 쪽)된다.
+        assertThat(tools.verify("가보험 든든건강은 한도를 초과해 이번 달에 더 받을 수 있는 금액이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강은 한도를 넘어 이번 달 지급분이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강은 한도에 도달해 이번 달 추가 수수료가 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 초과해 이번 달에 더 받을 수 있는 금액이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+    }
+
+    @Test
+    @DisplayName("허용 목록 밖의 활용형 부정도 이월이 있는 상품에 대한 틀린 주장을 통과시키지 않는다")
+    void unlistedNegationFormsDoNotLetAWrongClaimThrough() {
+        CompareAskTools tools = capStateTools();
+
+        // 허용 목록 밖의 활용형 부정도 틀린 주장을 통과시키지 않는다(#925 리뷰). 이월이 있는 상품에 대해 '안 걸렸다'고 하면 거절한다.
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘기지 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘긴 적이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 초과된 적이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘어선 적이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 초과할 일이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        // 못 받은 금액이 있다는 말이 뒤에 붙어도 앞쪽의 다른 부정을 덮지 않는다.
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘긴 적은 없지만 아직 받지 못한 금액이 있어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘기지 않았고 받지 못한 금액이 있어요.")).isEqualTo("CAP_STATE_MISMATCH");
+    }
+
+    @Test
+    @DisplayName("활용이 낀 부정도 부정으로 읽어 이월이 없는 상품에는 통과, 있는 상품에는 거절한다")
+    void inflectedNegationsAreNegations() {
+        CompareAskTools tools = capStateTools();
+
+        // 활용이 낀 부정도 부정이다(#925 리뷰).
+        assertThat(tools.verify("가보험 든든건강은 한도를 넘어서지 않았어요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강은 한도에 걸려 있지 않아요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강은 한도에 걸리지도 않았어요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강은 한도에 걸린 상태가 아니에요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘어서지 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸려 있지 않아요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸리지도 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸린 상태가 아니에요.")).isEqualTo("CAP_STATE_MISMATCH");
+    }
+
+    @Test
     @DisplayName("금액·비율이 든 문장만 빼고 나머지 설명을 남긴다")
     void onlyNumberSentencesAreDropped() {
         CompareAskTools tools = toolsWith("get_item", RANK_1);
@@ -224,6 +282,60 @@ class CompareAskToolsTest {
         assertThat(tools.keepNumberFreeSentences("순수령액은 684,000원이에요. 한도 영향은 90.5%예요.")).isEmpty();
         assertThat(tools.keepNumberFreeSentences("환수가 작아서 앞섰어요.")).isEqualTo("환수가 작아서 앞섰어요.");
         assertThat(tools.keepNumberFreeSentences("9위 상품은 없어요. 환수가 작아요.")).isEqualTo("환수가 작아요.");
+    }
+
+    @Test
+    @DisplayName("항목 없이 가장 앞섰다고만 쓴 문장은 1위 상품에만 맞다")
+    void leadClaimMustPointAtTheTopProduct() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.verify("나보험 튼튼건강이 가장 앞섰어요.")).isEqualTo("LEAD_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강이 제일 먼저 앞섰어요.")).isEqualTo("LEAD_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강이 제일 먼저 앞섰어요.")).isNull();
+        // 부정형은 뜻이 뒤집힌다: 1위가 가장 앞서지 않았다는 말이 틀리다.
+        assertThat(tools.verify("가보험 든든건강이 가장 앞서지 않았어요.")).isEqualTo("LEAD_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강은 가장 앞선 상품이 아니에요.")).isEqualTo("LEAD_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강이 가장 앞서지 않았어요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강은 가장 앞선 상품이 아니에요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강이 가장 앞섰어요.")).isNull();
+        assertThat(tools.verify("1위 가보험 든든건강이 가장 앞서요.")).isNull();
+        // 가정하는 문장이나 항목을 붙인 문장은 판단하지 않는다.
+        assertThat(tools.verify("나보험 튼튼건강이 가장 앞선다면 좋겠지만 순위는 참고용이에요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("두 상품을 견주는 최상위 주장은 '보다' 앞의 비교 상대를 빼고 주장 대상의 순위로 판단한다")
+    void leadClaimComparingTwoProductsJudgesTheClaimedOne() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        // 1위가 2위보다 가장 앞섰다는 말은 맞고, 반대(2위가 1위보다)는 틀리다.
+        assertThat(tools.verify("가보험 든든건강이 나보험 튼튼건강보다 가장 앞섰어요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강이 가보험 든든건강보다 가장 앞섰어요.")).isEqualTo("LEAD_MISMATCH");
+        // 비교 상대가 앞에 와도 같다.
+        assertThat(tools.verify("나보험 튼튼건강보다 가보험 든든건강이 가장 앞섰어요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강보다 나보험 튼튼건강이 가장 앞섰어요.")).isEqualTo("LEAD_MISMATCH");
+        // 부정형은 뒤집힌다: 2위가 1위보다 가장 앞서지 않았다는 말은 맞다.
+        assertThat(tools.verify("나보험 튼튼건강이 가보험 든든건강보다 가장 앞서지 않았어요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강이 나보험 튼튼건강보다 가장 앞서지 않았어요.")).isEqualTo("LEAD_MISMATCH");
+        // 앞섬 표현이 '보다' 앞에서 비교 상대를 꾸미면 대상을 가릴 수 없어 판단하지 않는다(맞는 답을 거절하지 않는다).
+        assertThat(tools.verify("가장 앞선 가보험 든든건강보다 나보험 튼튼건강은 순위가 아래예요.")).isNull();
+        assertThat(tools.verify("가장 앞선 나보험 튼튼건강보다 가보험 든든건강은 순위가 위예요.")).isNull();
+        // '보다'가 없으면 누가 주장 대상인지 알 수 없어 판단하지 않는다.
+        assertThat(tools.verify("가보험 든든건강과 나보험 튼튼건강 중 나보험 튼튼건강이 가장 앞섰어요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("서버 내부 도구를 언급하는 답은 거절한다")
+    void internalToolMentionsAreRejected() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.verify("이 챗봇은 도구를 통해 비교 값을 제공하며 순위를 설명해요.")).isEqualTo("TOOL_MENTION");
+        assertThat(tools.verify("get_item 으로 값을 확인했어요.")).isEqualTo("TOOL_MENTION");
+        assertThat(tools.verify("내부 도구로 값을 확인했어요.")).isEqualTo("TOOL_MENTION");
+        // 일반 용례의 '도구'는 막지 않는다.
+        assertThat(tools.verify("이 챗봇은 상품 비교를 돕는 보조 도구예요.")).isNull();
+        assertThat(tools.verify("compare(1, 2) 결과를 보면 앞서요.")).isEqualTo("TOOL_MENTION");
+        assertThat(tools.verify("이 챗봇은 비교 결과와 기본 용어를 안내해요.")).isNull();
     }
 
     @Test

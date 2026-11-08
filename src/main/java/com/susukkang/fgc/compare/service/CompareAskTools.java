@@ -78,15 +78,51 @@ final class CompareAskTools {
     /** '1위'처럼 순위를 말하는 표기. 소수점·쉼표 뒤의 숫자(금액 일부)는 순위로 보지 않는다. */
     private static final Pattern RANK_LABEL = Pattern.compile("(?<![\\d,.])(\\d{1,3})\\s*위(?!\\d)");
     /** '가장 큰/높은/많은'(최댓값) 또는 '가장 작은/낮은/적은'(최솟값) 주장. */
-    private static final Pattern SUPERLATIVE = Pattern.compile("가장\\s*(큰|크|커|높|많|작은|작|낮|적)");
+    private static final Pattern SUPERLATIVE = Pattern.compile("가장\\s*(큰|크|커|높|많|작은|작|낮|적)", Pattern.CANON_EQ);
     /** '한도에 걸렸다·도달했다·초과했다' 처럼 한도에 닿았다는 주장. 조사가 없는 '한도 초과 시'(설명)는 잡지 않는다. */
-    private static final Pattern CAP_HIT = Pattern.compile("한도(?:에|를|까지)\\s*(?:걸|도달|초과|넘|닿)(?!는|하는)");
+    private static final Pattern CAP_HIT = Pattern.compile("한도(?:[에를]|까지)\\s*(?:걸|도달|초과|[넘닿])(?!는|하는)", Pattern.CANON_EQ);
     /** 상품을 짚지 않은 문장은 "모든/전체 상품"처럼 전체를 말할 때만 상태 주장으로 본다(용어 설명의 "한도를 넘는 금액은…"은 제외). */
-    private static final Pattern ALL_SCOPE = Pattern.compile("모두|모든|전부|전체");
-    private static final Pattern CONDITIONAL = Pattern.compile("하면|이면|으면|라면|경우|만약|시\\s|시에");
+    private static final Pattern ALL_SCOPE = Pattern.compile("모두|모든|전부|전체", Pattern.CANON_EQ);
+    private static final Pattern CONDITIONAL = Pattern.compile("하면|이면|으면|라면|경우|만약|시\\s|시에", Pattern.CANON_EQ);
     /** 한도 도달 표현. 한 문장에서 긍정과 부정이 섞이면('1위는 걸렸고 2위는 걸리지 않았어요') 주장이 섞여 있어 판단하지 않는다. */
-    private static final Pattern CAP_VERB = Pattern.compile("걸리|걸려|걸렸|걸린|도달|초과|넘|닿");
-    private static final Pattern NEGATION = Pattern.compile("않|없|못|아니");
+    private static final Pattern CAP_VERB = Pattern.compile("걸[리려렸린]|도달|초과|[넘닿]", Pattern.CANON_EQ);
+    /** 답에 서버 내부 도구를 드러내는 말('도구를 통해 제공하며', 'get_item'). 설계사에게는 의미 없는 내부 구현이라 답으로 내보내지 않는다. '보조 도구예요' 같은 일반 용례는 막지 않는다. */
+    private static final List<Pattern> TOOL_MENTIONS = List.of(
+            Pattern.compile("(?:내부|서버)\\s*도구|함수\\s*호출", Pattern.CANON_EQ),
+            Pattern.compile("도구\\s*(?:[를로가값]|호출|결과)", Pattern.CANON_EQ),
+            Pattern.compile("get_item|explain_term|compare\\s*\\(", Pattern.CANON_EQ));
+    /** 도달 표현과 부정 사이에 끼는 활용('초과되지', '넘어서지', '걸려 있지', '초과하지'). */
+    private static final Pattern NEGATION_TAIL = Pattern.compile("^(?:[하한되돼]|[어아해]서|\\s*있)?", Pattern.CANON_EQ);
+    private static final List<Pattern> NEGATIONS = List.of(
+            Pattern.compile("^[지진]도?는?\\s*(?:[않못]|아니)", Pattern.CANON_EQ),
+            Pattern.compile("^[은는]?\\s*(?:적|일|경우|상태)[이가은는도]?\\s*(?:전혀\\s*)?(?:없|아니)", Pattern.CANON_EQ));
+
+    private static final Pattern ANY_NEGATION = Pattern.compile("[않없못]|아니", Pattern.CANON_EQ);
+    /** '한도를 넘어 받지 못한 금액이 있어요'처럼 못 받은 금액이 있다는 말. 부정어가 있어도 한도에 걸렸다는 긍정 주장이다. */
+    private static final Pattern UNRECEIVED_AMOUNT_EXISTS = Pattern.compile("[못않](?:(?![않없못]|아니)[^,.!?]){0,10}?(?:금액|수수료|분)[이은]?\\s*있", Pattern.CANON_EQ);
+    private static final int POSITIVE = 0;
+    private static final int NEGATED = 1;
+    private static final int UNCLEAR = 2;
+
+    /**
+     * 도달 표현 뒤의 말이 그 표현을 긍정하는지 부정하는지. 바로 뒤에서 부정이 확인되면 부정, 구간에 부정어가 하나도 없으면 긍정이다.
+     * 부정어가 있는데 바로 뒤가 아니면(활용형을 못 알아본 경우 포함) 긍정인지 부정인지 정규식으로 가를 수 없어 판단 불가로 둔다.
+     */
+    private static int polarityAfter(String rest) {
+        if (negatedRightAfter(rest)) {
+            return NEGATED;
+        }
+        // 못 받은 금액이 있다는 말은 긍정이지만, 그 말을 걷어 내고도 부정어가 남으면 다른 부정이 있는 것이라 가를 수 없다.
+        String stripped = UNRECEIVED_AMOUNT_EXISTS.matcher(rest).replaceAll("");
+        return ANY_NEGATION.matcher(stripped).find() ? UNCLEAR : POSITIVE;
+    }
+
+    /** 도달 표현 바로 뒤에서 그 표현을 부정하는지. 뒤쪽 다른 서술어의 '못'·'없'은 도달 표현의 부정이 아니다. */
+    private static boolean negatedRightAfter(String rest) {
+        Matcher tail = NEGATION_TAIL.matcher(rest);
+        String remainder = tail.find() ? rest.substring(tail.end()) : rest;
+        return NEGATIONS.stream().anyMatch(pattern -> pattern.matcher(remainder).find());
+    }
     private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+|\\n+");
     /** '커요'는 '크다'의 활용이라 '크'로는 잡히지 않는다. */
     private static final List<String> BIGGER_WORDS = List.of("많", "높", "크", "커");
@@ -253,6 +289,9 @@ final class CompareAskTools {
         if (RECOMMEND_PHRASES.stream().anyMatch(normalized::contains)) {
             return "RECOMMENDATION";
         }
+        if (TOOL_MENTIONS.stream().anyMatch(pattern -> pattern.matcher(normalized).find())) {
+            return "TOOL_MENTION";
+        }
         // 금액·비율은 서버 문장이 맡는다. 보험사·상품 이름 안의 숫자, 용어 '1,200% 룰', 표시 중인 범위의 순위 표기('1위')만 예외다.
         if (!AnswerNumberGuard.allowed(withoutRankLabels(normalized), CompareSummaryService.names(ranking))) {
             return "NUMBER_GUARD";
@@ -328,6 +367,9 @@ final class CompareAskTools {
                 reason = verifySuperlative(sentence);
             }
             if (reason == null) {
+                reason = verifyLeadClaim(sentence);
+            }
+            if (reason == null) {
                 reason = verifyCapState(sentence);
             }
             if (reason != null) {
@@ -336,6 +378,41 @@ final class CompareAskTools {
             start = end == normalized.length() ? end : ends.end();
         }
         return null;
+    }
+
+    /** 항목 없이 '가장 앞섰다'고만 쓴 문장('A가 가장 앞섰어요'). 순위는 종합 결과라서 이렇게 말할 수 있는 상품은 1위뿐이다(#919 C-R1). */
+    private static final Pattern LEAD_CLAIM = Pattern.compile("(?:가장|제일|맨)(?:\\s*먼저)?\\s*(?:앞섰|앞서|앞선|우수|상위)", Pattern.CANON_EQ);
+
+    /** 두 갈래(하지 않았다 / 아니다)로 나눠 한 식의 복잡도를 줄이고, 소유 수량자로 되돌림(backtracking)을 막는다. */
+    private static final List<Pattern> LEAD_NEGATIONS = List.of(
+            Pattern.compile("^[하한]?[지진]도?는?\\s*+[않못]", Pattern.CANON_EQ),
+            Pattern.compile("^[하한]?\\s*+(?:상품|것|쪽|곳)?+[이가은는]?+\\s*+아니", Pattern.CANON_EQ));
+
+    private String verifyLeadClaim(String sentence) {
+        if (!LEAD_CLAIM.matcher(sentence).find() || CONDITIONAL.matcher(sentence).find() || sentence.contains("다면")) {
+            return null;
+        }
+        Matcher lead = LEAD_CLAIM.matcher(sentence);
+        lead.find();
+        // 환수·이월 같은 항목을 앞에 붙인 말은 그 항목만의 이야기라 항목별 검사(최상급)에 맡긴다.
+        if (!metricsIn(sentence.substring(0, lead.start())).isEmpty()) {
+            return null;
+        }
+        Set<Integer> mentioned = ranksMentioned(sentence);
+        int top = ranking.items().stream().mapToInt(Item::rank).min().orElse(1);
+        if (mentioned.size() == 2) {
+            // '나보험이 가보험보다 가장 앞섰어요': 비교 상대('보다' 바로 앞 상품)와 주장 대상을 가려 주장 대상만 본다.
+            // '가장 앞선 가보험보다 …'처럼 앞섬 표현이 '보다' 앞에서 비교 상대를 꾸미면 대상을 가릴 수 없어 판단하지 않는다.
+            int than = sentence.indexOf("보다");
+            mentioned = than >= 0 && lead.start() > than ? leadSubject(sentence, mentioned) : Set.of();
+        }
+        if (mentioned.size() != 1) {
+            return null;
+        }
+        // '가장 앞서지 않았어요', '가장 앞선 상품이 아니에요'는 1위가 아닐 때만 맞다.
+        String afterLead = sentence.substring(lead.end());
+        boolean negated = LEAD_NEGATIONS.stream().anyMatch(pattern -> pattern.matcher(afterLead).find());
+        return mentioned.contains(top) == negated ? "LEAD_MISMATCH" : null;
     }
 
     private String verifySuperlative(String sentence) {
@@ -394,7 +471,7 @@ final class CompareAskTools {
             return null;
         }
         // 도달 표현마다 뒤따르는 부분에서 부정을 본다. 같은 주장의 반복은 함께 검사하고, 긍정과 부정이 섞이면 판단하지 않는다.
-        Set<Boolean> polarities = new HashSet<>();
+        Set<Integer> polarities = new HashSet<>();
         Matcher verb = CAP_VERB.matcher(sentence);
         List<int[]> verbs = new ArrayList<>();
         while (verb.find()) {
@@ -402,12 +479,16 @@ final class CompareAskTools {
         }
         for (int k = 0; k < verbs.size(); k++) {
             int to = k + 1 < verbs.size() ? verbs.get(k + 1)[0] : sentence.length();
-            polarities.add(NEGATION.matcher(sentence.substring(verbs.get(k)[1], to)).find());
+            polarities.add(polarityAfter(sentence.substring(verbs.get(k)[1], to)));
+        }
+        // 긍정인지 부정인지 가를 수 없으면 맞는 말인지 알 수 없으므로 거절한다(서버 문장으로 대체되는 안전한 쪽).
+        if (polarities.contains(UNCLEAR)) {
+            return "CAP_STATE_MISMATCH";
         }
         if (polarities.size() != 1) {
             return null;
         }
-        boolean negated = polarities.iterator().next();
+        boolean negated = polarities.iterator().next() == NEGATED;
         // 걸렸다는 말은 말한 상품 모두에 이월이 있어야 맞고, 걸리지 않았다는 말은 하나도 없어야 맞다.
         boolean holds = negated ? scope.stream().noneMatch(item -> item.carryover() > 0)
                 : scope.stream().allMatch(item -> item.carryover() > 0);
@@ -574,6 +655,33 @@ final class CompareAskTools {
     }
 
     /** 글에서 보험사·상품 이름(줄인 이름 포함)이나 순위 표기('3위')로 언급된 순위 집합. */
+    /**
+     * 두 상품을 견주는 최상위 주장에서 주장 대상의 순위. '보다' 바로 앞에 나온 상품을 비교 상대로 보고 나머지를 대상으로 삼는다.
+     * '보다'가 없거나 앞선 상품을 가릴 수 없으면 빈 집합(판단하지 않음)이다.
+     */
+    private Set<Integer> leadSubject(String sentence, Set<Integer> mentioned) {
+        String normalized = Normalizer.normalize(sentence, Normalizer.Form.NFKC);
+        int than = normalized.indexOf("보다");
+        if (than < 0) {
+            return Set.of();
+        }
+        Integer comparator = null;
+        int nearest = -1;
+        for (Item item : ranking.items()) {
+            int at = firstMention(normalized, item);
+            if (mentioned.contains(item.rank()) && at >= 0 && at < than && at > nearest) {
+                nearest = at;
+                comparator = item.rank();
+            }
+        }
+        if (comparator == null) {
+            return Set.of();
+        }
+        Set<Integer> subject = new HashSet<>(mentioned);
+        subject.remove(comparator);
+        return subject;
+    }
+
     Set<Integer> ranksMentioned(String text) {
         String normalized = Normalizer.normalize(text, Normalizer.Form.NFKC);
         Set<Integer> ranks = new HashSet<>();
