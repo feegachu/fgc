@@ -271,6 +271,16 @@ export function ContractPaymentForm({
     setEdits((previous) => ({ ...previous, [id]: { ...previous[id], ...patch } }))
     setChecks({})
   }
+  useLayoutEffect(() => {
+    if (busy !== 'precheck') return
+    const panel = editor.current?.querySelector<HTMLElement>('#cap-panel')
+    if (!panel) return
+    const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
+    window.scrollBy({
+      top: panel.getBoundingClientRect().top - headerBottom - 16,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    })
+  }, [busy])
   async function run(action: string, task: () => Promise<void>) {
     if (lock.current || !canProcess) return
     lock.current = true

@@ -1,6 +1,8 @@
 import { StatusBadge, type StatusTone } from '../../components/StatusBadge'
 import { rateText, usageRate, won } from '../../lib/format'
 import type { CapPreview, Precheck } from './form-api'
+import { CapUsage } from '../cap/badges'
+import '../cap/cap.css'
 
 type Row = { id: number; name: string; item: string; amount: number; result?: Precheck }
 const tones: Record<string, StatusTone> = {
@@ -28,12 +30,17 @@ export function ContractPaymentCapPanel({ rows, pending }: { rows: Row[]; pendin
       <div className="contract-batch-cap-summary">
         <span>선택 지급액</span><strong>{Number.isSafeInteger(total) ? won(total) : '-'}</strong>
       </div>
-      {common && common.resultStatus !== 'NOT_APPLICABLE' && <div className="contract-batch-cap-summary-grid">
-        <div><span>계약 한도</span><strong>{won(common.limitAmount)}</strong></div>
-        <div><span>검증 기준 산입 총액</span><strong>{won(common.includedAmount)}</strong></div>
-        <div><span>잔여 한도</span><strong>{won(common.remainingAmount)}</strong></div>
-        <div><span>한도 사용률</span><strong>{usageRate(common.usagePct)}%</strong></div>
-      </div>}
+      {common && common.resultStatus !== 'NOT_APPLICABLE' && <>
+        <div className="contract-batch-cap-summary-grid">
+          <div><span>계약 한도</span><strong>{won(common.limitAmount)}</strong></div>
+          <div><span>검증 기준 산입 총액</span><strong>{won(common.includedAmount)}</strong></div>
+          <div><span>잔여 한도</span><strong>{won(common.remainingAmount)}</strong></div>
+        </div>
+        <div className="contract-batch-cap-gauge">
+          <span>1,200% 한도 사용률</span>
+          <CapUsage value={common.usagePct} status={common.resultStatus} />
+        </div>
+      </>}
       {rows.length ? <div className="contract-batch-cap-table">
         <table>
           <thead><tr><th>설계사 / 수수료 항목</th><th>지급액</th><th>산입액 / 판정</th></tr></thead>
