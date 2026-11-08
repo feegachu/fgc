@@ -6,7 +6,7 @@ const HIGHLIGHT_PADDING = 10
 export interface SpotlightPresentation {
   side?: 'right' | 'left' | 'above' | 'below' | 'either'
   includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean; rowLimit?: number
-  fixedCard?: boolean | 'left'; scrollToTop?: boolean
+  fixedCard?: boolean | 'left' | 'right'; scrollToTop?: boolean
 }
 
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>, detailed = false,
@@ -131,12 +131,12 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         const cardLeftBoundary = workspaceRight - workspaceLeft >= 224 ? workspaceLeft : 0
         // The full workflow keeps one coach slot while only the spotlight moves.
         // Reserve a stable height as well: shorter instructions must not move Next.
-        if (fixedCard === 'left') {
+        if (fixedCard === 'left' || fixedCard === 'right') {
           const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
           const topBoundary = headerBottom + 16
           const cardWidth = Math.min(420, Math.max(0, workspaceRight - cardLeftBoundary - 24))
           const cardHeight = Math.max(0, Math.min(360, height - topBoundary - 16))
-          const cardLeft = cardLeftBoundary + 12
+          const cardLeft = fixedCard === 'right' ? workspaceRight - cardWidth - 12 : cardLeftBoundary + 12
           const cardTop = height - cardHeight - 16
           const rect = target?.isConnected ? targetRect() : null
           setPosition({

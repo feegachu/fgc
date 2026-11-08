@@ -85,8 +85,10 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
   const demoNumberStep = after && decision?.step === 'contract.create' && location.pathname === '/contracts/new'
     && explanation.step?.id === 'features.contract.contract-form-page.contract-no'
   const demoNumber = useDemoContractNumber(explanation.target, demoNumberStep && detailedWorkflow && !collapsed && !busy && !leave)
+  const coachSide = decision?.step === 'contract.create' && location.pathname === '/contracts/new'
+    && explanation.step?.presentation?.side === 'left' ? 'left' : 'right'
   const position = useSpotlight(!collapsed ? activeTarget : null, card, detailedWorkflow,
-    after ? { ...explanation.step?.presentation, fixedCard: 'left' } : detailedWorkflow ? explanation.step?.presentation : undefined)
+    after ? { ...explanation.step?.presentation, fixedCard: coachSide } : detailedWorkflow ? explanation.step?.presentation : undefined)
   useGuideStep(explanation.step, explanation.target, explanation.next, detailedWorkflow && !collapsed && !busy && !leave)
   const detailedInput = useRef(false)
   useLayoutEffect(() => { detailedInput.current = detailedPayment || detailedWorkflow })

@@ -296,7 +296,7 @@ it('uses a scrollable bottom card when a full-width target leaves no usable vert
 })
 
 
-it('keeps the full workflow coach fixed across targets, missing targets and viewport resizing', () => {
+it.each(['left', 'right'] as const)('keeps the full workflow coach fixed on the %s across targets, missing targets and viewport resizing', (fixedCard) => {
   vi.useFakeTimers()
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   const width = vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1440)
@@ -305,17 +305,18 @@ it('keeps the full workflow coach fixed across targets, missing targets and view
   document.body.append(first, next)
   vi.spyOn(first, 'getBoundingClientRect').mockReturnValue(new DOMRect(280, 100, 1100, 200))
   vi.spyOn(next, 'getBoundingClientRect').mockReturnValue(new DOMRect(900, 100, 480, 50))
-  const view = render(<Card target={first} detailed presentation={{ fixedCard: 'left' }} />)
+  const view = render(<Card target={first} detailed presentation={{ fixedCard }} />)
   try {
     act(() => { vi.advanceTimersByTime(100) })
     const card = screen.getByRole('region', { name: 'Guide card' })
+    expect(card).toHaveStyle({ left: fixedCard === 'right' ? '1008px' : '12px', top: '524px', width: '420px', height: '360px' })
     const original = card.getAttribute('style')
     const originalBox = card.dataset.box
-    view.rerender(<Card target={next} detailed presentation={{ side: 'right', fixedCard: 'left' }} />)
+    view.rerender(<Card target={next} detailed presentation={{ side: 'right', fixedCard }} />)
     act(() => { vi.advanceTimersByTime(100) })
     expect(card.getAttribute('style')).toBe(original)
     expect(card.dataset.box).not.toBe(originalBox)
-    view.rerender(<Card target={null} detailed presentation={{ fixedCard: 'left' }} />)
+    view.rerender(<Card target={null} detailed presentation={{ fixedCard }} />)
     act(() => { vi.advanceTimersByTime(100) })
     expect(card.getAttribute('style')).toBe(original)
     width.mockReturnValue(360); height.mockReturnValue(400)
