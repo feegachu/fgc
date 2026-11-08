@@ -99,7 +99,7 @@ public class CompareAskService {
             Pattern.compile("순위.{0,6}(?:어떻게|무슨|뭘|무엇).{0,6}(?:정해|정하|결정|산정|매겨|나와|나뉘)", Pattern.CANON_EQ),
             Pattern.compile("순위.{0,4}(?:기준|방식)", Pattern.CANON_EQ),
             Pattern.compile("(?:정하는|정해지는|매기는)\\s*(?:기준|방식)", Pattern.CANON_EQ));
-    static final String RANK_CRITERIA = "이 서비스가 쓰는 가정 산식(compare-net-v1) 기준으로, 순위는 보수적 순수령액이 큰 순서로 정해요. 같으면 환수 노출액이 작은 쪽이, 그래도 같으면 상품 등록 순서가 앞서요. 순위는 참고용이라 최종 선택은 설계사님이 해요.";
+    static final String RANK_CRITERIA = "이 서비스가 쓰는 프로젝트 가정 산식(compare-net-v1, D-01 가정)이에요. 확정된 업무 기준이 아니라 가정이고, 이 기준으로 순위는 보수적 순수령액이 큰 순서로 정해요. 같으면 환수 노출액이 작은 쪽이, 그래도 같으면 상품 등록 순서가 앞서요. 순위는 참고용이라 최종 선택은 설계사님이 해요.";
     private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)(?!급)|순위|차이|비교", Pattern.CANON_EQ);
     private static final List<String> FORBIDDEN = CompareSummaryService.FORBIDDEN;
 

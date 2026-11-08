@@ -259,7 +259,8 @@ class CompareAskServiceTest {
         assertThat(response.answer()).isEqualTo("보수적 순수령액이 큰 순서로 정하고 같으면 환수가 작은 쪽이 앞서요.");
 
         llmReturns(false, "");
-        assertThat(service.ask(question, threeItems()).answer()).isEqualTo(CompareAskService.RANK_CRITERIA);
+        assertThat(service.ask(question, threeItems()).answer()).isEqualTo(CompareAskService.RANK_CRITERIA)
+                .contains("가정").contains("확정된 업무 기준이 아니라");
 
         gatewayFails();
         assertThat(service.ask(question, threeItems()).answer()).isEqualTo(CompareAskService.RANK_CRITERIA);

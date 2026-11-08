@@ -400,6 +400,10 @@ final class CompareAskTools {
         }
         Set<Integer> mentioned = ranksMentioned(sentence);
         int top = ranking.items().stream().mapToInt(Item::rank).min().orElse(1);
+        if (mentioned.size() == 2) {
+            // '나보험이 가보험보다 가장 앞섰어요': 비교 상대('보다' 바로 앞 상품)와 주장 대상을 가려 주장 대상만 본다.
+            mentioned = leadSubject(sentence, mentioned);
+        }
         if (mentioned.size() != 1) {
             return null;
         }
@@ -649,6 +653,33 @@ final class CompareAskTools {
     }
 
     /** 글에서 보험사·상품 이름(줄인 이름 포함)이나 순위 표기('3위')로 언급된 순위 집합. */
+    /**
+     * 두 상품을 견주는 최상위 주장에서 주장 대상의 순위. '보다' 바로 앞에 나온 상품을 비교 상대로 보고 나머지를 대상으로 삼는다.
+     * '보다'가 없거나 앞선 상품을 가릴 수 없으면 빈 집합(판단하지 않음)이다.
+     */
+    private Set<Integer> leadSubject(String sentence, Set<Integer> mentioned) {
+        String normalized = Normalizer.normalize(sentence, Normalizer.Form.NFKC);
+        int than = normalized.indexOf("보다");
+        if (than < 0) {
+            return Set.of();
+        }
+        Integer comparator = null;
+        int nearest = -1;
+        for (Item item : ranking.items()) {
+            int at = firstMention(normalized, item);
+            if (mentioned.contains(item.rank()) && at >= 0 && at < than && at > nearest) {
+                nearest = at;
+                comparator = item.rank();
+            }
+        }
+        if (comparator == null) {
+            return Set.of();
+        }
+        Set<Integer> subject = new HashSet<>(mentioned);
+        subject.remove(comparator);
+        return subject;
+    }
+
     Set<Integer> ranksMentioned(String text) {
         String normalized = Normalizer.normalize(text, Normalizer.Form.NFKC);
         Set<Integer> ranks = new HashSet<>();

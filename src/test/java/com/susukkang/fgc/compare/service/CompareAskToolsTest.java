@@ -299,9 +299,26 @@ class CompareAskToolsTest {
         assertThat(tools.verify("나보험 튼튼건강은 가장 앞선 상품이 아니에요.")).isNull();
         assertThat(tools.verify("가보험 든든건강이 가장 앞섰어요.")).isNull();
         assertThat(tools.verify("1위 가보험 든든건강이 가장 앞서요.")).isNull();
-        // 가정이거나 둘 이상을 견주는 문장, 항목을 붙인 문장은 판단하지 않는다.
+        // 가정하는 문장이나 항목을 붙인 문장은 판단하지 않는다.
         assertThat(tools.verify("나보험 튼튼건강이 가장 앞선다면 좋겠지만 순위는 참고용이에요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("두 상품을 견주는 최상위 주장은 '보다' 앞의 비교 상대를 빼고 주장 대상의 순위로 판단한다")
+    void leadClaimComparingTwoProductsJudgesTheClaimedOne() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        // 1위가 2위보다 가장 앞섰다는 말은 맞고, 반대(2위가 1위보다)는 틀리다.
         assertThat(tools.verify("가보험 든든건강이 나보험 튼튼건강보다 가장 앞섰어요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강이 가보험 든든건강보다 가장 앞섰어요.")).isEqualTo("LEAD_MISMATCH");
+        // 비교 상대가 앞에 와도 같다.
+        assertThat(tools.verify("나보험 튼튼건강보다 가보험 든든건강이 가장 앞섰어요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강보다 나보험 튼튼건강이 가장 앞섰어요.")).isEqualTo("LEAD_MISMATCH");
+        // 부정형은 뒤집힌다: 2위가 1위보다 가장 앞서지 않았다는 말은 맞다.
+        assertThat(tools.verify("나보험 튼튼건강이 가보험 든든건강보다 가장 앞서지 않았어요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강이 나보험 튼튼건강보다 가장 앞서지 않았어요.")).isEqualTo("LEAD_MISMATCH");
+        // '보다'가 없으면 누가 주장 대상인지 알 수 없어 판단하지 않는다.
+        assertThat(tools.verify("가보험 든든건강과 나보험 튼튼건강 중 나보험 튼튼건강이 가장 앞섰어요.")).isNull();
     }
 
     @Test
