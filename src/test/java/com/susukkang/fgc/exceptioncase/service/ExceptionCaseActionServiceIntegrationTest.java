@@ -144,7 +144,31 @@ class ExceptionCaseActionServiceIntegrationTest {
                 rs.getString("assigned_to")), String.valueOf(exceptionCaseId));
 
         assertThat(assignAudit).isEqualTo(new AuditValues(
-                "NEW", "NEW", "ASSIGN", "DOC-ASSIGN-001", String.valueOf(userId)));
+                "NEW", "IN_REVIEW", "ASSIGN", "DOC-ASSIGN-001", String.valueOf(userId)));
+    }
+
+    @Test
+    void 다른담당자에게_배정하면_검토중상태와_실제처리자를_보존한다() {
+        var users = exceptionCaseService.options().assignableUsers();
+        assertThat(users).hasSizeGreaterThan(1);
+        var actor = users.getFirst();
+        var assignee = users.getLast();
+        Long exceptionCaseId = insertNewCase();
+
+        var result = exceptionCaseService.action(exceptionCaseId,
+                new ExceptionActionRequest(ExceptionActionType.ASSIGN, "담당자에게 전달", null, assignee.userId()),
+                actor.userId(), actor.loginId());
+
+        assertThat(result.toStatus()).isEqualTo(ExceptionStatus.IN_REVIEW);
+        assertThat(result.actionBy()).isEqualTo(actor.userId());
+        assertThat(jdbcTemplate.queryForObject("SELECT assigned_to FROM fgc.exception_case WHERE exception_case_id = ?",
+                Long.class, exceptionCaseId)).isEqualTo(assignee.userId());
+        assertThat(jdbcTemplate.queryForObject("SELECT action_by FROM fgc.exception_action WHERE exception_case_id = ?",
+                Long.class, exceptionCaseId)).isEqualTo(actor.userId());
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT (after_value ->> 'assignedTo')::bigint FROM fgc.audit_log
+                 WHERE entity_type = 'EXCEPTION_CASE' AND entity_id = ?
+                """, Long.class, String.valueOf(exceptionCaseId))).isEqualTo(assignee.userId());
     }
 
     /** FGC-FUN-053: 실제 이연 조치는 검토중 예외를 해결 상태로 닫는다. */
@@ -349,16 +373,16 @@ class ExceptionCaseActionServiceIntegrationTest {
     }
 
     @Test
-    void 처리사유가_공백이면_EXCP_001을_반환한다() {
-        assertThatThrownBy(() -> exceptionCaseService.action(
-                1L,
+    void 처리사유_입력없이_검토를_시작하면_내역을_자동기록한다() {
+        Long id = insertNewCase();
+        Long actor = firstUserId();
+        var result = exceptionCaseService.userAction(
+                id,
                 new ExceptionActionRequest(ExceptionActionType.START_REVIEW, " ", "DOC-001"),
-                1L,
-                "settle01"))
-                .isInstanceOf(FgcBusinessException.class)
-                .satisfies(exception -> assertThat(
-                        ((FgcBusinessException) exception).getErrorCode())
-                        .isEqualTo(FgcErrorCode.EXCP_001));
+                actor, loginIdOf(actor));
+        assertThat(result.reason()).isEqualTo("검토 시작 처리");
+        assertThat(result.toStatus()).isEqualTo(ExceptionStatus.IN_REVIEW);
+        assertThat(jdbcTemplate.queryForObject("SELECT assigned_to FROM fgc.exception_case WHERE exception_case_id = ?", Long.class, id)).isEqualTo(actor);
     }
 
     /**

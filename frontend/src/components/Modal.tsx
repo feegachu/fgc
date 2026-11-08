@@ -10,6 +10,7 @@ export function Modal({
   title,
   children,
   footer,
+  headerActions,
   onClose,
   closeOnBackdrop = true,
   closeOnEscape = true,
@@ -20,6 +21,7 @@ export function Modal({
   title: string
   children: ReactNode
   footer?: ReactNode
+  headerActions?: ReactNode
   onClose: () => void
   closeOnBackdrop?: boolean
   closeOnEscape?: boolean
@@ -117,11 +119,11 @@ export function Modal({
           <h2 className="modal-title" id={titleId}>
             {title}
           </h2>
-          <button data-guide-feature="components.modal.button" type="button" className="icon-button" aria-label="창 닫기" onClick={onClose}>
+          <div className="modal-header-actions">{headerActions}<button data-guide-feature="components.modal.button" type="button" className="icon-button" aria-label="창 닫기" onClick={onClose}>
             <span className="material-symbols-rounded" aria-hidden="true">
               close
             </span>
-          </button>
+          </button></div>
         </header>
         <div className="modal-body">{children}</div>
         {footer && <footer className="modal-footer">{footer}</footer>}

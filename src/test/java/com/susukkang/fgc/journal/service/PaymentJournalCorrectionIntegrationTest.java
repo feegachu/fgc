@@ -36,6 +36,304 @@ class PaymentJournalCorrectionIntegrationTest {
     private Long contractId;
     private Long validationRunId;
     private PaymentStage paymentStage = PaymentStage.GA_TO_FC;
+    private boolean legacyPaymentWithoutSourceContract;
+    @Autowired com.susukkang.fgc.exceptioncase.service.ExceptionPaymentCorrectionService exceptionPayments;
+    @Autowired com.susukkang.fgc.exceptioncase.service.ExceptionCaseService exceptionActions;
+    @Autowired com.susukkang.fgc.cap.service.CapCheckService capChecks;
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(PaymentStage.class)
+    @WithMockUser(roles = "SETTLEMENT")
+    void correctionPreviewReplacesNineHundredThousandWithSixHundredThousandWithoutImportingTheScheduleTotal(PaymentStage stage) {
+        Fixture f = fixture(stage, "900000", "988000");
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=?, monthly_equivalent_first_premium=76000 WHERE contract_id=?", TEST_MONTH, contractId);
+        startException(f.exception());
+        var old = payments.get(f.payment());
+        var result = exceptionPayments.preview(f.exception(), new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                old.paymentId(), old.updatedAt(), paymentBody(old, "600000", TEST_MONTH)), 1L);
+        assertThat(result.capPreview()).hasSize(1);
+        var cap = result.capPreview().getFirst();
+        assertThat(cap.existingIncludedAmount()).isZero();
+        assertThat(cap.candidateAmount()).isEqualTo(600000);
+        assertThat(cap.includedAmount()).isEqualTo(600000);
+        assertThat(payments.get(f.payment()).amount()).isEqualByComparingTo("900000");
+        assertThat(status(f.exception())).isEqualTo("IN_REVIEW");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(PaymentStage.class)
+    @WithMockUser(roles = "SETTLEMENT")
+    void scheduleBasedCapRoutesToItsSourceAndOnlyResolvesAfterTheSchedulePasses(PaymentStage stage) {
+        Fixture f = fixture(stage, "900000", "988000");
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=?, monthly_equivalent_first_premium=76000 WHERE contract_id=?", LocalDate.of(2026, 7, 1), contractId);
+        var cap = capChecks.calculateAndSave(com.susukkang.fgc.cap.dto.CapCalculationCommand.manual(
+                contractId, stage, LocalDate.of(2026, 7, 1), null));
+        assertThat(cap.result().resultStatus()).as(cap.result().toString()).isEqualTo(CapResultStatus.VIOLATION);
+        Long id = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.exception_case(exception_key,exception_type,severity,status,contract_id,
+                    source_entity_type,source_entity_id,cap_check_id,title,description)
+                VALUES (?,'CAP_VIOLATION','CRITICAL','NEW',?,'CAP_CHECK',?,?,'예상 스케줄 한도 초과','예상액 988000')
+                RETURNING exception_case_id
+                """, Long.class, "EXCP-PLAN-"+UUID.randomUUID(), contractId, cap.capCheckId().toString(), cap.capCheckId());
+        startException(id);
+        var context = exceptionPayments.context(id, 1L);
+        assertThat(context.scheduledBasis()).isTrue();
+        assertThat(context.correctionTarget()).isEqualTo("SCHEDULE");
+        assertThat(context.paymentStage()).isEqualTo(stage);
+        assertThat(context.payments()).isEmpty();
+        assertThat(context.scheduleLink()).startsWith("/schedules/");
+        var old = payments.get(f.payment());
+        var request = new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                old.paymentId(), old.updatedAt(), paymentBody(old,"600000",TEST_MONTH));
+        assertThatThrownBy(() -> exceptionPayments.preview(id, request, 1L)).isInstanceOf(FgcBusinessException.class);
+        assertThatThrownBy(() -> exceptionPayments.correct(id, request, 1L,"admin")).isInstanceOf(FgcBusinessException.class);
+        assertThat(payments.get(f.payment()).amount()).isEqualByComparingTo("900000");
+        var blocked = exceptionPayments.recheckSchedule(id, 1L, "admin");
+        assertThat(blocked.resolved()).isFalse();
+        assertThat(status(id)).isEqualTo("IN_REVIEW");
+        jdbcTemplate.update("UPDATE fgc.schedule_line SET expected_amount=600000 WHERE schedule_header_id IN (SELECT schedule_header_id FROM fgc.schedule_header WHERE contract_id=? AND payment_stage=?)", contractId, stage.name());
+        var resolved = exceptionPayments.recheckSchedule(id, 1L, "admin");
+        assertThat(resolved.resolved()).isTrue();
+        assertThat(resolved.action().actionType()).isEqualTo("CORRECT");
+        assertThat(status(id)).isEqualTo("RESOLVED");
+        assertThat(payments.get(f.payment()).amount()).isEqualByComparingTo("900000");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"EXPECTED_MISSING", "INVALID_CONTRACT_PAYMENT"})
+    @WithMockUser(roles = "SETTLEMENT")
+    void zeroExpectedAmountRoutesToScheduleOrContractInsteadOfEditingPayments(String resultType) {
+        Fixture f = fixture(PaymentStage.INSURER_TO_GA, "700000", "100000");
+        jdbcTemplate.update("UPDATE fgc.reconciliation_result SET expected_total_amount=0,result_type=? WHERE reconciliation_run_id=? AND contract_id=?", resultType, f.run(), contractId);
+        startException(f.exception());
+        var context = exceptionPayments.context(f.exception(), 1L);
+        assertThat(context.correctionTarget()).isEqualTo(resultType.equals("EXPECTED_MISSING") ? "SCHEDULE" : "CONTRACT");
+        assertThat(context.payments()).isEmpty();
+        assertThat(context.scheduleLink()).isEqualTo("/contracts/" + contractId + "?tab=schedules");
+        var old = payments.get(f.payment());
+        assertThatThrownBy(() -> exceptionPayments.correct(f.exception(), new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                old.paymentId(), old.updatedAt(), paymentBody(old, "100000", TEST_MONTH)), 1L, "admin")).isInstanceOf(FgcBusinessException.class);
+        assertThat(payments.get(f.payment()).amount()).isEqualByComparingTo("700000");
+    }
+
+    @Test
+    @WithMockUser(roles = "SETTLEMENT")
+    void paymentWithContractOnlyOnAttributionCanBeCorrectedAfterSuccessfulPrecheck() {
+        legacyPaymentWithoutSourceContract = true;
+        Fixture f = fixture();
+        startException(f.exception());
+        var old = payments.get(f.payment());
+        var request = new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                old.paymentId(), old.updatedAt(), paymentBody(old, "100000", TEST_MONTH));
+        assertThat(exceptionPayments.preview(f.exception(), request, 1L).confirmable()).isTrue();
+        assertThat(exceptionPayments.correct(f.exception(), request, 1L, "admin").resolved()).isTrue();
+    }
+
+    @Test
+    @WithMockUser(roles = "SETTLEMENT")
+    void exceptionEditorCorrectsTheActualPaymentAndOnlyResolvesAfterReconciliationMatches() {
+        Fixture f = fixture();
+        startException(f.exception());
+        var old = payments.get(f.payment());
+        assertThat(exceptionPayments.context(f.exception(), 1L).payments()).extracting(p -> p.paymentId()).contains(f.payment());
+        var result = exceptionPayments.correct(f.exception(), new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                old.paymentId(), old.updatedAt(), paymentBody(old, "100000", old.settlementMonth())), 1L, "admin");
+        assertThat(result.resolved()).as(result.message()).isTrue();
+        assertThat(result.action().actionType()).isEqualTo("CORRECT");
+        assertThat(payments.get(f.payment()).status()).isEqualTo(CommissionPaymentStatus.CANCELLED);
+        assertThat(result.payment().status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(result.payment().amount()).isEqualByComparingTo("100000");
+    }
+
+    @Test
+    @WithMockUser(roles = "SETTLEMENT")
+    void incompletePaymentCorrectionKeepsTheExceptionInReviewAndOffersTheReplacementForFurtherEditing() {
+        Fixture f = fixture();
+        startException(f.exception());
+        var old = payments.get(f.payment());
+        var result = exceptionPayments.correct(f.exception(), new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                old.paymentId(), old.updatedAt(), paymentBody(old, "100001", old.settlementMonth())), 1L, "admin");
+        assertThat(result.resolved()).isFalse();
+        assertThat(status(f.exception())).isEqualTo("IN_REVIEW");
+        assertThat(result.remainingIssues()).extracting(i -> i.resultType()).contains("AMOUNT_DIFFERENCE");
+        assertThat(result.message()).contains("예상 100,000원 / 실제 100,001원");
+        assertThat(exceptionPayments.context(f.exception(), 1L).payments()).extracting(p -> p.paymentId()).contains(result.payment().paymentId());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    @WithMockUser(roles = "SETTLEMENT")
+    void capDraftCorrectionInfersReductionOrDeferralAndRevalidatesBeforeResolving(boolean defer) {
+        Fixture f = fixture();
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=? WHERE contract_id=?", TEST_MONTH, contractId);
+        var seed = payments.get(f.payment());
+        var draft = payments.create(paymentBody(seed, "1000000000", TEST_MONTH));
+        assertThatThrownBy(() -> payments.confirm(draft.paymentId(), "EXCP-CAP-TEST-" + draft.paymentId()))
+                .isInstanceOf(com.susukkang.fgc.transaction.service.CommissionPaymentConfirmationRejectedException.class);
+        Long exceptionId = id("SELECT exception_case_id FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND exception_type='CAP_VIOLATION' ORDER BY exception_case_id LIMIT 1", draft.paymentId().toString());
+        startException(exceptionId);
+        var result = exceptionPayments.correct(exceptionId, new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                draft.paymentId(), payments.get(draft.paymentId()).updatedAt(),
+                paymentBody(draft, defer ? "1000000000" : "1", defer ? TEST_MONTH.plusMonths(12) : TEST_MONTH)), 1L, "admin");
+        assertThat(result.resolved()).isTrue();
+        assertThat(result.action().actionType()).isEqualTo(defer ? "DEFER" : "REDUCE");
+        assertThat(result.payment().status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+    }
+
+    @Test
+    @WithMockUser(roles = "SETTLEMENT")
+    void sourceCorrectionRejectsAnotherReviewerAndSelfAssignment() {
+        Fixture f = fixture();
+        assertThatThrownBy(() -> exceptionActions.userAction(f.exception(),
+                new com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest(ExceptionActionType.ASSIGN, null, null, 1L), 1L, "admin"))
+                .isInstanceOf(FgcBusinessException.class);
+        startException(f.exception());
+        assertThatThrownBy(() -> exceptionPayments.context(f.exception(), 2L)).isInstanceOf(FgcBusinessException.class);
+        assertThat(payments.get(f.payment()).status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    @WithMockUser(roles="SETTLEMENT")
+    void partialDeferralConfirmsOnlyCurrentAmountAndKeepsTheExcessAsAFutureDraft(boolean settlementSupport) {
+        Fixture f=fixture();
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=? WHERE contract_id=?",TEST_MONTH,contractId);
+        var draftBody=paymentBody(payments.get(f.payment()),"1000000000",TEST_MONTH);
+        if (settlementSupport) {
+            Long item=id("SELECT commission_item_id FROM fgc.commission_item WHERE item_code='SETTLEMENT_SUPPORT'");
+            var a=draftBody.attributions().getFirst();
+            draftBody=new com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest(draftBody.sourceType(),draftBody.sourceBusinessKey(),
+                    draftBody.contractId(),draftBody.agentId(),item,draftBody.amount(),draftBody.settlementMonth(),draftBody.cashflowType(),
+                    draftBody.scheduledPaymentDate(),draftBody.paymentStage(),draftBody.allocationPolicyVersion(),List.of(
+                    new com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionRequest(a.contractId(),a.attributionDate(),a.amount(),
+                    a.inclusionDecisionStatus(),a.exclusionType(),a.inclusionDecisionReason(),"월별 신계약 배부",a.evidenceRef(),AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY)),draftBody.evidenceRef(),draftBody.note());
+        }
+        var draft=payments.create(draftBody);
+        assertThatThrownBy(() -> payments.confirm(draft.paymentId(),"PARTIAL-"+draft.paymentId())).isInstanceOf(com.susukkang.fgc.transaction.service.CommissionPaymentConfirmationRejectedException.class);
+        Long exception=id("SELECT exception_case_id FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND exception_type='CAP_VIOLATION'",draft.paymentId().toString());
+        startException(exception);
+        var result=exceptionPayments.correct(exception,new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                draft.paymentId(),payments.get(draft.paymentId()).updatedAt(),paymentBody(draft,"1",TEST_MONTH),null,null,"DEFER",new BigDecimal("999999999"),TEST_MONTH.plusMonths(12)),1L,"admin");
+        assertThat(result.resolved()).isTrue();
+        assertThat(result.action().actionType()).isEqualTo("DEFER");
+        assertThat(result.payment().amount()).isEqualByComparingTo("1");
+        assertThat(result.deferredPayment().amount()).isEqualByComparingTo("999999999");
+        assertThat(result.deferredPayment().status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        assertThat(result.deferredPayment().scheduledPaymentDate()).isEqualTo(TEST_MONTH.plusMonths(12));
+        if (settlementSupport) {
+            assertThat(result.deferredPayment().settlementMonth()).isEqualTo(TEST_MONTH);
+            assertThat(result.deferredPayment().attributions().getFirst().attributionMethod()).isEqualTo(AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY);
+        }
+    }
+
+    @Test @WithMockUser(roles="SETTLEMENT")
+    void duplicateRecordCanBeReversedWithoutCreatingADeductionAndResolvesAsCancel() {
+        Fixture f=fixture(PaymentStage.GA_TO_FC,"150000","100000");
+        var old=payments.get(f.payment());
+        Long policy=id("SELECT policy_version_id FROM fgc.commission_transaction WHERE commission_transaction_id=?",f.payment());
+        var other=insertPayment(contractId,policy,f.item(),f.agent(),1,"100000","CONFIRMED",UUID.randomUUID().toString());
+        insertPostedJournal("CONFIRMED_FC_PAYOUT","COMMISSION_TRANSACTION",other.transactionId(),contractId,f.agent(),f.item(),"100000","CONFIRMED_PAYOUT_EXPENSE","CONFIRMED_PAYOUT_PAYABLE");
+        jdbcTemplate.update("UPDATE fgc.reconciliation_run SET superseded_yn=true WHERE reconciliation_run_id=?",f.run());
+        Long run=jdbcTemplate.queryForObject("INSERT INTO fgc.reconciliation_run(settlement_month,payment_stage,insurer_id,validation_run_id,corrects_reconciliation_run_id) SELECT settlement_month,payment_stage,insurer_id,validation_run_id,reconciliation_run_id FROM fgc.reconciliation_run WHERE reconciliation_run_id=? RETURNING reconciliation_run_id",Long.class,f.run());
+        jdbcTemplate.update("UPDATE fgc.reconciliation_run SET status='RUNNING',started_at=clock_timestamp() WHERE reconciliation_run_id=?",run);
+        Long insurer=id("SELECT insurer_id FROM fgc.insurance_contract WHERE contract_id=?",contractId);
+        execution.executeInTransaction(new ReconciliationExecutionRequest(run,validationRunId,TEST_MONTH,PaymentStage.GA_TO_FC,insurer,1L)); detection.bulkCreate(run);
+        Long exception=id("SELECT e.exception_case_id FROM fgc.exception_case e JOIN fgc.reconciliation_result r ON e.source_entity_id=r.reconciliation_result_id::text WHERE e.source_entity_type='RECONCILIATION_RESULT' AND r.reconciliation_run_id=? AND r.contract_id=? AND r.result_type='DUPLICATE'",run,contractId);
+        startException(exception);
+        var result=exceptionPayments.cancelDuplicate(exception,new com.susukkang.fgc.exceptioncase.dto.ExceptionDuplicateCancelRequest(old.paymentId(),old.updatedAt(),"중복 기록 확인"),1L,"admin");
+        assertThat(result.resolved()).isTrue();
+        assertThat(result.action().actionType()).isEqualTo("CANCEL");
+        assertThat(payments.get(old.paymentId()).status()).isEqualTo(CommissionPaymentStatus.CANCELLED);
+        assertThat(payments.get(other.transactionId()).status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+    }
+
+    private void startException(Long id) {
+        exceptionActions.userAction(id, new com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest(
+                ExceptionActionType.START_REVIEW, null, null), 1L, "admin");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(PaymentStage.class)
+    @WithMockUser(roles = "SETTLEMENT")
+    void missingActualCanBeRegisteredFromTheExceptionAndOnlyClosesAfterMatching(PaymentStage stage) {
+        Fixture f = fixture(stage, "50000", "100000");
+        corrections.reverse(new ReverseJournalCommand(f.journal(), "누락 지급 정정 준비", null, 1L));
+        Long currentRun = id("SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE corrects_reconciliation_run_id=?", f.run());
+        Long exceptionId = id("""
+                SELECT e.exception_case_id FROM fgc.exception_case e JOIN fgc.reconciliation_result r
+                  ON e.source_entity_type='RECONCILIATION_RESULT' AND e.source_entity_id=r.reconciliation_result_id::text
+                WHERE r.reconciliation_run_id=? AND r.contract_id=? AND r.result_type='ACTUAL_MISSING'
+                """, currentRun, contractId);
+        startException(exceptionId);
+        var context = exceptionPayments.context(exceptionId, 1L);
+        assertThat(context.suggestedPayment()).isNotNull();
+        assertThat(context.payments()).isEmpty();
+        assertThat(context.canRegisterPayment()).isTrue();
+        var result = exceptionPayments.correct(exceptionId,
+                new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(null, null, context.suggestedPayment()), 1L, "admin");
+        assertThat(result.payment().status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(result.resolved()).as(result.message()).isTrue();
+        assertThat(result.action().actionType()).isEqualTo("RECONCILE_AGAIN");
+    }
+
+    @Test
+    @WithMockUser(roles = "SETTLEMENT")
+    void amountDifferenceCannotRegisterAnotherPaymentAndRequiresSettlementEvidenceForActualTransfers() {
+        Fixture f = fixture(PaymentStage.GA_TO_FC, "825000", "845000");
+        startException(f.exception());
+        var old = payments.get(f.payment());
+        assertThat(exceptionPayments.context(f.exception(), 1L).canRegisterPayment()).isFalse();
+        assertThatThrownBy(() -> exceptionPayments.preview(f.exception(), new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                null, null, paymentBody(old, "20000", TEST_MONTH)), 1L)).isInstanceOf(FgcBusinessException.class);
+        var body = paymentBody(old, "845000", TEST_MONTH);
+        assertThatThrownBy(() -> exceptionPayments.preview(f.exception(), new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                old.paymentId(), old.updatedAt(), body, "SETTLEMENT_COMPLETED", ""), 1L)).isInstanceOf(FgcBusinessException.class);
+        var result = exceptionPayments.correct(f.exception(), new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                old.paymentId(), old.updatedAt(), body, "SETTLEMENT_COMPLETED", "추가 송금 20,000원 · BANK-1"), 1L, "admin");
+        assertThat(result.resolved()).isTrue();
+        assertThat(result.action().actionType()).isEqualTo("CORRECT");
+        assertThat(result.action().reason()).contains("BANK-1");
+        assertThat(payments.get(f.payment()).status()).isEqualTo(CommissionPaymentStatus.CANCELLED);
+        assertThat(result.payment().amount()).isEqualByComparingTo("845000");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(PaymentStage.class)
+    @WithMockUser(roles = "SETTLEMENT")
+    void missingActualOffersTheExistingDraftAndConfirmsItWithoutCreatingAnotherPayment(PaymentStage stage) {
+        Fixture f = fixture(stage);
+        corrections.reverse(new ReverseJournalCommand(f.journal(), "누락 초안 확인", null, 1L));
+        Long currentRun = id("SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE corrects_reconciliation_run_id=?", f.run());
+        Long exceptionId = id("""
+                SELECT e.exception_case_id FROM fgc.exception_case e JOIN fgc.reconciliation_result r
+                  ON e.source_entity_type='RECONCILIATION_RESULT' AND e.source_entity_id=r.reconciliation_result_id::text
+                WHERE r.reconciliation_run_id=? AND r.contract_id=? AND r.result_type='ACTUAL_MISSING'
+                """, currentRun, contractId);
+        startException(exceptionId);
+        var suggestion = exceptionPayments.context(exceptionId, 1L).suggestedPayment();
+        var draft = payments.create(suggestion);
+        var context = exceptionPayments.context(exceptionId, 1L);
+        assertThat(context.canRegisterPayment()).isFalse();
+        assertThat(context.payments()).extracting(p -> p.paymentId()).contains(draft.paymentId());
+        assertThatThrownBy(() -> exceptionPayments.correct(exceptionId,
+                new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(null, null, suggestion), 1L, "admin"))
+                .isInstanceOf(FgcBusinessException.class);
+        var result = exceptionPayments.correct(exceptionId,
+                new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(draft.paymentId(), draft.updatedAt(), suggestion), 1L, "admin");
+        assertThat(result.payment().paymentId()).isEqualTo(draft.paymentId());
+        assertThat(result.resolved()).isTrue();
+        assertThat(result.action().actionType()).isEqualTo("RECONCILE_AGAIN");
+    }
+
+    private com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest paymentBody(
+            com.susukkang.fgc.transaction.dto.CommissionPaymentResponse old, String amount, LocalDate month) {
+        var attribution = old.attributions().getFirst();
+        return new com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest("GA_MANUAL_PAYMENT", "EXCP-TEST-" + UUID.randomUUID(),
+                old.contractId() == null ? attribution.contractId() : old.contractId(), old.agentId(), old.commissionItemId(), new BigDecimal(amount), month, old.cashflowType(), month,
+                old.paymentStage(), old.allocationPolicyVersion(), List.of(new com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionRequest(
+                attribution.contractId(), month, new BigDecimal(amount), attribution.inclusionDecisionStatus(), attribution.exclusionType(),
+                "예외 원인 수정", attribution.allocationBasis(), attribution.evidenceRef(), attribution.attributionMethod())), old.evidenceRef(), null);
+    }
 
     @Test
     void repostCancelsOldPaymentAndMatchesReplacementWithoutDuplicateAndResolvesException() {
@@ -214,6 +512,10 @@ class PaymentJournalCorrectionIntegrationTest {
     private Fixture fixture() { return fixture(PaymentStage.GA_TO_FC); }
 
     private Fixture fixture(PaymentStage stage) {
+        return fixture(stage, "50000", "100000");
+    }
+
+    private Fixture fixture(PaymentStage stage, String actualAmount, String expectedAmount) {
         paymentStage = stage;
         boolean payout = stage == PaymentStage.GA_TO_FC;
         contractId = cloneContract();
@@ -226,12 +528,12 @@ class PaymentJournalCorrectionIntegrationTest {
                 SELECT ?,COALESCE(MAX(run_no),0)+1,'CREATED' FROM fgc.validation_run WHERE validation_month=?
                 RETURNING validation_run_id
                 """,Long.class,TEST_MONTH,TEST_MONTH);
-        Long line = insertSchedule(contractId,policy,item,agent,1,"100000");
-        insertPostedJournal(payout ? "EXPECTED_FC_PAYOUT" : "EXPECTED_INSURER_INCOME","SCHEDULE_LINE",line,contractId,payout ? agent : null,item,"100000",payout ? "EXPECTED_PAYOUT_EXPENSE" : "EXPECTED_RECEIVABLE",payout ? "EXPECTED_PAYOUT_PAYABLE" : "EXPECTED_INCOME");
-        var old = insertPayment(contractId,policy,item,agent,1,"50000","DRAFT",UUID.randomUUID().toString());
+        Long line = insertSchedule(contractId,policy,item,agent,1,expectedAmount);
+        insertPostedJournal(payout ? "EXPECTED_FC_PAYOUT" : "EXPECTED_INSURER_INCOME","SCHEDULE_LINE",line,contractId,payout ? agent : null,item,expectedAmount,payout ? "EXPECTED_PAYOUT_EXPENSE" : "EXPECTED_RECEIVABLE",payout ? "EXPECTED_PAYOUT_PAYABLE" : "EXPECTED_INCOME");
+        var old = insertPayment(contractId,policy,item,agent,1,actualAmount,"DRAFT",UUID.randomUUID().toString());
         jdbcTemplate.update("UPDATE fgc.transaction_attribution SET allocation_basis_snapshot='{\"inclusionDecisionReason\":\"direct\",\"allocationBasis\":\"DIRECT\"}'::jsonb,evidence_ref='548' WHERE transaction_attribution_id=?", old.attributionId());
         jdbcTemplate.update("UPDATE fgc.commission_transaction SET status='CONFIRMED' WHERE commission_transaction_id=?",old.transactionId());
-        Long journal = insertPostedJournal(payout ? "CONFIRMED_FC_PAYOUT" : "ACTUAL_INSURER_STATEMENT","COMMISSION_TRANSACTION",old.transactionId(),contractId,payout ? agent : null,item,"50000",payout ? "CONFIRMED_PAYOUT_EXPENSE" : "ACTUAL_RECEIVABLE",payout ? "CONFIRMED_PAYOUT_PAYABLE" : "ACTUAL_INCOME");
+        Long journal = insertPostedJournal(payout ? "CONFIRMED_FC_PAYOUT" : "ACTUAL_INSURER_STATEMENT","COMMISSION_TRANSACTION",old.transactionId(),contractId,payout ? agent : null,item,actualAmount,payout ? "CONFIRMED_PAYOUT_EXPENSE" : "ACTUAL_RECEIVABLE",payout ? "CONFIRMED_PAYOUT_PAYABLE" : "ACTUAL_INCOME");
         Long run = jdbcTemplate.queryForObject("INSERT INTO fgc.reconciliation_run(settlement_month,payment_stage,insurer_id,validation_run_id) VALUES (?,?,?,?) RETURNING reconciliation_run_id",Long.class,TEST_MONTH,stage.name(),insurer,validationRunId);
         jdbcTemplate.update("UPDATE fgc.reconciliation_run SET status='RUNNING',started_at=clock_timestamp() WHERE reconciliation_run_id=?",run);
         execution.executeInTransaction(new ReconciliationExecutionRequest(run,validationRunId,TEST_MONTH,stage,insurer,1L));
@@ -337,7 +639,7 @@ class PaymentJournalCorrectionIntegrationTest {
                 RETURNING commission_transaction_id
                 """, Long.class,
                 stage, sourceType,
-                "IT-048-03:" + suffix, contractId, paymentStage == PaymentStage.GA_TO_FC ? agentId : null, commissionItemId, policyVersionId,
+                "IT-048-03:" + suffix, legacyPaymentWithoutSourceContract ? null : contractId, paymentStage == PaymentStage.GA_TO_FC ? agentId : null, commissionItemId, policyVersionId,
                 installmentNo, TEST_MONTH, dueDate, new BigDecimal(amount), insurer, batch);
         Long attributionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.transaction_attribution (

@@ -23,4 +23,5 @@ public class JournalHeaderDraft {
     private final Long policyVersionId;
     private final String description;
     private final List<JournalLineDraft> lines;
+    private final com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest replacementPayment;
 }

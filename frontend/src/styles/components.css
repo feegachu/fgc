@@ -1039,6 +1039,22 @@ a.kpi-card:active {
   border-bottom: 1px solid var(--color-border-default);
 }
 
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.modal-header-actions .screen-help-trigger .screen-help-icon {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
 .modal-title {
   font-size: 1.125rem;
   font-weight: 700;

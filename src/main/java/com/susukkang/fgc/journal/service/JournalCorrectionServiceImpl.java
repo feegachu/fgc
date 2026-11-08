@@ -183,6 +183,7 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                 .contractId(original.getContractId())
                 .policyVersionId(original.getPolicyVersionId())
                 .description(command.description().trim())
+                .replacementPayment(command.replacementPayment())
                 .lines(correctedLines)
                 .build();
     }
@@ -248,7 +249,7 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
             }
         }
 
-        reconciliationCorrection.refresh(affectedRuns, correctionGroupKey, command.requestedBy());
+        reconciliationCorrection.refresh(affectedRuns, correctionGroupKey, command.requestedBy(), command.reason());
         recordAudit(original, reversalId, repostedId, correctionGroupKey,
                 request, command.requestedBy(), originalLines, correctedDraft);
 

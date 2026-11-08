@@ -254,12 +254,12 @@ export const screenWalkthroughs: Record<string, readonly ScreenHelpStep[]> = {
   'EXCP-W01.action': tour('예외 처리 입력',
     feature('features.exception.action-panel.select', '처리 조치 선택',
       '현재 상태에서 가능한 조치를 고르세요.', '선택한 예외와 처리 대상을 확인하세요.'),
-    feature('features.exception.action-panel.textarea', '처리 사유',
-      '확인한 내용과 조치 이유를 입력하세요.', '후속 업무가 있다면 함께 기록하세요.'),
+    feature('features.exception-page.process', '예외 원인 수정',
+      '검토 담당자는 예외 건 처리에서 원인 자료를 수정할 수 있습니다.', '비활성 버튼에 마우스를 올리면 처리할 수 없는 이유가 표시됩니다.'),
     feature('features.exception.action-panel.input', '처리 증빙',
-      '조치를 뒷받침하는 증빙을 입력하세요.', '사유와 연결된 원자료인지 확인하세요.'),
+      '조치를 뒷받침하는 증빙이 있으면 입력하세요.', '연결된 원자료인지 확인하세요.'),
     target('exception.actionSave', '조치 저장',
-      '조치·사유·증빙을 확인한 뒤 저장하세요.', '저장 후 변경된 상태와 처리 이력을 확인하세요.')
+      '다른 담당자를 배정하거나 본인이 검토를 시작하세요.', '저장 후 변경된 담당자와 검토중 상태를 확인하세요.')
   ).map(step => ({ ...step, anchor: undefined, presentation: { fixedCard: 'right' as const, allowPageScroll: true } })),
   'EXCP-W01.correction': tour('원장 정정',
     region('correction.original', '[aria-label="원분개 읽기 전용"]', '원분개 확인',

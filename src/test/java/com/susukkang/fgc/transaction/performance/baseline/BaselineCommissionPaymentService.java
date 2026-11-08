@@ -79,6 +79,15 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class BaselineCommissionPaymentService implements CommissionPaymentService {
+    @Override
+    public CommissionPaymentResponse confirmExceptionCorrection(Long id, String key) {
+        throw new UnsupportedOperationException("정정 경로는 성능 기준 구현에 포함하지 않습니다.");
+    }
+
+    @Override
+    public TransactionPrecheckResponse precheckCorrectionCandidate(CommissionPaymentCreateRequest request, Long id) {
+        throw new UnsupportedOperationException("정정 경로는 성능 기준 구현에 포함하지 않습니다.");
+    }
     /** New assistant preview is outside the frozen pre-migration write performance baseline. */
     @Override
     public com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse precheckCandidate(

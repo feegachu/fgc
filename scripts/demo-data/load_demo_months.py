@@ -322,20 +322,9 @@ class Loader:
         sys.exit(f'{month} 검증이 6분 안에 끝나지 않았습니다')
 
     def close_exceptions(self, before_month=None, month=None, keep=()):
-        """지난 달 예외를 검토 완료로 닫는다. 조치 이력이 남는다. keep 유형은 시연에서 처리하도록 남긴다."""
-        done = 0
-        # 먼저 다 모은다. 처리하면서 쪽을 넘기면 목록이 밀려 건너뛴다.
-        for row in self.pages('/api/v1/exceptions?status=OPEN'):
-            detected = (row.get('validationMonth') or '')[:7]
-            if not detected or (month and detected != month) or (before_month and detected >= before_month) or row.get('type') in keep:
-                continue
-            exception_id = row['exceptionCaseId']
-            if row.get('status') == 'NEW':
-                self.s.ok('POST', f'/api/v1/exceptions/{exception_id}/actions', {'actionType': 'START_REVIEW', 'reason': '월 마감 검토 시작'})
-            status, _ = self.s.call('POST', f'/api/v1/exceptions/{exception_id}/actions',
-                                    {'actionType': 'RESOLVE', 'reason': '월 마감 검토 완료', 'evidenceRef': '월 마감 검토표'})
-            done += status == 200
-        return done
+        """외부 송금·보험사 회신·반려 판단이 필요한 예외는 로더가 임의 종결하지 않는다."""
+        print('  예외는 원천 수정·재검증 또는 담당자의 근거 있는 반려로 처리합니다. 일괄 종결하지 않습니다.')
+        return 0
 
     def finalize(self, run):
         if self.s.ok('GET', f'/api/v1/validation-runs/{run}')['header'].get('status') == 'FINALIZED':

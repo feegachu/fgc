@@ -212,7 +212,7 @@ class JournalCorrectionConcurrencyIntegrationTest {
                 """, caseId)).isEqualTo(2);
         assertThat(jdbcTemplate.queryForMap("""
                 SELECT status, assigned_to FROM fgc.exception_case WHERE exception_case_id = ?
-                """, caseId)).containsAllEntriesOf(Map.of("status", "NEW", "assigned_to", actorId));
+        """, caseId)).containsAllEntriesOf(Map.of("status", "IN_REVIEW", "assigned_to", actorId));
         assertThat(count("""
                 SELECT COUNT(*) FROM fgc.audit_log WHERE entity_type = 'EXCEPTION_CASE'
                    AND entity_id = ? AND action_code = 'EXCEPTION_ACTION'

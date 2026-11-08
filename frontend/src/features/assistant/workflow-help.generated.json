@@ -7460,6 +7460,19 @@
         "next": []
       },
       {
+        "stepId": "help.098b76468dfb8b04608f7f9c0b832d4f",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.settlement-evidence",
+        "title": "예외, 추가 송금·반환 증빙",
+        "instruction": "‘추가 송금·반환 증빙’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.0aa4553744d37f7bd499b7a9e75f0d36",
         "screenId": "EXCP-W01",
         "targetId": "components.pagination.button",
@@ -7490,11 +7503,11 @@
         "next": []
       },
       {
-        "stepId": "help.0cb418aaa02bbf86eecb5b59b6f98b41",
+        "stepId": "help.0e224facf3b9bbd9fffccfbb999ceb9d",
         "screenId": "EXCP-W01",
-        "targetId": "features.exception.action-panel.button-2",
-        "title": "예외, 원장 정정 계속 / 원장 정정 확인",
-        "instruction": "‘원장 정정 계속 / 원장 정정 확인’ 위치입니다.",
+        "targetId": "features.exception.review.reason",
+        "title": "예외, 검토 메모 · 종결 근거",
+        "instruction": "‘검토 메모 · 종결 근거’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -7529,6 +7542,20 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.1676eeb00274331afca566cd0ad9a023",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.schedule",
+        "title": "예외, 예상 스케줄 확인",
+        "instruction": "‘예상 스케줄 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -7620,6 +7647,19 @@
         "next": []
       },
       {
+        "stepId": "help.2ebacba28f5de565ce086180bdca49a6",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.cancel-duplicate",
+        "title": "예외, 선택한 중복 기록 역분개·취소",
+        "instruction": "‘선택한 중복 기록 역분개·취소’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.314bd9f56f7d61c664bee80dd0031772",
         "screenId": "EXCP-W01",
         "targetId": "exception.summary.policy_duplicate",
@@ -7650,16 +7690,17 @@
         "next": []
       },
       {
-        "stepId": "help.3e4b9c7f8414807c78478ee47490b8e8",
+        "stepId": "help.3a4f3d7258b9b4e865e2fd0ced92b1c1",
         "screenId": "EXCP-W01",
-        "targetId": "features.exception.action-panel.textarea",
-        "title": "예외, 처리 사유",
-        "instruction": "‘처리 사유’ 위치입니다.",
+        "targetId": "features.exception.payment-correction.duplicate-guide",
+        "title": "예외, 중복 지급 확인",
+        "instruction": "‘중복 지급 확인’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
           "GA_ADMIN",
-          "SETTLEMENT"
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -7722,6 +7763,35 @@
         "next": []
       },
       {
+        "stepId": "help.4f4c08a1eeb5ca76aa684be4094e47b9",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.discard",
+        "title": "예외, 입력 버리고 닫기",
+        "instruction": "‘입력 버리고 닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.5243a2220e8fbf8f363761ad12d44241",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.schedule-correction.contract",
+        "title": "예외, 계약 상태 확인",
+        "instruction": "‘계약 상태 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.536d80b9fb46935f4a786f02ef539592",
         "screenId": "EXCP-W01",
         "targetId": "components.pagination.button-5",
@@ -7733,6 +7803,19 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.584a109821dfc42accd7016be754ea79",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.planned-action",
+        "title": "예외, 감액·이연 구분",
+        "instruction": "‘감액·이연 구분’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -7809,6 +7892,20 @@
         "next": []
       },
       {
+        "stepId": "help.670e4aa433196628546e8eb645e0a5d5",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception-page.process",
+        "title": "예외, 예외 건 처리",
+        "instruction": "‘예외 건 처리’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.67a5e048d067b39997d93187988807dd",
         "screenId": "EXCP-W01",
         "targetId": "features.exception.journal-correction-modal.input-2",
@@ -7838,6 +7935,20 @@
         "next": []
       },
       {
+        "stepId": "help.6b5f054de28d708b5b9ae285f6d6220e",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.recheck",
+        "title": "예외, 스케줄 재검증 / 재대사",
+        "instruction": "‘스케줄 재검증 / 재대사’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.711a02234e2eba85b8f60cf8ed066ab8",
         "screenId": "EXCP-W01",
         "targetId": "exception.summary.reconciliation_mismatch",
@@ -7853,6 +7964,20 @@
         "next": []
       },
       {
+        "stepId": "help.73791344d75cecc85ee94e23ebae7041",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.close",
+        "title": "예외, 닫기",
+        "instruction": "‘닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.760abe8ea99426e9fca5ebeba1cd7d45",
         "screenId": "EXCP-W01",
         "targetId": "exception.summary.journal_correction_required",
@@ -7864,6 +7989,19 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.79fd1188671b38778e71c2d36cf2042c",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.mode",
+        "title": "예외, 처리 구분",
+        "instruction": "‘처리 구분’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -7955,6 +8093,34 @@
         "next": []
       },
       {
+        "stepId": "help.8d7fb55848ce5e10d1a5349a4ec012e3",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.schedule-correction.policy",
+        "title": "예외, 적용 수수료 규칙 확인",
+        "instruction": "‘적용 수수료 규칙 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.9191f931d99fe2630b25682084de2de6",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.action-panel.journal-history",
+        "title": "예외, 원장 정정 확인",
+        "instruction": "‘원장 정정 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.91be1c6e8a5b44e2df29344d8363e9cd",
         "screenId": "EXCP-W01",
         "targetId": "exception.summary.policy_missing",
@@ -7966,6 +8132,48 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.92f20b440024dc72225ffe9384a6656f",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.basis",
+        "title": "예외, 검출 당시 실제 산입액 ·",
+        "instruction": "‘검출 당시 실제 산입액 ·’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.9407f4e5b26947cc57c65671d57705b1",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.payment",
+        "title": "예외, 수정할 지급 건",
+        "instruction": "‘수정할 지급 건’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.94d8d668786e0cad8c8b2cf8011ae533",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.continue",
+        "title": "예외, 계속 작성",
+        "instruction": "‘계속 작성’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -7985,6 +8193,20 @@
         "next": []
       },
       {
+        "stepId": "help.975d1109d9fec08d9764d7bc5dd17cc5",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.reject",
+        "title": "예외, 근거 확인 · 반려 종결",
+        "instruction": "‘근거 확인 · 반려 종결’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.978657d0c36e8d4a588f2ba00256b0dd",
         "screenId": "EXCP-W01",
         "targetId": "components.pagination.button-2",
@@ -7996,6 +8218,19 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.98ef5b10967701368c76a3ec43575c84",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.receipt-confirmed",
+        "title": "예외, 보험사 명세·입금 확인 완료",
+        "instruction": "‘보험사 명세·입금 확인 완료’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -8024,6 +8259,49 @@
           "SYSTEM_ADMIN",
           "GA_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.9c713c19bc84febf21387a7b0687f870",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.recheck",
+        "title": "예외, 원천 재검증",
+        "instruction": "‘원천 재검증’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.9c930756ce23f7ca966d07bf98585c38",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.continue",
+        "title": "예외, 계속 작성",
+        "instruction": "‘계속 작성’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.a2c2173860b3453daf777eacaaa34e63",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.missing-guide",
+        "title": "예외, 누락 지급 등록 · 재대사",
+        "instruction": "‘누락 지급 등록 · 재대사’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -8066,6 +8344,21 @@
           "SYSTEM_ADMIN",
           "GA_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.b54646808c7aaac59a84898fa18c0713",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.missing-schedule",
+        "title": "예외, 예상 항목·회차 확인",
+        "instruction": "‘예상 항목·회차 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -8159,6 +8452,64 @@
         "next": []
       },
       {
+        "stepId": "help.c82875e30e6f404e27b881ceedc96a68",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.duplicate-mode",
+        "title": "예외, 중복 유형",
+        "instruction": "‘중복 유형’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.c9f1aac326c54cf203661ed4b7fbe9b2",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.journal",
+        "title": "예외, 연결된 원장 확인",
+        "instruction": "‘연결된 원장 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cc84e991075779bf81a470d43de5d9e3",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.remaining",
+        "title": "예외, 현재 대사 차이",
+        "instruction": "‘현재 대사 차이’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cddc7b441bc323175b306b58572e7e38",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.close",
+        "title": "예외, 닫기",
+        "instruction": "‘닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.cdfb189c99a6c4f740c7cc7a3716aa33",
         "screenId": "EXCP-W01",
         "targetId": "features.exception.journal-correction-modal.input",
@@ -8168,6 +8519,19 @@
         "roles": [
           "SYSTEM_ADMIN",
           "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.d16c714d600cddc49d0369ed10d1775f",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.deferred-date",
+        "title": "예외, 초과분 지급 예정일",
+        "instruction": "‘초과분 지급 예정일’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
           "SETTLEMENT"
         ],
         "next": []
@@ -8192,6 +8556,20 @@
         "targetId": "features.exception.journal-correction-modal.input-6",
         "title": "예외, 증빙",
         "instruction": "‘증빙’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.d9dd4c7c9fe15c5baf44e0e326f27a98",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.evidence",
+        "title": "예외, 근거 문서·관리번호",
+        "instruction": "‘근거 문서·관리번호’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8245,6 +8623,50 @@
         "next": []
       },
       {
+        "stepId": "help.e8020160f04a620caca03975ad0e4db5",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.amount-guide",
+        "title": "예외, 금액 부족·초과 정정",
+        "instruction": "‘금액 부족·초과 정정’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ebe366d2add5814b30adcf24466b0b7d",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.discard",
+        "title": "예외, 입력 버리고 닫기",
+        "instruction": "‘입력 버리고 닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ece1b781eaa4eb3e532693753f916a0a",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.comment",
+        "title": "예외, 의견 저장 · 검토중 유지",
+        "instruction": "‘의견 저장 · 검토중 유지’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.ed5ac180fb752d833b6ccdbf297e54a1",
         "screenId": "EXCP-W01",
         "targetId": "features.exception.action-panel.form",
@@ -8255,6 +8677,21 @@
           "SYSTEM_ADMIN",
           "GA_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f3ff8cf8429c2fc287642e43460822d3",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.result",
+        "title": "예외, 대사 결과 확인",
+        "instruction": "‘대사 결과 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -8270,6 +8707,20 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f7306e4f77632c3e90d9f498f338d6f2",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.action-panel.assignee",
+        "title": "예외, 배정 담당자",
+        "instruction": "‘배정 담당자’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -10030,6 +10481,19 @@
         "next": []
       },
       {
+        "stepId": "help.098b76468dfb8b04608f7f9c0b832d4f",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.settlement-evidence",
+        "title": "예외, 추가 송금·반환 증빙",
+        "instruction": "‘추가 송금·반환 증빙’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.0aa4553744d37f7bd499b7a9e75f0d36",
         "screenId": "EXCP-W01",
         "targetId": "components.pagination.button",
@@ -10089,20 +10553,6 @@
         "next": []
       },
       {
-        "stepId": "help.0cb418aaa02bbf86eecb5b59b6f98b41",
-        "screenId": "EXCP-W01",
-        "targetId": "features.exception.action-panel.button-2",
-        "title": "예외, 원장 정정 계속 / 원장 정정 확인",
-        "instruction": "‘원장 정정 계속 / 원장 정정 확인’ 위치입니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "SYSTEM_ADMIN",
-          "GA_ADMIN",
-          "SETTLEMENT"
-        ],
-        "next": []
-      },
-      {
         "stepId": "help.0d06ea61e6c0c47be1a7dee8a8e8b2e0",
         "screenId": "RECO-W01",
         "targetId": "reconciliation.kpi.exception",
@@ -10126,6 +10576,20 @@
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.0e224facf3b9bbd9fffccfbb999ceb9d",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.reason",
+        "title": "예외, 검토 메모 · 종결 근거",
+        "instruction": "‘검토 메모 · 종결 근거’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
           "SETTLEMENT"
         ],
         "next": []
@@ -10291,6 +10755,20 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.1676eeb00274331afca566cd0ad9a023",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.schedule",
+        "title": "예외, 예상 스케줄 확인",
+        "instruction": "‘예상 스케줄 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -10664,6 +11142,19 @@
         "next": []
       },
       {
+        "stepId": "help.2ebacba28f5de565ce086180bdca49a6",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.cancel-duplicate",
+        "title": "예외, 선택한 중복 기록 역분개·취소",
+        "instruction": "‘선택한 중복 기록 역분개·취소’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.2ecae3a3ebb333aa210d0be4dd106cfa",
         "screenId": "LEDG-W01",
         "targetId": "components.pagination.button-5",
@@ -10871,6 +11362,21 @@
         "next": []
       },
       {
+        "stepId": "help.3a4f3d7258b9b4e865e2fd0ced92b1c1",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.duplicate-guide",
+        "title": "예외, 중복 지급 확인",
+        "instruction": "‘중복 지급 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.3afaadc57e5eb3146f6d5a4b6f77eae6",
         "screenId": "CONT-W01",
         "targetId": "contract.filter.select.currentstatus",
@@ -10891,20 +11397,6 @@
         "targetId": "features.ledger.ledger-page.input-2",
         "title": "검증원장, 증빙 참조",
         "instruction": "‘증빙 참조’ 위치입니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "SYSTEM_ADMIN",
-          "GA_ADMIN",
-          "SETTLEMENT"
-        ],
-        "next": []
-      },
-      {
-        "stepId": "help.3e4b9c7f8414807c78478ee47490b8e8",
-        "screenId": "EXCP-W01",
-        "targetId": "features.exception.action-panel.textarea",
-        "title": "예외, 처리 사유",
-        "instruction": "‘처리 사유’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -11088,6 +11580,20 @@
         "next": []
       },
       {
+        "stepId": "help.4f4c08a1eeb5ca76aa684be4094e47b9",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.discard",
+        "title": "예외, 입력 버리고 닫기",
+        "instruction": "‘입력 버리고 닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.4fa97bad656a82dcfe39d7be070e7d59",
         "screenId": "LEDG-W01",
         "targetId": "components.data-table.input",
@@ -11123,6 +11629,21 @@
         "targetId": "ledger.explorer.section-2",
         "title": "검증원장, 계약별 분개 내역",
         "instruction": "‘계약별 분개 내역’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.5243a2220e8fbf8f363761ad12d44241",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.schedule-correction.contract",
+        "title": "예외, 계약 상태 확인",
+        "instruction": "‘계약 상태 확인’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -11189,6 +11710,19 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.584a109821dfc42accd7016be754ea79",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.planned-action",
+        "title": "예외, 감액·이연 구분",
+        "instruction": "‘감액·이연 구분’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -11488,6 +12022,20 @@
         "next": []
       },
       {
+        "stepId": "help.670e4aa433196628546e8eb645e0a5d5",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception-page.process",
+        "title": "예외, 예외 건 처리",
+        "instruction": "‘예외 건 처리’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.67a5e048d067b39997d93187988807dd",
         "screenId": "EXCP-W01",
         "targetId": "features.exception.journal-correction-modal.input-2",
@@ -11573,6 +12121,20 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.6b5f054de28d708b5b9ae285f6d6220e",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.recheck",
+        "title": "예외, 스케줄 재검증 / 재대사",
+        "instruction": "‘스케줄 재검증 / 재대사’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -11740,6 +12302,20 @@
         "next": []
       },
       {
+        "stepId": "help.73791344d75cecc85ee94e23ebae7041",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.close",
+        "title": "예외, 닫기",
+        "instruction": "‘닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.73cf10137720058061011a1944c98aea",
         "screenId": "CONT-W01",
         "targetId": "components.pagination.button-5",
@@ -11856,6 +12432,19 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.79fd1188671b38778e71c2d36cf2042c",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.mode",
+        "title": "예외, 처리 구분",
+        "instruction": "‘처리 구분’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -12229,6 +12818,20 @@
         "next": []
       },
       {
+        "stepId": "help.8d7fb55848ce5e10d1a5349a4ec012e3",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.schedule-correction.policy",
+        "title": "예외, 적용 수수료 규칙 확인",
+        "instruction": "‘적용 수수료 규칙 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.8e4ba37fb65284be0b7c02fd32337b10",
         "screenId": "CONT-W01",
         "targetId": "components.filter-bar.button-2",
@@ -12240,6 +12843,20 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.9191f931d99fe2630b25682084de2de6",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.action-panel.journal-history",
+        "title": "예외, 원장 정정 확인",
+        "instruction": "‘원장 정정 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -12274,6 +12891,20 @@
         "next": []
       },
       {
+        "stepId": "help.92f20b440024dc72225ffe9384a6656f",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.basis",
+        "title": "예외, 검출 당시 실제 산입액 ·",
+        "instruction": "‘검출 당시 실제 산입액 ·’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.92f252f2f5ab06af94a3326fafea664a",
         "screenId": "CAP-W01",
         "targetId": "components.data-table.input",
@@ -12285,6 +12916,34 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.9407f4e5b26947cc57c65671d57705b1",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.payment",
+        "title": "예외, 수정할 지급 건",
+        "instruction": "‘수정할 지급 건’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.94d8d668786e0cad8c8b2cf8011ae533",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.continue",
+        "title": "예외, 계속 작성",
+        "instruction": "‘계속 작성’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -12315,6 +12974,20 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.975d1109d9fec08d9764d7bc5dd17cc5",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.reject",
+        "title": "예외, 근거 확인 · 반려 종결",
+        "instruction": "‘근거 확인 · 반려 종결’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -12354,6 +13027,19 @@
         "targetId": "features.transaction-list-page.button-1",
         "title": "수수료 지급, 예시 지급 건 수정",
         "instruction": "‘예시 지급 건 수정’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.98ef5b10967701368c76a3ec43575c84",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.receipt-confirmed",
+        "title": "예외, 보험사 명세·입금 확인 완료",
+        "instruction": "‘보험사 명세·입금 확인 완료’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -12450,6 +13136,34 @@
         "next": []
       },
       {
+        "stepId": "help.9c713c19bc84febf21387a7b0687f870",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.recheck",
+        "title": "예외, 원천 재검증",
+        "instruction": "‘원천 재검증’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.9c930756ce23f7ca966d07bf98585c38",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.continue",
+        "title": "예외, 계속 작성",
+        "instruction": "‘계속 작성’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.9ed889dfa5df302278b244249045c620",
         "screenId": "ARB-W01",
         "targetId": "components.list-header.select",
@@ -12519,6 +13233,21 @@
         "roles": [
           "SYSTEM_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.a2c2173860b3453daf777eacaaa34e63",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.missing-guide",
+        "title": "예외, 누락 지급 등록 · 재대사",
+        "instruction": "‘누락 지급 등록 · 재대사’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -12736,6 +13465,21 @@
           "SYSTEM_ADMIN",
           "GA_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.b54646808c7aaac59a84898fa18c0713",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.missing-schedule",
+        "title": "예외, 예상 항목·회차 확인",
+        "instruction": "‘예상 항목·회차 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -13063,6 +13807,19 @@
         "next": []
       },
       {
+        "stepId": "help.c82875e30e6f404e27b881ceedc96a68",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.duplicate-mode",
+        "title": "예외, 중복 유형",
+        "instruction": "‘중복 유형’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.c884592ba584b4fbf65264007e3eeef0",
         "screenId": "ARB-W01",
         "targetId": "features.arbitrage.arbitrage-detail.section",
@@ -13108,6 +13865,21 @@
         "next": []
       },
       {
+        "stepId": "help.c9f1aac326c54cf203661ed4b7fbe9b2",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.journal",
+        "title": "예외, 연결된 원장 확인",
+        "instruction": "‘연결된 원장 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.ca5b0594f2be8a595215a1a0db5be773",
         "screenId": "CONT-W01",
         "targetId": "components.pagination.button",
@@ -13137,6 +13909,21 @@
         "next": []
       },
       {
+        "stepId": "help.cc84e991075779bf81a470d43de5d9e3",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.remaining",
+        "title": "예외, 현재 대사 차이",
+        "instruction": "‘현재 대사 차이’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.cce1c7c3e4a7a1b4740b8e872bc9c48a",
         "screenId": "VRUN-W01",
         "targetId": "features.validation.validation-run-list-page.select",
@@ -13146,6 +13933,21 @@
         "roles": [
           "SYSTEM_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cddc7b441bc323175b306b58572e7e38",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.close",
+        "title": "예외, 닫기",
+        "instruction": "‘닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -13205,6 +14007,19 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.d16c714d600cddc49d0369ed10d1775f",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.deferred-date",
+        "title": "예외, 초과분 지급 예정일",
+        "instruction": "‘초과분 지급 예정일’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -13391,6 +14206,20 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.d9dd4c7c9fe15c5baf44e0e326f27a98",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.evidence",
+        "title": "예외, 근거 문서·관리번호",
+        "instruction": "‘근거 문서·관리번호’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -13602,6 +14431,21 @@
         "next": []
       },
       {
+        "stepId": "help.e8020160f04a620caca03975ad0e4db5",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.amount-guide",
+        "title": "예외, 금액 부족·초과 정정",
+        "instruction": "‘금액 부족·초과 정정’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.e9011e0762b457c3cf22b32557d365d7",
         "screenId": "CONT-W01",
         "targetId": "features.contract.contract-list-page.section",
@@ -13658,6 +14502,35 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ebe366d2add5814b30adcf24466b0b7d",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.discard",
+        "title": "예외, 입력 버리고 닫기",
+        "instruction": "‘입력 버리고 닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ece1b781eaa4eb3e532693753f916a0a",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.review.comment",
+        "title": "예외, 의견 저장 · 검토중 유지",
+        "instruction": "‘의견 저장 · 검토중 유지’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -13781,6 +14654,21 @@
         "next": []
       },
       {
+        "stepId": "help.f3ff8cf8429c2fc287642e43460822d3",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.payment-correction.result",
+        "title": "예외, 대사 결과 확인",
+        "instruction": "‘대사 결과 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.f49091aca709b3378acffb41b01caa56",
         "screenId": "EXCP-W01",
         "targetId": "components.modal.button",
@@ -13820,6 +14708,20 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f7306e4f77632c3e90d9f498f338d6f2",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.action-panel.assignee",
+        "title": "예외, 배정 담당자",
+        "instruction": "‘배정 담당자’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -14863,11 +15765,37 @@
     "workflowId": "payment.amount.review",
     "steps": [
       {
+        "stepId": "help.00ad1d8a516311603514ec80fc1aca68",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.correction.save-footer",
+        "title": "수수료 지급 등록, 수정 저장 / 등록 저장",
+        "instruction": "‘수정 저장 / 등록 저장’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.080202af06ecf76a517817db5d62f803",
         "screenId": "TRAN-W02",
         "targetId": "components.search-select.button-3",
         "title": "수수료 지급 등록, 선택 해제",
         "instruction": "‘선택 해제’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.0cc36ecc32d3a96cfd3ec0c32c1811d2",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.correction.precheck-footer",
+        "title": "수수료 지급 등록, 사전검증",
+        "instruction": "‘사전검증’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15555,8 +16483,8 @@
         "stepId": "help.d28db8ea18c2905c1f0e9fd9092438f4",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.btn-save",
-        "title": "수수료 지급 등록, 저장 중 / 수정 저장 / 임시저장 (검증 없음)",
-        "instruction": "‘저장 중 / 수정 저장 / 임시저장 (검증 없음)’ 위치입니다.",
+        "title": "수수료 지급 등록, 저장 중 / 수정 저장 / 등록 및 재검증 / 수정 저장 / 임시저장 (검증 없음)",
+        "instruction": "‘저장 중 / 수정 저장 / 등록 및 재검증 / 수정 저장 / 임시저장 (검증 없음)’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15765,11 +16693,37 @@
     "workflowId": "payment.draft",
     "steps": [
       {
+        "stepId": "help.00ad1d8a516311603514ec80fc1aca68",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.correction.save-footer",
+        "title": "수수료 지급 등록, 수정 저장 / 등록 저장",
+        "instruction": "‘수정 저장 / 등록 저장’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.080202af06ecf76a517817db5d62f803",
         "screenId": "TRAN-W02",
         "targetId": "components.search-select.button-3",
         "title": "수수료 지급 등록, 선택 해제",
         "instruction": "‘선택 해제’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.0cc36ecc32d3a96cfd3ec0c32c1811d2",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.correction.precheck-footer",
+        "title": "수수료 지급 등록, 사전검증",
+        "instruction": "‘사전검증’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -16457,8 +17411,8 @@
         "stepId": "help.d28db8ea18c2905c1f0e9fd9092438f4",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.btn-save",
-        "title": "수수료 지급 등록, 저장 중 / 수정 저장 / 임시저장 (검증 없음)",
-        "instruction": "‘저장 중 / 수정 저장 / 임시저장 (검증 없음)’ 위치입니다.",
+        "title": "수수료 지급 등록, 저장 중 / 수정 저장 / 등록 및 재검증 / 수정 저장 / 임시저장 (검증 없음)",
+        "instruction": "‘저장 중 / 수정 저장 / 등록 및 재검증 / 수정 저장 / 임시저장 (검증 없음)’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -16667,11 +17621,37 @@
     "workflowId": "payment.confirm",
     "steps": [
       {
+        "stepId": "help.00ad1d8a516311603514ec80fc1aca68",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.correction.save-footer",
+        "title": "수수료 지급 등록, 수정 저장 / 등록 저장",
+        "instruction": "‘수정 저장 / 등록 저장’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.080202af06ecf76a517817db5d62f803",
         "screenId": "TRAN-W02",
         "targetId": "components.search-select.button-3",
         "title": "수수료 지급 등록, 선택 해제",
         "instruction": "‘선택 해제’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.0cc36ecc32d3a96cfd3ec0c32c1811d2",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.correction.precheck-footer",
+        "title": "수수료 지급 등록, 사전검증",
+        "instruction": "‘사전검증’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -17359,8 +18339,8 @@
         "stepId": "help.d28db8ea18c2905c1f0e9fd9092438f4",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.btn-save",
-        "title": "수수료 지급 등록, 저장 중 / 수정 저장 / 임시저장 (검증 없음)",
-        "instruction": "‘저장 중 / 수정 저장 / 임시저장 (검증 없음)’ 위치입니다.",
+        "title": "수수료 지급 등록, 저장 중 / 수정 저장 / 등록 및 재검증 / 수정 저장 / 임시저장 (검증 없음)",
+        "instruction": "‘저장 중 / 수정 저장 / 등록 및 재검증 / 수정 저장 / 임시저장 (검증 없음)’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",

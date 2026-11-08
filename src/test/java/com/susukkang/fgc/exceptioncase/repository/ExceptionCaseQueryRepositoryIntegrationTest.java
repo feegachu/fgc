@@ -87,6 +87,18 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
         insertCase("RESOLVED", "INFO", "IT 해결-" + suffix);
     }
 
+    @Test
+    void arbitrageSeverityMigrationUpdatesOpenCasesAndPreservesClosedHistory() throws java.io.IOException {
+        jdbcTemplate.update("UPDATE fgc.exception_case SET exception_type='ARBITRAGE_CANDIDATE',severity='HIGH' WHERE contract_id=?", contractId);
+        String migration = new org.springframework.core.io.ClassPathResource("db/migration/V85__arbitrage_candidate_warning_severity.sql")
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        jdbcTemplate.execute(migration);
+        assertThat(jdbcTemplate.queryForList("SELECT severity FROM fgc.exception_case WHERE contract_id=? AND status IN ('NEW','IN_REVIEW')", String.class, contractId))
+                .containsExactlyInAnyOrder("WARNING", "WARNING");
+        assertThat(jdbcTemplate.queryForObject("SELECT severity FROM fgc.exception_case WHERE contract_id=? AND status='RESOLVED'", String.class, contractId))
+                .isEqualTo("HIGH");
+    }
+
     private Long insertContract(String uniqueContractNo) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.insurance_contract (
@@ -250,6 +262,33 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
                 """, Long.class, userId);
         assertThat(repository.findAssignees())
                 .noneMatch(assigneeRow -> assigneeRow.userId().equals(unassignedUserId));
+    }
+
+    @Test
+    void 배정선택지는_배정이력과_무관하게_활성_처리권한_사용자만_포함한다() {
+        List<Long> expected = jdbcTemplate.queryForList("""
+                SELECT u.user_id FROM fgc.app_user u JOIN fgc.app_role r ON r.role_id = u.role_id
+                 WHERE u.account_status = 'ACTIVE'
+                   AND r.role_code IN ('SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN')
+                 ORDER BY u.login_id
+                """, Long.class);
+        assertThat(expected).isNotEmpty();
+        Long userId = expected.getFirst();
+        jdbcTemplate.update("UPDATE fgc.exception_case SET assigned_to = NULL WHERE assigned_to = ?", userId);
+
+        assertThat(repository.findAssignableUsers()).extracting(row -> row.userId())
+                .containsExactlyElementsOf(expected);
+        assertThat(repository.isAssignableUser(userId)).isTrue();
+        assertThat(repository.isAssignableUser(Long.MAX_VALUE)).isFalse();
+
+        jdbcTemplate.update("UPDATE fgc.app_user SET account_status = 'DISABLED' WHERE user_id = ?", userId);
+        assertThat(repository.findAssignableUsers()).noneMatch(row -> row.userId().equals(userId));
+        assertThat(repository.isAssignableUser(userId)).isFalse();
+        Long readOnlyUser = jdbcTemplate.queryForObject("""
+                SELECT u.user_id FROM fgc.app_user u JOIN fgc.app_role r ON r.role_id = u.role_id
+                 WHERE r.role_code = 'COMPLIANCE' ORDER BY u.user_id LIMIT 1
+                """, Long.class);
+        assertThat(repository.isAssignableUser(readOnlyUser)).isFalse();
     }
 
     /** FGC-FUN-052·VRUN-W02 '예외함 열기' 링크의 검증월 검색조건 — 연도 경계(12월↔1월)도 섞이지 않는다. */

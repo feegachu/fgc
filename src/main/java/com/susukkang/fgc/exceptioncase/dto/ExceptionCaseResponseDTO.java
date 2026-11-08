@@ -141,10 +141,12 @@ public record ExceptionCaseResponseDTO(
         return switch (sourceEntityType) {
             case "INSURANCE_CONTRACT" -> "/contracts/" + sourceEntityId;
             case "ARBITRAGE_CHECK" -> "/arbitrage-checks";
+            case "CAP_CHECK" -> contractNo == null || contractNo.isBlank() ? "/cap-checks"
+                    : "/cap-checks?contractNo=" + java.net.URLEncoder.encode(contractNo, java.nio.charset.StandardCharsets.UTF_8);
             case "COMMISSION_TRANSACTION" -> "/transactions/new?id=" + sourceEntityId;
             case "SCHEDULE_HEADER" -> "/schedules/" + sourceEntityId;
             case "JOURNAL_HEADER" -> "/journals?selected=" + sourceEntityId;
-            case "RECONCILIATION_RESULT" -> reconciliationSourceLink();
+            case "RECONCILIATION_RESULT" -> "/reconciliations?resultId=" + sourceEntityId;
             default -> null;
         };
     }
@@ -170,28 +172,4 @@ public record ExceptionCaseResponseDTO(
         return null;
     }
 
-    private String reconciliationSourceLink() {
-        String reason = reasonCode == null || reasonCode.isBlank()
-                ? reconciliationResultType
-                : reasonCode;
-        if ("EXPECTED_MISSING".equals(reason)) {
-            return contractNo == null || contractNo.isBlank()
-                    ? "/schedules"
-                    : "/schedules?contractNo=" + contractNo;
-        }
-        if ("ACTUAL_MISSING".equals(reason)) {
-            return "/transactions/new";
-        }
-        if ("INVALID_CONTRACT_PAYMENT".equals(reason)
-                || "POLICY_VERSION_ERROR".equals(reason)) {
-            return contractId == null
-                    ? null
-                    : "/contracts/" + contractId;
-        }
-        if ("JOURNAL_IMBALANCE".equals(reason)) {
-            return "/journals";
-        }
-        // 양쪽 금액·회차·조직·설계사를 함께 봐야 하는 유형은 대사 비교 팝업을 직접 연다.
-        return "/reconciliations?resultId=" + sourceEntityId;
-    }
 }

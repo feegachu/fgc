@@ -57,11 +57,12 @@ export const JOURNAL_CORRECTION_TYPE = 'JOURNAL_CORRECTION_REQUIRED'
 
 /**
  * 조치 유형 표와 상태 전이 규칙. 서버 ExceptionActionType.supports()·isJournalCorrectionGeneralAction() 과
- * 같은 표다 — 화면은 허용되는 조치만 보여 주기 위해 쓰고, 최종 판정은 서버(409 FGC-EXCP-003)가 한다.
+ * 같은 표다(의견은 새 조치 선택지에서 제외하고 기존 이력만 표시한다).
+ * 화면은 허용되는 조치만 보여 주기 위해 쓰고, 최종 판정은 서버(409 FGC-EXCP-003)가 한다.
  */
 const actionTable: { type: string; label: string; from: ExceptionStatus[]; generalForCorrection: boolean }[] = [
   { type: 'ASSIGN', label: '담당 배정', from: ['NEW', 'IN_REVIEW'], generalForCorrection: true },
-  { type: 'START_REVIEW', label: '검토 시작', from: ['NEW'], generalForCorrection: true },
+  { type: 'START_REVIEW', label: '검토 시작', from: ['NEW', 'IN_REVIEW'], generalForCorrection: true },
   { type: 'CORRECT', label: '정정', from: ['IN_REVIEW'], generalForCorrection: false },
   { type: 'REDUCE', label: '감액', from: ['IN_REVIEW'], generalForCorrection: false },
   { type: 'CANCEL', label: '취소', from: ['IN_REVIEW'], generalForCorrection: false },
@@ -71,7 +72,6 @@ const actionTable: { type: string; label: string; from: ExceptionStatus[]; gener
   { type: 'RESOLVE', label: '해결', from: ['IN_REVIEW'], generalForCorrection: false },
   { type: 'REJECT', label: '반려', from: ['IN_REVIEW'], generalForCorrection: true },
   { type: 'REOPEN', label: '재검토 시작', from: ['REJECTED'], generalForCorrection: true },
-  { type: 'COMMENT', label: '의견', from: ['NEW', 'IN_REVIEW'], generalForCorrection: true },
 ]
 
 export function availableActions(status: string | undefined, exceptionType: string | undefined) {

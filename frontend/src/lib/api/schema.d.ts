@@ -1105,6 +1105,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exceptions/{id}/payment-correction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["context"];
+        put?: never;
+        post: operations["correct"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exceptions/{id}/payment-correction/cancel-duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancelDuplicate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exceptions/{id}/payment-correction/precheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exceptions/{id}/payment-correction/recheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recheck_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exceptions/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["context_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exceptions/{id}/review/recheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recheck"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/home/summary": {
         parameters: {
             query?: never;
@@ -2412,6 +2508,26 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseExceptionPaymentContext: {
+            data?: components["schemas"]["ExceptionPaymentContext"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseExceptionPaymentCorrectionResponse: {
+            data?: components["schemas"]["ExceptionPaymentCorrectionResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseExceptionReviewContext: {
+            data?: components["schemas"]["ExceptionReviewContext"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseExceptionSourceRecheckResponse: {
+            data?: components["schemas"]["ExceptionSourceRecheckResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseFinalizeChecklistResponse: {
             data?: components["schemas"]["FinalizeChecklistResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2514,11 +2630,6 @@ export interface components {
         };
         ApiResponseListRetry: {
             data?: components["schemas"]["Retry"][];
-            error?: components["schemas"]["ApiError"];
-            requestId?: string;
-        };
-        ApiResponseListScheduleHeaderResponse: {
-            data?: components["schemas"]["ScheduleHeaderResponse"][];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -4340,6 +4451,8 @@ export interface components {
         ExceptionActionRequest: {
             /** @enum {string} */
             actionType: "ASSIGN" | "START_REVIEW" | "CORRECT" | "REDUCE" | "CANCEL" | "DEFER" | "RECONCILE_AGAIN" | "FALSE_POSITIVE" | "RESOLVE" | "REJECT" | "REOPEN" | "COMMENT";
+            /** Format: int64 */
+            assignedTo?: number;
             evidenceRef?: string;
             reason?: string;
         };
@@ -4455,6 +4568,13 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        ExceptionDuplicateCancelRequest: {
+            evidenceRef?: string;
+            /** Format: date-time */
+            expectedUpdatedAt: string;
+            /** Format: int64 */
+            paymentId: number;
+        };
         ExceptionOccurrenceResponse: {
             /** Format: date-time */
             detectedAt?: string;
@@ -4477,11 +4597,75 @@ export interface components {
             validationRunId?: number;
         };
         ExceptionOptionsResponse: {
+            assignableUsers?: components["schemas"]["ExceptionAssigneeRow"][];
             assignees?: components["schemas"]["ExceptionAssigneeRow"][];
             reasons?: components["schemas"]["Option"][];
             severities?: components["schemas"]["Option"][];
             types?: components["schemas"]["Option"][];
             validationMonths?: string[];
+        };
+        ExceptionPaymentContext: {
+            canRegisterPayment?: boolean;
+            capBasis?: components["schemas"]["CapCheckBasisResponse"];
+            contractLink?: string;
+            correctionTarget?: string;
+            /** Format: date */
+            deferrableFrom?: string;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            payments?: components["schemas"]["CommissionPaymentResponse"][];
+            policyLink?: string;
+            reconciliationResultType?: string;
+            remainingIssues?: components["schemas"]["ExceptionReconciliationIssue"][];
+            scheduleLink?: string;
+            scheduledBasis?: boolean;
+            suggestedPayment?: components["schemas"]["CommissionPaymentCreateRequest"];
+        };
+        ExceptionPaymentCorrectionRequest: {
+            correctionMode?: string;
+            deferredAmount?: number;
+            /** Format: date */
+            deferredPaymentDate?: string;
+            /** Format: date-time */
+            expectedUpdatedAt?: string;
+            payment: components["schemas"]["CommissionPaymentCreateRequest"];
+            /** Format: int64 */
+            paymentId?: number;
+            plannedAction?: string;
+            settlementEvidence?: string;
+        };
+        ExceptionPaymentCorrectionResponse: {
+            action?: components["schemas"]["ExceptionActionResponse"];
+            deferredPayment?: components["schemas"]["CommissionPaymentResponse"];
+            message?: string;
+            payment?: components["schemas"]["CommissionPaymentResponse"];
+            remainingIssues?: components["schemas"]["ExceptionReconciliationIssue"][];
+            resolved?: boolean;
+        };
+        ExceptionReconciliationIssue: {
+            actualAgent?: string;
+            actualAmount?: number;
+            differenceAmount?: number;
+            expectedAgent?: string;
+            expectedAmount?: number;
+            /** Format: int32 */
+            installmentNo?: number;
+            /** Format: int64 */
+            resultId?: number;
+            resultLabel?: string;
+            resultType?: string;
+            sourceLink?: string;
+        };
+        ExceptionReviewContext: {
+            administratorReviewRequired?: boolean;
+            /** Format: date */
+            contractDate?: string;
+            contractStatus?: string;
+            guidance?: string;
+            links?: components["schemas"]["Link"][];
+            offeringMismatch?: boolean;
+            recheckAvailable?: boolean;
+            rejectionRequiresEvidence?: boolean;
         };
         ExceptionSeverityCountResponse: {
             /** Format: int64 */
@@ -4489,6 +4673,12 @@ export interface components {
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "HIGH" | "CRITICAL";
             severityLabel?: string;
+        };
+        ExceptionSourceRecheckResponse: {
+            action?: components["schemas"]["ExceptionActionResponse"];
+            capBasis?: components["schemas"]["CapCheckBasisResponse"];
+            message?: string;
+            resolved?: boolean;
         };
         ExceptionSummary: {
             /** Format: int64 */
@@ -4912,6 +5102,10 @@ export interface components {
             /** Format: int32 */
             lineNo?: number;
             memo?: string;
+        };
+        Link: {
+            href?: string;
+            label?: string;
         };
         LoginRequest: {
             loginId: string;
@@ -8432,6 +8626,172 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseJournalCorrectionActionResponse"];
+                };
+            };
+        };
+    };
+    context: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExceptionPaymentContext"];
+                };
+            };
+        };
+    };
+    correct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExceptionPaymentCorrectionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExceptionPaymentCorrectionResponse"];
+                };
+            };
+        };
+    };
+    cancelDuplicate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExceptionDuplicateCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExceptionPaymentCorrectionResponse"];
+                };
+            };
+        };
+    };
+    preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExceptionPaymentCorrectionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseTransactionPrecheckResponse"];
+                };
+            };
+        };
+    };
+    recheck_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExceptionSourceRecheckResponse"];
+                };
+            };
+        };
+    };
+    context_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExceptionReviewContext"];
+                };
+            };
+        };
+    };
+    recheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExceptionSourceRecheckResponse"];
                 };
             };
         };

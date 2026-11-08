@@ -2040,12 +2040,17 @@
     "element": "Button"
   },
   {
-    "id": "features.exception.action-panel.button",
-    "file": "features/exception/ActionPanel.tsx",
+    "id": "features.exception-page.process",
+    "file": "features/exception/ExceptionPage.tsx",
     "element": "Button"
   },
   {
-    "id": "features.exception.action-panel.button-2",
+    "id": "features.exception.action-panel.assignee",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.action-panel.button",
     "file": "features/exception/ActionPanel.tsx",
     "element": "Button"
   },
@@ -2058,6 +2063,11 @@
     "id": "features.exception.action-panel.input",
     "file": "features/exception/ActionPanel.tsx",
     "element": "input"
+  },
+  {
+    "id": "features.exception.action-panel.journal-history",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "Button"
   },
   {
     "id": "features.exception.action-panel.link",
@@ -2073,11 +2083,6 @@
     "id": "features.exception.action-panel.select",
     "file": "features/exception/ActionPanel.tsx",
     "element": "select"
-  },
-  {
-    "id": "features.exception.action-panel.textarea",
-    "file": "features/exception/ActionPanel.tsx",
-    "element": "textarea"
   },
   {
     "id": "features.exception.exception-page.button",
@@ -2133,6 +2138,11 @@
     "id": "features.exception.exception-page.summary",
     "file": "features/exception/ExceptionPage.tsx",
     "element": "summary"
+  },
+  {
+    "id": "features.exception.information",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "section"
   },
   {
     "id": "features.exception.journal-correction-modal.button",
@@ -2238,6 +2248,201 @@
     "id": "features.exception.journal-correction-modal.textarea",
     "file": "features/exception/JournalCorrectionModal.tsx",
     "element": "textarea"
+  },
+  {
+    "id": "features.exception.payment-correction.amount-guide",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.payment-correction.basis",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "summary"
+  },
+  {
+    "id": "features.exception.payment-correction.cancel-duplicate",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.payment-correction.close",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.payment-correction.continue",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.payment-correction.defer-guide",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.payment-correction.deferred-date",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.payment-correction.discard",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.payment-correction.duplicate-guide",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.payment-correction.duplicate-mode",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.payment-correction.journal",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.payment-correction.missing-guide",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.payment-correction.missing-schedule",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.payment-correction.mode",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.payment-correction.payment",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.payment-correction.planned-action",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.payment-correction.receipt-confirmed",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.payment-correction.recheck",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.payment-correction.remaining",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.payment-correction.result",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.payment-correction.schedule",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.payment-correction.settlement-evidence",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.review-panel",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.review.close",
+    "file": "features/exception/SourceReviewModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.review.comment",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.review.continue",
+    "file": "features/exception/SourceReviewModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.review.discard",
+    "file": "features/exception/SourceReviewModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.review.evidence",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.review.link",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.review.reason",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "features.exception.review.recheck",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.review.reject",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.schedule-correction",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.schedule-correction.contract",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.schedule-correction.contract-preview",
+    "file": "features/exception/ScheduleCorrectionPanel.tsx",
+    "element": "div"
+  },
+  {
+    "id": "features.exception.schedule-correction.contract-summary",
+    "file": "features/exception/ScheduleCorrectionPanel.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.schedule-correction.policy",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.schedule-correction.regenerate",
+    "file": "features/exception/ScheduleCorrectionPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.schedule-correction.schedule-list",
+    "file": "features/exception/ScheduleCorrectionPanel.tsx",
+    "element": "section"
   },
   {
     "id": "features.ledger.ledger-page.button",
@@ -2898,6 +3103,16 @@
     "id": "features.transaction.confirmation-panels.section",
     "file": "features/transaction/PrecheckResultPanel.tsx",
     "element": "section"
+  },
+  {
+    "id": "features.transaction.correction.precheck-footer",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.correction.save-footer",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
   },
   {
     "id": "features.transaction.payment-guide.button",

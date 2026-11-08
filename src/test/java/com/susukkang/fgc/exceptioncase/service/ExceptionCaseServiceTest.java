@@ -5,6 +5,10 @@ import com.susukkang.fgc.exceptioncase.repository.ExceptionActionRepository;
 import com.susukkang.fgc.audit.repository.AuditLogRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.code.ExceptionActionType;
+import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseActionTarget;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseQueryRepository;
@@ -143,5 +147,41 @@ class ExceptionCaseServiceTest {
                 .isInstanceOf(FgcBusinessException.class)
                 .satisfies(thrown -> assertThat(((FgcBusinessException) thrown).getErrorCode())
                         .isEqualTo(FgcErrorCode.COMMON_002));
+    }
+
+    @Test
+    void assignsSelectedReviewerAndKeepsActorInHistory() {
+        given(caseRepository.findByIdForUpdate(11L)).willReturn(
+                new ExceptionCaseActionTarget(11L, "CAP_VIOLATION", ExceptionStatus.NEW, null));
+        given(queryRepository.isAssignableUser(8L)).willReturn(true);
+        given(actionRepository.findNextActionSeq(11L)).willReturn(1);
+        given(caseRepository.updateCaseAfterAction(11L, ExceptionStatus.IN_REVIEW, 8L, null)).willReturn(1);
+
+        var response = service.action(11L,
+                new ExceptionActionRequest(ExceptionActionType.ASSIGN, "담당자에게 전달", null, 8L),
+                7L, "settle01");
+
+        assertThat(response.toStatus()).isEqualTo(ExceptionStatus.IN_REVIEW);
+        assertThat(response.actionBy()).isEqualTo(7L);
+        verify(caseRepository).updateCaseAfterAction(11L, ExceptionStatus.IN_REVIEW, 8L, null);
+        var audit = org.mockito.ArgumentCaptor.forClass(com.susukkang.fgc.audit.entity.AuditLog.class);
+        verify(auditLogRepository).saveAndFlush(audit.capture());
+        assertThat(audit.getValue()).extracting("afterValue").asString().contains("\"assignedTo\":8");
+    }
+
+    @Test
+    void rejectsUnavailableAssigneeBeforeWritingHistory() {
+        given(caseRepository.findByIdForUpdate(11L)).willReturn(
+                new ExceptionCaseActionTarget(11L, "CAP_VIOLATION", ExceptionStatus.NEW, null));
+        given(queryRepository.isAssignableUser(8L)).willReturn(false);
+
+        assertThatThrownBy(() -> service.action(11L,
+                new ExceptionActionRequest(ExceptionActionType.ASSIGN, "담당자에게 전달", null, 8L),
+                7L, "settle01"))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(thrown -> assertThat(((FgcBusinessException) thrown).getErrorCode())
+                        .isEqualTo(FgcErrorCode.COMMON_002));
+        verifyNoInteractions(actionRepository, auditLogRepository);
+        verify(caseRepository, never()).updateCaseAfterAction(any(), any(), any(), any());
     }
 }

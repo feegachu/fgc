@@ -332,7 +332,8 @@ final class ExceptionCaseBaselineSql {
                       FROM fgc.exception_case
                      WHERE status IN ('NEW', 'IN_REVIEW')
                      GROUP BY exception_type
-                     ORDER BY exception_type
+                     ORDER BY MAX(CASE severity WHEN 'CRITICAL' THEN 3 WHEN 'HIGH' THEN 2 WHEN 'WARNING' THEN 1 ELSE 0 END) DESC,
+                              exception_type
                     """);
                 sql.append(" ");
                 yield new Statement(sql.toString(), parameters, rows(com.susukkang.fgc.exceptioncase.dto.ExceptionTypeSummaryRow.class), "", "");

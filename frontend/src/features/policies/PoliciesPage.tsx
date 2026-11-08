@@ -38,10 +38,15 @@ export function PoliciesPage() {
   const { user } = useAuth()
   const preview = useContext(PolicyPreviewContext)
   const cache = useQueryClient()
-  const [creating, setCreating] = useState(false)
+  const [localCreating, setLocalCreating] = useState(false)
   const [message, setMessage] = useState('')
   const defaultDate = useReferenceDate()
   const [params, setParams] = useSearchParams()
+  const creating = localCreating || params.get('create') === '1'
+  function setCreating(open: boolean) {
+    setLocalCreating(open)
+    if (!open && params.has('create')) patch({ create: null })
+  }
   const asOf = params.get('asOf') ?? defaultDate
   const active = tabs.find((tab) => tab.id === params.get('tab'))?.id ?? 'versions'
   const policies = usePolicies(asOf)

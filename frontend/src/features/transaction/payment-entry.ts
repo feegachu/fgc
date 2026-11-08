@@ -11,7 +11,7 @@ export interface PaymentEntry {
 const positive = (value: string | null) =>
   value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? value : undefined
 export function safeReturnTo(value: string | null, fallback: string) {
-  return value && value.length < 5000 && /^\/(contracts|transactions|schedules|intake)(?:[/?]|$)/.test(value)
+  return value && value.length < 5000 && /^\/(contracts|transactions|schedules|intake|exceptions|clawbacks|arbitrage-checks)(?:[/?]|$)/.test(value)
     ? value
     : fallback
 }

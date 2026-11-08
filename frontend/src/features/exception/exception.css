@@ -572,13 +572,69 @@
 
 .exception-detail-modal { width: min(1160px, calc(100vw - 32px)); }
 .exception-detail-modal .exception-side-panels { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); align-items: start; }
-.exception-detail-modal [data-guide-target="exception.action"] { grid-column: 1; grid-row: 1 / span 2; }
-.exception-detail-modal .exception-side-panels > :first-child,
-.exception-detail-modal .exception-side-panels > :last-child { grid-column: 2; }
+.exception-main-panels, .exception-history-panels { display: grid; gap: var(--space-4); min-width: 0; }
+.exception-detail-modal .exception-main-panels { grid-column: 1; }
+.exception-detail-modal .exception-history-panels { grid-column: 2; }
 .exception-detail-modal .exception-detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.exception-detail-modal .exception-action-form { border-top: 0; margin-top: 0; padding-top: 0; }
+.exception-detail-modal .exception-main-panels .surface-header { background: var(--color-bg-subtle, #f8fafc); }
+.exception-review-owner { margin-right: auto; font-size: 0.8125rem; }
+.exception-review-content { display: grid; gap: var(--space-3); }
+.exception-review-content > p { color: var(--color-text-secondary); font-size: 0.8125rem; line-height: 1.6; }
+.exception-review-links, .exception-review-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.exception-review-actions { justify-content: flex-end; }
+.exception-process-tooltip { position: relative; display: inline-flex; }
+.exception-process-tooltip-content {
+  position: absolute; z-index: 30; right: 0; bottom: calc(100% + 10px);
+  width: max-content; max-width: min(320px, calc(100vw - 48px));
+  padding: 10px 12px; border-radius: var(--radius-md); background: #1e293b; color: #fff;
+  font-size: 0.8125rem; font-weight: 400; line-height: 1.5; white-space: normal;
+  box-shadow: 0 4px 12px #0f172a20; visibility: hidden; opacity: 0; pointer-events: none;
+}
+.exception-process-tooltip:hover .exception-process-tooltip-content,
+.exception-process-tooltip:focus .exception-process-tooltip-content,
+.exception-process-tooltip:focus-within .exception-process-tooltip-content { visibility: visible; opacity: 1; }
+.exception-detail-help:empty { display: none; }
+.exception-detail-help .screen-help-trigger { display: inline-flex; align-items: center; gap: var(--space-2); }
+.exception-payment-modal { width: min(1480px, calc(100vw - 32px)); }
+.exception-payment-footer-actions { display: inline-flex; align-items: center; gap: var(--space-2); }
+.exception-payment-footer-actions:empty { display: none; }
+.exception-schedule-correction { display: grid; gap: var(--space-4); }
+.exception-schedule-amounts { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
+.exception-schedule-amounts > div { display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--color-border-default); border-radius: var(--radius-md); }
+.exception-schedule-amounts span { color: var(--color-text-secondary); font-size: 0.8125rem; }
+.exception-schedule-amounts strong { font-size: 1.375rem; font-variant-numeric: tabular-nums; }
+.exception-schedule-amounts > div:last-child strong { color: var(--color-danger, #dc2626); }
+.exception-schedule-breakdown { list-style: none; margin: 0; padding: 0; }
+.exception-schedule-breakdown li { display: flex; justify-content: space-between; padding-block: var(--space-3); border-bottom: 1px solid var(--color-border-default); }
+.exception-schedule-links { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.exception-correction-source { font-weight: 600; }
+.exception-correction-workflow { display: grid; gap: var(--space-3); margin-bottom: var(--space-4); padding: var(--space-4); border: 1px solid var(--color-border-default); border-radius: var(--radius-md); background: var(--color-bg-subtle, #f8fafc); }
+.exception-correction-workflow h3 { font-size: 0.875rem; }
+.exception-correction-workflow p { color: var(--color-text-secondary); font-size: 0.8125rem; line-height: 1.6; }
+.exception-remaining-issues { margin-block: var(--space-4); border: 1px solid var(--color-border-default); border-radius: var(--radius-md); overflow: hidden; font-size: 0.8125rem; }
+.exception-remaining-issues h3 { padding: var(--space-3) var(--space-4); font-size: 0.875rem; }
+.exception-reconciliation-table { min-width: 480px; }
+.exception-reconciliation-table tbody tr { background: var(--color-bg-subtle, #f8fafc); }
+.exception-difference-amount { color: var(--color-status-error-text); }
+.exception-reconciliation-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3) var(--space-4); color: var(--color-text-secondary); border-bottom: 1px solid var(--color-border-default); }
+.exception-reconciliation-meta strong { color: var(--color-text-primary); font-weight: 500; }
+.exception-reconciliation-meta a { margin-left: auto; }
+.exception-reconciliation-item:last-child .exception-reconciliation-meta { border-bottom: 0; }
+.exception-contract-schedules { display: grid; gap: var(--space-4); }
+.exception-contract-schedules .surface-header { display: flex; justify-content: space-between; gap: var(--space-3); }
+.exception-contract-schedule-list { overflow: hidden; }
+.exception-payment-basis { margin-bottom: var(--space-3); padding: var(--space-3); background: #f4f7fc; border: 1px solid var(--color-border-default); border-radius: var(--radius-md); font-size: 0.8125rem; }
+.exception-payment-basis summary { cursor: pointer; font-weight: 600; }
+.exception-payment-basis ul { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-2) 0; list-style: none; }
+.exception-payment-basis p { margin-bottom: var(--space-2); color: var(--color-text-secondary); }
+.exception-payment-form .transaction-gate-step { padding-block: var(--space-2); }
+.exception-correction-result { padding: var(--space-3); margin-block: var(--space-3); background: var(--color-bg-subtle, #f8fafc); border-radius: var(--radius-md); }
+.exception-payment-form { padding: 0; margin-top: var(--space-4); }
 @media (max-width: 800px) {
+  .exception-schedule-amounts { grid-template-columns: 1fr; }
   .exception-detail-modal .exception-side-panels { display: flex; flex-direction: column; }
-  .exception-detail-modal .exception-side-panels > .surface { width: 100%; }
-  .exception-detail-modal [data-guide-target="exception.action"] { order: -1; }
+  .exception-detail-modal .exception-side-panels > div { width: 100%; }
   .exception-detail-modal .exception-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .exception-review-owner { display: none; }
 }

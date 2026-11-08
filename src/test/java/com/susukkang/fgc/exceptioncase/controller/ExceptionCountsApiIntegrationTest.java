@@ -72,8 +72,8 @@ class ExceptionCountsApiIntegrationTest {
                 .andExpect(jsonPath("$.data.bySeverity[*].severityLabel").value(contains("긴급", "높음", "주의")))
                 .andExpect(jsonPath("$.data.bySeverity[*].count").value(contains(1, 1, 2)))
                 .andExpect(jsonPath("$.data.byType[*].type")
-                        .value(contains("CAP_VIOLATION", "DATA_QUALITY", "RECONCILIATION_MISMATCH")))
-                .andExpect(jsonPath("$.data.byType[*].count").value(contains(1, 2, 1)))
+                        .value(contains("DATA_QUALITY", "RECONCILIATION_MISMATCH", "CAP_VIOLATION")))
+                .andExpect(jsonPath("$.data.byType[*].count").value(contains(2, 1, 1)))
                 .andExpect(jsonPath("$.data.byType[0].typeLabel").isNotEmpty());
     }
 
