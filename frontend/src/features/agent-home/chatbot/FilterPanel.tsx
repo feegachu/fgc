@@ -27,7 +27,14 @@ export function FilterPanel({
     <section data-guide-feature="features.agent-home.chatbot.filter-panel.section" className="cb-filters" aria-label="보험사 세부 선택">
       <div className="cb-filters-head">
         보험사 세부 선택
-        <span className="cb-muted">선택 사항</span>
+        <label className="filter-checkbox">
+          <input data-guide-feature="features.agent-home.chatbot.filter-panel.exclude-cap-overflow"
+            type="checkbox"
+            checked={value.excludeCapOverflow}
+            onChange={(event) => onChange({ ...value, excludeCapOverflow: event.target.checked })}
+          />
+          <span>한도를 넘어 이월이 생기는 상품은 제외</span>
+        </label>
         {count > 0 && <span className="cb-pill">{count}개 적용</span>}
         {count > 0 && (
           <Button data-guide-feature="features.agent-home.chatbot.filter-panel.reset" variant="secondary" className="cb-filters-reset" onClick={() => onChange(EMPTY_FILTERS)}>
@@ -54,14 +61,6 @@ export function FilterPanel({
             </div>
           </fieldset>
         )}
-        <label className="filter-checkbox">
-          <input data-guide-feature="features.agent-home.chatbot.filter-panel.exclude-cap-overflow"
-            type="checkbox"
-            checked={value.excludeCapOverflow}
-            onChange={(event) => onChange({ ...value, excludeCapOverflow: event.target.checked })}
-          />
-          <span>한도를 넘어 이월이 생기는 상품은 제외</span>
-        </label>
       </div>
     </section>
   )
