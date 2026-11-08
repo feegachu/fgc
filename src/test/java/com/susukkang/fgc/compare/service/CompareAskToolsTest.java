@@ -317,6 +317,9 @@ class CompareAskToolsTest {
         // 부정형은 뒤집힌다: 2위가 1위보다 가장 앞서지 않았다는 말은 맞다.
         assertThat(tools.verify("나보험 튼튼건강이 가보험 든든건강보다 가장 앞서지 않았어요.")).isNull();
         assertThat(tools.verify("가보험 든든건강이 나보험 튼튼건강보다 가장 앞서지 않았어요.")).isEqualTo("LEAD_MISMATCH");
+        // 앞섬 표현이 '보다' 앞에서 비교 상대를 꾸미면 대상을 가릴 수 없어 판단하지 않는다(맞는 답을 거절하지 않는다).
+        assertThat(tools.verify("가장 앞선 가보험 든든건강보다 나보험 튼튼건강은 보수적 순수령액이 적어요.")).isNull();
+        assertThat(tools.verify("가장 앞선 나보험 튼튼건강보다 가보험 든든건강은 보수적 순수령액이 커요.")).isNull();
         // '보다'가 없으면 누가 주장 대상인지 알 수 없어 판단하지 않는다.
         assertThat(tools.verify("가보험 든든건강과 나보험 튼튼건강 중 나보험 튼튼건강이 가장 앞섰어요.")).isNull();
     }

@@ -402,7 +402,9 @@ final class CompareAskTools {
         int top = ranking.items().stream().mapToInt(Item::rank).min().orElse(1);
         if (mentioned.size() == 2) {
             // '나보험이 가보험보다 가장 앞섰어요': 비교 상대('보다' 바로 앞 상품)와 주장 대상을 가려 주장 대상만 본다.
-            mentioned = leadSubject(sentence, mentioned);
+            // '가장 앞선 가보험보다 …'처럼 앞섬 표현이 '보다' 앞에서 비교 상대를 꾸미면 대상을 가릴 수 없어 판단하지 않는다.
+            int than = sentence.indexOf("보다");
+            mentioned = than >= 0 && lead.start() > than ? leadSubject(sentence, mentioned) : Set.of();
         }
         if (mentioned.size() != 1) {
             return null;
