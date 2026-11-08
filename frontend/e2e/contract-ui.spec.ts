@@ -360,7 +360,9 @@ test('계약 직접 진입·새로고침·두 스케줄·409 입력 보존·수�
   await expect(page.getByPlaceholder('계약번호 입력')).toHaveValue('CONT-UI-EDIT')
   await page.getByRole('link', { name: '취소', exact: true }).click()
   await page.getByRole('button', { name: '이동' }).click()
-  await expect(page.getByRole('heading', { name: '보험계약 목록' })).toBeVisible()
+  await expect(page).toHaveURL(/\/contracts\/1(?:\?|$)/)
+  await expect(page.getByRole('heading', { name: '보험계약 상세', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: '보험계약 수정', exact: true })).toHaveCount(0)
 })
 
 test('CONT-W03 상태 변경은 허용 전이·사유 입력·확인창을 거쳐 사건과 멱등키를 함께 보낸다', async ({
@@ -432,7 +434,7 @@ test('없는 계약의 기존 오류와 COMPLIANCE의 폼 직접 진입 권한�
   await expect(page.getByRole('button', { name: /저장하고 예상 스케줄/ })).toHaveCount(0)
 })
 
-test('상세 값 정렬·가로 한도 안내문·지급 표 전체 열의 가시성을 유지한다', async ({ page }, testInfo) => {
+test('상세 값 정렬·한도 안내문 제거·지급 표 전체 열의 가시성을 유지한다', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 900, height: 1000 })
   await fixture(page)
   await page.goto('contracts/1')
@@ -447,11 +449,9 @@ test('상세 값 정렬·가로 한도 안내문·지급 표 전체 열의 가�
   await page.screenshot({ path: testInfo.outputPath('contract-detail-aligned.png'), fullPage: true })
   await page.getByRole('tab', { name: '1,200%', exact: true }).click()
   const note = page.locator('.contract-tab-guidance')
-  await expect(note).toContainText('두 규제를 더하지 마세요')
-  await expect(note.locator('.guidance-icon')).toHaveText('warning')
+  await expect(note).toHaveCount(0)
+  await expect(page.getByText('두 규제를 더하지 마세요', { exact: false })).toHaveCount(0)
   await expect(page.getByRole('region', { name: '지급단계별 판정' })).toContainText('조회된 자료가 없습니다.')
-  expect((await note.boundingBox())!.height).toBeLessThan(80)
-  expect((await note.locator('.guidance-copy').boundingBox())!.width).toBeGreaterThan(200)
   await page.screenshot({ path: testInfo.outputPath('contract-cap-compact.png'), fullPage: true })
   await page.getByRole('tab', { name: '지급/대사' }).click()
   const table = page.getByRole('table', { name: '수수료 지급 건' })

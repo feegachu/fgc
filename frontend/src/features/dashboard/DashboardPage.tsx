@@ -415,7 +415,7 @@ function SettlementGuideEntry({ card = false }: { card?: boolean }) {
             <br />
             가이드
           </strong>
-          <span className="dashboard-guide-caption">계약부터 최종 확정까지</span>
+          <span className="dashboard-guide-caption">계약부터 예외함 확인까지</span>
           <span className="dashboard-guide-start">
             시작하기 <span aria-hidden="true">→</span>
           </span>

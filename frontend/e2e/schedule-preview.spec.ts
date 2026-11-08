@@ -59,7 +59,6 @@ for (const seven of [false, true]) {
           totalPages: 1,
           totalElements: 1,
         }
-      else if (path.endsWith('/versions')) data = [header()]
       else if (path.endsWith('/regenerate')) {
         expect(route.request().postDataJSON()).toEqual({
           reason: '승인 정책 반영',

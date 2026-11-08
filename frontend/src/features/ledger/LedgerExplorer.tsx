@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
 import { Button } from '../../components/Button'
+import { ViewModeSwitch } from '../../components/HierarchyTree'
 import { LedgerContractTree } from './LedgerContractTree'
 import { KpiCard } from '../../components/KpiCard'
 import { ListPagination } from '../../components/ListPagination'
@@ -48,10 +49,7 @@ export function LedgerExplorer() {
   }
   return <div className="ledger-react-page list-page">
     <header className="page-header ledger-explorer-page-header"><div className="page-header-copy"><h1 className="page-title">검증원장</h1><p>기준 정산월 {month?.replace('-', '년 ')}월</p></div>
-      <div className="ledger-explorer-toolbar" role="group" aria-label="검증원장 보기 방식">
-        <button data-guide-feature="ledger.explorer.button-1" type="button" aria-pressed={!all} onClick={() => update({ ledgerView: '', selected: '', evidence: '', journalPage: '' })}>계약별 보기</button>
-        <button data-guide-feature="ledger.explorer.button-2" type="button" aria-pressed={all} onClick={() => update({ ledgerView: 'all', selected: '', evidence: '', journalPage: '' })}>전체 분개 보기</button>
-      </div><ScreenHelp screenId="LEDG-W01" /></header>
+      <ScreenHelp screenId="LEDG-W01" /></header>
     <LedgerFilters key={JSON.stringify(criteria) + month + searched} criteria={criteria} month={month} searched={searched}
       onSearch={fields => update({ ...fields, searched: 'true', contractId: '', selected: '', evidence: '', contractPage: '', journalPage: '' })}
       onReset={() => setParams(month ? { month } : {})} />
@@ -65,8 +63,8 @@ export function LedgerExplorer() {
           onPageChange={page => update({ contractPage: String(page), contractId: '', selected: '', evidence: '', journalPage: '' })} />
       </LedgerOverview>}
       <div className="ledger-explorer-right" aria-busy={query.isFetching || single.isFetching}>
-      <section data-guide-feature="ledger.explorer.section-1" className="surface ledger-contract-summary" aria-label="분개 합계">
-        <header className="surface-header"><h2 className="surface-title">{all ? '전체 분개' : contract?.contractNo ?? '분개 내역'}</h2>
+      <section data-guide-feature="ledger.explorer.section-1" className="ledger-summary-group" aria-label="분개 합계">
+        <header className="surface surface-header ledger-contract-summary"><h2 className="surface-title">{all ? '전체 분개' : contract?.contractNo ?? '분개 내역'}</h2>
           {contract?.agentName && <span>{contract.agentName} · {contract.insurerName}</span>}<small>{selected ? '선택한 분개' : `분개 ${int(totals?.journalCount ?? 0)}건`}</small>
           {selected && <Button data-guide-feature="ledger.explorer.all-entries" variant="ghost" onClick={() => update({ selected: '' })}>전체 내역</Button>}</header>
         <div className="ledger-balance-summary kpi-group">
@@ -76,19 +74,27 @@ export function LedgerExplorer() {
             tone={!totals ? 'neutral' : totals.debitTotal === totals.creditTotal ? 'success' : 'error'} footer={!totals ? '조회 대기' : totals.debitTotal === totals.creditTotal ? '차변·대변 균형' : '차변·대변 불일치'} />
         </div>
       </section>
-      <section data-guide-feature="ledger.explorer.section-2" className="surface ledger-journals" aria-label="계약별 분개 내역">
-        <header className="surface-header"><h2 className="surface-title">분개 내역</h2><span>{int(active?.journals.totalElements ?? 0)}건 · {int(totals?.lineCount ?? 0)}행</span><small>단위: 원</small></header>
+      <section data-guide-feature="ledger.explorer.section-2" className="surface ledger-journals" aria-label="계약별 분개 내역" data-guide-completed={params.has('evidence') && evidenceVisible}>
+        <header className="surface-header"><h2 className="surface-title">분개 내역</h2><span>{int(active?.journals.totalElements ?? 0)}건 · {int(totals?.lineCount ?? 0)}행</span>
+          <div className="ledger-journal-tools"><small>단위: 원</small>
+            <ViewModeSwitch value={all ? 'table' : 'tree'} label="검증원장 보기 방식" treeLabel="계약별 보기" tableLabel="전체 분개 보기"
+              onChange={view => update({ ledgerView: view === 'table' ? 'all' : '', selected: '', evidence: '', journalPage: '' })} />
+          </div>
+        </header>
         {(query.isFetching || selected && single.isFetching) && <p role="status" className="empty-state">분개 내역을 불러오고 있습니다.</p>}
         {single.error && selected && <p role="alert">{errorText(single.error)}</p>}
         {!query.isFetching && !entries.length && <p className="empty-state">조건에 맞는 분개가 없습니다.</p>}
-        {!!entries.length && <JournalTable entries={entries} selected={evidenceId} onSelect={id => update({ evidence: String(id) })} paginated={(active?.journals.totalPages ?? 0) > 1} />}
+        {!!entries.length && <JournalTable entries={entries} selected={evidenceId} onSelect={id => {
+          update({ evidence: String(id) })
+          document.querySelector('.ledger-journals')?.dispatchEvent(new Event('fgc-ledger-evidence-opened'))
+        }} paginated={(active?.journals.totalPages ?? 0) > 1} />}
         {!selected && <ListPagination label="분개 내역 페이지" page={selection.page} totalPages={data?.journals.totalPages ?? 0} onPageChange={page => update({ journalPage: String(page), evidence: '' })} />}
       </section>
     {evidenceVisible && <section data-guide-feature="ledger.explorer.section-3" className="surface ledger-linked-evidence" aria-label="분개 상세">
       <header className="surface-header"><h2 className="surface-title">연결 근거</h2><span>{detail.data?.journalNo}</span><small>{detail.data ? detail.data.balanced ? '차변·대변 일치' : '차변·대변 불일치' : ''}</small></header>
       {detail.error && <p role="alert">{errorText(detail.error)}</p>}
       {detail.isPending && <p role="status">분개 근거를 불러오는 중입니다.</p>}
-      {detail.data && <><DetailSummary detail={detail.data} /><div className="ledger-react-actions">
+      {detail.data && <><DetailSummary detail={detail.data} /><div className="ledger-react-actions" data-guide-target="ledger.actions">
         <DisabledButtonHint disabled={!canReverse || !eligible} reason={!canReverse ? '역분개 권한이 없습니다.' : '기표됨 상태이며 아직 역분개하지 않은 분개만 처리할 수 있습니다.'}>
           <Button data-guide-feature="ledger.explorer.reverse" disabled={!canReverse || !eligible} onClick={() => setAction('reverse')}>역분개</Button>
         </DisabledButtonHint>

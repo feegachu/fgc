@@ -2,8 +2,8 @@ import { SaveGuide } from '../assistant/guide/save-guide'
 import { useRunGuide } from '../assistant/guide/useRunGuide'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useOutletContext, useParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { Button } from '../../components/Button'
 import { KpiCardContent } from '../../components/KpiCard'
@@ -24,7 +24,6 @@ import {
   isRunning,
   runDetailQuery,
   runProgressQuery,
-  runsQuery,
 } from './api'
 import type { FinalizeChecklist, ValidationRunDetail, ValidationTarget } from './api'
 import { FinalizeDialogs } from './FinalizeDialogs'
@@ -125,6 +124,8 @@ function DetailBody({
   const [executed, setExecuted] = useState(false)
   const [previousAttemptId, setPreviousAttemptId] = useState<number | null>(null)
   const [attemptWaitGeneration, setAttemptWaitGeneration] = useState(0)
+  const [presentedChecklist, setPresentedChecklist] = useState<number | null>(null)
+  const checklistPresented = useCallback(() => setPresentedChecklist(attemptWaitGeneration), [attemptWaitGeneration])
   const attemptWaitExpired = useRestartAttemptDeadline(executed && previousAttemptId !== null, attemptWaitGeneration)
   const polling =
     executed ||
@@ -159,12 +160,12 @@ function DetailBody({
   // 폴링이 종료 상태에 닿으면 헤더·결과 요약·확정 조건을 다시 불러온다(1차는 전체 리로드였다).
   const finished = (executed || header.status === 'RUNNING') && live && !isRunning(live.status)
   const announced = useRef(false)
+  const refreshRequested = useRef(false)
   useEffect(() => {
-    if (!finished || announced.current) return
-    announced.current = true
-    toast(status === 'FAILED' ? '검증이 중단되었습니다. 실패 사유를 확인해 주세요.' : '검증 계산이 끝났습니다. 결과를 불러옵니다.', status === 'FAILED' ? 'error' : 'success', 3000)
+    if (!finished || refreshRequested.current) return
+    refreshRequested.current = true
     void client.invalidateQueries({ queryKey: ['validation-runs'] })
-  }, [finished, client, status])
+  }, [finished, client])
 
   // 일시 오류는 다음 폴링에서 회복되므로 연속 3회 실패해야 한 번만 알린다.
   // errorUpdateCount 는 누적값이라, 마지막 성공 시점의 값을 기준으로 연속 실패만 센다.
@@ -203,6 +204,7 @@ function DetailBody({
     onMutate: () => ({ restarting: false, attemptId: progress.data?.attemptId ?? 0 }),
     onSuccess: (_response, _variables, before) => {
       announced.current = false
+      refreshRequested.current = false
       setPreviousAttemptId(before?.restarting ? before.attemptId : null)
       setExecuted(true)
       setAttemptWaitGeneration((value) => value + 1)
@@ -222,6 +224,12 @@ function DetailBody({
       : status === 'FAILED' ? failureText(failureMessage, currentStep) : ''
   const guideState = guideError ? 'error' : progressToastActive || executed && status === 'CREATED' ? 'running'
     : ['COMPLETED', 'FINALIZED'].includes(status ?? '') && resultStep >= 8 && summariesLoaded ? 'ready' : 'waiting'
+  const resultsPresented = !revised || guideState === 'ready' && (status === 'FINALIZED' || presentedChecklist === attemptWaitGeneration)
+  useEffect(() => {
+    if (!finished || announced.current || status !== 'FAILED' && !resultsPresented) return
+    announced.current = true
+    toast(status === 'FAILED' ? '검증이 중단되었습니다. 실패 사유를 확인해 주세요.' : '검증 계산이 끝났습니다. 결과를 확인해 주세요.', status === 'FAILED' ? 'error' : 'success', 3000)
+  }, [finished, status, resultsPresented])
   const progressToastTitle = execute.isPending || awaitingAttempt ? '월 통합검증 시작 중'
       : status === 'RUNNING' ? '월 통합검증 실행 중' : '검증 결과 표시 중'
   const activeStepName = STEP_NAMES.find((_name, index) => displayed.state(index + 1) === 'running')
@@ -270,21 +278,11 @@ function DetailBody({
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 상세/확정</h1>
         </div>
-        <RunPicker currentId={id} link={link} />
-        <Link data-guide-feature="validation.restart" data-guide-target="validation.restart" className="button button-secondary" to={link('/validation-runs')}>신규 실행 만들기</Link>
+        <Link data-guide-feature="validation.restart" data-guide-target="validation.restart" className="button button-secondary" to={link('/validation-runs')}>
+          <span className="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+          목록으로
+        </Link>
       </header>
-
-      {/* 확정 불가역 경고 — 업무·규제 제약이므로 화면 설명문과 달리 남긴다 (운영정책서 제43조) */}
-      <div className="guidance guidance-warning">
-        <span className="material-symbols-rounded guidance-icon" aria-hidden="true">
-          gavel
-        </span>
-        <div>
-          <p>
-            <strong>확정하면 이 실행의 결과는 고칠 수 없습니다.</strong> 바로잡으려면 새 실행을 만들어야 합니다.
-          </p>
-        </div>
-      </div>
 
       <section data-guide-feature="features.validation.validation-run-detail-page.section-2" className="surface" aria-labelledby="vrun-header-title">
         <header className="surface-header">
@@ -367,6 +365,7 @@ function DetailBody({
           </p>
           {header.runType !== 'MANUAL_CONTRACT' && <ValidationRestartPanel key={id} id={id} month={header.validationMonth ?? ""} runNo={header.runNo ?? 0} status={status ?? 'CREATED'} waiting={!progress.isSuccess || !!(executed && !finished)} canProcess={canProcess} onAccepted={() => {
             announced.current = false
+            refreshRequested.current = false
             setPreviousAttemptId(progress.data?.attemptId ?? 0)
             setExecuted(true)
             setAttemptWaitGeneration(value => value + 1)
@@ -414,8 +413,8 @@ function DetailBody({
 
       <ExceptionSection detail={resultDetail} openLink={link} completed={revised ? resultStep : undefined} />
 
-      <div className="vrun-finalize-sidebar">
-      <div data-guide-target="validation.checklist"><ChecklistSection status={status} checklist={checklist} revised={revised} completed={resultStep} generation={`${attemptWaitGeneration}-live`} /></div>
+      <div className="vrun-finalize-sidebar" data-guide-target="validation.finalizeReview">
+      <div data-guide-target="validation.checklist"><ChecklistSection status={status} checklist={checklist} revised={revised} completed={resultStep} generation={`${attemptWaitGeneration}-live`} onPresented={checklistPresented} /></div>
 
       <FinalizeSection
         revised={revised}
@@ -434,41 +433,6 @@ function DetailBody({
       />
       </div>
       </div>
-    </div>
-  )
-}
-
-/** 최근 실행 20건 — 고르고 [이동]을 눌러야 넘어간다(1차와 같다). */
-function RunPicker({ currentId, link }: { currentId: string; link: (path: string) => string }) {
-  const navigate = useNavigate()
-  const runs = useQuery(runsQuery({ status: '', page: 1, sort: '' }))
-  const [picked, setPicked] = useState('')
-  const value = picked || currentId
-  return (
-    <div className="page-header-actions">
-      <div className="filter-field vrun-run-picker">
-        <label className="filter-field-label" htmlFor="pick-run">
-          실행
-        </label>
-        <select data-guide-feature="features.validation.validation-run-detail-page.pick-run"
-          className="select-control"
-          id="pick-run"
-          value={value}
-          onChange={(event) => setPicked(event.target.value)}
-        >
-          {(runs.data?.content ?? []).map((run) => (
-            <option key={run.validationRunId} value={String(run.validationRunId)}>
-              {formatMonth(run.validationMonth)}, {run.runNo}차 실행, {run.statusLabel}
-            </option>
-          ))}
-        </select>
-      </div>
-      <Button data-guide-feature="features.validation.validation-run-detail-page.button-4" variant="secondary" onClick={() => void navigate(link(`/validation-runs/${value}`))}>
-        <span className="material-symbols-rounded" aria-hidden="true">
-          open_in_new
-        </span>
-        이동
-      </Button>
     </div>
   )
 }
@@ -626,18 +590,20 @@ function ChecklistSection({
   revised,
   completed,
   generation,
+  onPresented,
 }: {
   status?: string
   checklist: ReturnType<typeof useQuery<FinalizeChecklist>>
   revised: boolean
   completed: number
   generation: string
+  onPresented?: () => void
 }) {
   const data = checklist.data
   if (revised && status !== 'FINALIZED') return <AnimatedRunChecklist
     key={generation} completed={completed} data={status === 'COMPLETED' && !checklist.isFetching && !checklist.isError ? data : undefined}
     error={status === 'COMPLETED' && checklist.isError ? errorText(checklist.error as Error, '확정 조건을 불러오지 못했습니다.') : undefined}
-    retry={() => void checklist.refetch()} />
+    retry={() => void checklist.refetch()} onPresented={onPresented} />
   let summary: { text: string; tone: 'success' | 'error' | 'review' | null } = { text: '확인 중', tone: null }
   let body: React.ReactNode
   if (status === 'FINALIZED') {

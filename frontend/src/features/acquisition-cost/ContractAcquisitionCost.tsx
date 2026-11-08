@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
 import { QueryState } from '../reference/ReferenceUI'
@@ -11,14 +10,11 @@ import { AcquisitionCostResult, AcquisitionFailure } from './AcquisitionCostResu
 import { ContractAcquisitionTable } from './ContractAcquisitionTable'
 
 /** 계약 상세의 작은 영역(스크럼 4차). 이 계약의 최근 결과만 보이고, 목록과 이력은 ACQC-W01에서 본다. */
-export function ContractAcquisitionCost({ contractId, contractNo, concise = false }: { contractId: string; contractNo?: string; concise?: boolean }) {
-  return concise ? <>
-    <Link data-guide-feature="features.acquisition-cost.contract-acquisition-cost.results" to={`/acquisition-cost-checks?contractNo=${encodeURIComponent(contractNo ?? '')}`}>전체 결과 보기</Link>
-    <ContractAcquisitionTable contractId={contractId} />
-  </> : <LegacyContractAcquisitionCost contractId={contractId} contractNo={contractNo} />
+export function ContractAcquisitionCost({ contractId, concise = false }: { contractId: string; concise?: boolean }) {
+  return concise ? <ContractAcquisitionTable contractId={contractId} /> : <LegacyContractAcquisitionCost contractId={contractId} />
 }
 
-function LegacyContractAcquisitionCost({ contractId, contractNo }: { contractId: string; contractNo?: string }) {
+function LegacyContractAcquisitionCost({ contractId }: { contractId: string }) {
   const canProcess = usePermission('canProcess')
   const [stage, setStage] = useState<AcquisitionRequest['paymentStage']>('GA_TO_FC')
   const query = useQuery(contractAcquisitionQuery(contractId, stage))
@@ -54,12 +50,6 @@ function LegacyContractAcquisitionCost({ contractId, contractNo }: { contractId:
         ) : (
           <p className="field-helper">검증 요청은 처리 권한이 있는 계정만 할 수 있습니다.</p>
         )}
-        <Link
-          data-guide-feature="features.acquisition-cost.contract-acquisition-cost.link"
-          to={`/acquisition-cost-checks?contractNo=${encodeURIComponent(contractNo ?? '')}`}
-        >
-          전체 결과 보기
-        </Link>
       </div>
       {mutation.error && (
         <AcquisitionFailure error={mutation.error} retry={requestCheck} reload={() => void query.refetch()} />

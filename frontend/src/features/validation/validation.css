@@ -227,17 +227,6 @@
 
 /* ───────────────────── VRUN-W02 상세 · 확정 ───────────────────── */
 
-.vrun-run-picker {
-  gap: 0.25rem;
-}
-
-.vrun-run-picker .select-control {
-  width: min(18rem, 60vw);
-  height: 1.75rem;
-  padding-block: 0;
-  font-size: 0.75rem;
-}
-
 /*
  * 10단계 스텝퍼.
  * assets/fgc.css:159-182 의 .fgc-stepper 를 여기로 옮겨 토큰화한 것이다.
@@ -541,10 +530,6 @@
   .vrun-filter-bar {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .vrun-run-picker .select-control {
-    width: 100%;
   }
 
   .vrun-finalize-row {

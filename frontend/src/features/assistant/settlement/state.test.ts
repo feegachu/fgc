@@ -1,4 +1,4 @@
-import { destinations } from './catalog'
+import { destinations, settlementCatalog } from './catalog'
 import { describe, expect, it } from 'vitest'
 import { decide, STEPS, replacePayment, handoffFor } from './state'
 import type { Evidence, Selection } from './state'
@@ -54,17 +54,18 @@ function evidence(): Evidence {
 describe('FUN-088 server evidence decisions', () => {
   it('registers exactly nine logical stages', () => expect(STEPS).toHaveLength(9))
   it('does not call a completed calculation finalized', () =>
-    expect(decide(selection, evidence(), 'GA_ADMIN')).toMatchObject({ step: 'validation.finalize' }))
-  it('only finishes on the actual FINALIZED state', () => {
+    expect(decide(selection, evidence(), 'GA_ADMIN')).toMatchObject({ step: 'ledger.review' }))
+  it('keeps the guide on ledger review even when financial validation is FINALIZED', () => {
     const state = evidence()
     state.validation!.header!.status = 'FINALIZED'
-    expect(decide(selection, state, 'SETTLEMENT').complete).toBe(true)
+    expect(decide(selection, state, 'SETTLEMENT')).toMatchObject({ step: 'ledger.review' })
+    expect(decide(selection, state, 'SETTLEMENT')).not.toHaveProperty('complete')
   })
   it('routes a cancelled original payment to explicit correction selection without completing', () => {
     const state = evidence()
     state.payment!.status = 'CANCELLED'
     expect(decide(selection, state, 'SETTLEMENT')).toMatchObject({ step: 'exception.resolve' })
-    expect(decide(selection, state, 'SETTLEMENT').complete).toBeUndefined()
+    expect(decide(selection, state, 'SETTLEMENT')).not.toHaveProperty('complete')
   })
   it('rechecks a selected replacement payment against the existing contract and month', () => {
     const state = evidence()
@@ -99,7 +100,7 @@ describe('FUN-088 server evidence decisions', () => {
     state.payment!.updatedAt = undefined
     state.payment!.createdAt = '2026-10-30T15:00:00'
     state.validation!.header!.startedAt = '2026-10-30T15:01:00'
-    expect(decide(selection, state, 'GA_ADMIN').step).toBe('validation.finalize')
+    expect(decide(selection, state, 'GA_ADMIN').step).toBe('ledger.review')
   })
 
   it.each(['COMPLETED', 'FINALIZED'] as const)('refuses %s completion without verifiable timestamps', (status) => {
@@ -179,15 +180,15 @@ describe('FUN-088 server evidence decisions', () => {
     state.reconciliation!.status = status
     expect(decide(selection, state, 'GA_ADMIN').step).toBe('reconciliation.review')
   })
-  it('branches mismatch to exception and only returns after fresh matched results', () => {
+  it('continues through ledger review for both matched and mismatched results', () => {
     const state = evidence()
     state.results!.summary!.exceptionCount = 1
-    expect(decide(selection, state, 'GA_ADMIN').step).toBe('exception.resolve')
+    expect(decide(selection, state, 'GA_ADMIN').step).toBe('ledger.review')
     state.results!.summary!.exceptionCount = 0
     state.openExceptions = 1
-    expect(decide(selection, state, 'GA_ADMIN').step).toBe('exception.resolve')
+    expect(decide(selection, state, 'GA_ADMIN').step).toBe('ledger.review')
     state.openExceptions = 0
-    expect(decide(selection, state, 'GA_ADMIN').step).toBe('validation.finalize')
+    expect(decide(selection, state, 'GA_ADMIN').step).toBe('ledger.review')
   })
   it('does not accept an empty reconciliation as a verified match', () => {
     const state = evidence()
@@ -204,12 +205,12 @@ describe('FUN-088 server evidence decisions', () => {
     state.openExceptions = undefined
     expect(decide(selection, state, 'GA_ADMIN').step).toBe('reconciliation.review')
   })
-  it('hands finalization to authorized staff', () =>
-    expect(decide(selection, evidence(), 'SETTLEMENT').reason).toContain('맡기세요'))
-  it('requires all eight checklist items', () => {
+  it('continues with read-only ledger guidance for settlement staff', () =>
+    expect(decide(selection, evidence(), 'SETTLEMENT').step).toBe('ledger.review'))
+  it('does not gate read-only ledger guidance on the financial finalization checklist', () => {
     const state = evidence()
     state.checklist!.conditions!.pop()
-    expect(decide(selection, state, 'GA_ADMIN').reason).toContain('확정 조건 8개')
+    expect(decide(selection, state, 'GA_ADMIN').step).toBe('ledger.review')
   })
   it.each(['month', 'contract', 'stage', 'run', 'reconciliation'] as const)('rejects mismatched %s', (field) => {
     const state = evidence()
@@ -269,4 +270,15 @@ it.each([-1, 0.5, NaN])('rejects invalid exception counts %s instead of advancin
   const state = evidence()
   state.openExceptions = count
   expect(decide(selection, state, 'GA_ADMIN').step).toBe('reconciliation.review')
+})
+
+it('registers ledger as stage 8 and exception reference as stage 9, without a financial finalization stage', () => {
+  const catalog = settlementCatalog(selection)
+  expect(catalog.steps).toHaveLength(9)
+  expect(catalog.steps.slice(-2)).toMatchObject([
+    { stepId: 'ledger.review', screenId: 'LEDG-W01', instruction: '검증원장' },
+    { stepId: 'exception.resolve', screenId: 'EXCP-W01', instruction: '예외함 확인' },
+  ])
+  expect(catalog.steps.some(step => step.completionConditionId === 'FINALIZED')).toBe(false)
+  expect(destinations(selection)['ledger.review'].path).toBe('/journals?month=2026-07&contractId=1')
 })

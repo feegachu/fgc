@@ -14,18 +14,29 @@ export function useGuideSequence<T>(steps: readonly T[], key: string, identify: 
     go, next: () => go(index + 1), previous: () => go(index - 1) }
 }
 
-type Behavior = Pick<ScreenHelpStep, 'onEnter' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent'>
+type Behavior = Pick<ScreenHelpStep, 'onEnter' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent' | 'requireAction'>
 /** Presentation and selection only; never clicks save/execute/confirm controls. */
 export function useGuideStep(step: Behavior | undefined, target: HTMLElement | null, next: () => void, enabled: boolean) {
+  const [completion, setCompletion] = useState<{ target: HTMLElement; completed: boolean } | null>(null)
+  useEffect(() => {
+    if (!enabled || !target || !step?.requireAction) return
+    const read = () => setCompletion({ target, completed: target.dataset.guideCompleted === 'true' })
+    read()
+    const observer = new MutationObserver(read)
+    observer.observe(target, { attributes: true, attributeFilter: ['data-guide-completed'] })
+    return () => observer.disconnect()
+  }, [enabled, target, step?.requireAction])
   const advance = useRef(next)
   useEffect(() => { advance.current = next }, [next])
   useEffect(() => {
     if (!enabled || !target || !step?.advanceOnEvent) return
     let timer = 0
-    const completed = () => { clearTimeout(timer); timer = window.setTimeout(() => advance.current(), 350) }
+    const completed = () => { clearTimeout(timer); timer = window.setTimeout(() => {
+      if (!step.requireAction || target.dataset.guideCompleted === 'true') advance.current()
+    }, 350) }
     target.addEventListener(step.advanceOnEvent, completed)
     return () => { clearTimeout(timer); target.removeEventListener(step.advanceOnEvent!, completed) }
-  }, [enabled, target, step?.advanceOnEvent])
+  }, [enabled, target, step?.advanceOnEvent, step?.requireAction])
   useEffect(() => {
     if (enabled) return step?.onEnter?.()
   }, [step, enabled])
@@ -60,4 +71,5 @@ export function useGuideStep(step: Behavior | undefined, target: HTMLElement | n
     target.addEventListener('fgc-guide-selected', selected)
     return () => { clearTimeout(timer); observer.disconnect(); target.removeEventListener('change', selected); target.removeEventListener('fgc-guide-selected', selected) }
   }, [target, step?.advanceOnSelection, enabled])
+  return !!step?.requireAction && !(completion?.target === target && completion.completed)
 }

@@ -113,13 +113,6 @@ export const scheduleDetailQuery = (id: string) =>
     meta: { errorToast: false },
   })
 
-export const scheduleVersionsQuery = (id: string) =>
-  queryOptions({
-    queryKey: ['schedules', 'versions', id],
-    queryFn: ({ signal }) => get<ScheduleHeader[]>(schedulePath(id, '/versions'), signal),
-    meta: { errorToast: false },
-  })
-
 /** IF-API-28C — 같은 계약의 다른 지급단계에서 사용 중인 운영 스케줄 ID. */
 export const findActiveSchedule = (id: string, paymentStage: string) =>
   get<number>(schedulePath(id, `/active?paymentStage=${encodeURIComponent(paymentStage)}`))

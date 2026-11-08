@@ -20,11 +20,13 @@ function sourceFiles(domain: string) {
 function countBinding(sources: string[], selector: string) {
   const attribute = selector.match(/\[([\w-]+)="([^"]+)"\]/)
   const id = selector.match(/^#([\w-]+)$/)
-  const name = id ? 'id' : attribute?.[1]
+  const className = selector.match(/^\.([\w-]+)$/)?.[1]
+  const name = className ? 'className' : id ? 'id' : attribute?.[1]
   const value = id?.[1] ?? attribute?.[2]
   const tail = attribute ? selector.slice(selector.indexOf(attribute[0]) + attribute[0].length).trim() : ''
   const literalMatches = (node: ts.Node | undefined): boolean => !!node && (
-    ts.isStringLiteral(node) ? node.text === value :
+    ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) ? (className ? node.text.split(/\s+/).includes(className) : node.text === value) :
+    className && ts.isTemplateExpression(node) ? node.head.text.split(/\s+/).includes(className) :
     ts.isJsxExpression(node) ? literalMatches(node.expression) :
     ts.isConditionalExpression(node) ? literalMatches(node.whenTrue) || literalMatches(node.whenFalse) : false
   )
@@ -96,13 +98,13 @@ const scenarios = [
   ['/contracts/new', 'contract'], ['/contracts/1', 'contract'], ['/schedules/1', 'schedule'],
   ['/transactions/new', 'transaction'], ['/transactions', 'transaction'],
   ['/validation-runs', 'validation'], ['/validation-runs/1', 'validation'],
-  ['/reconciliation', 'reconciliation'], ['/exceptions', 'exception'],
+  ['/reconciliation', 'reconciliation'], ['/journals', 'ledger'], ['/exceptions', 'exception'],
 ] as const
 const routes: Record<string, string[]> = {
   'contract.create': ['/contracts/new', '/contracts/1'], 'schedule.review': ['/contracts/1', '/schedules/1'],
   'payment.precheck': ['/transactions/new', '/transactions'], 'payment.confirm': ['/transactions/new', '/transactions'],
   'validation.execute': ['/validation-runs', '/validation-runs/1'], 'reconciliation.review': ['/reconciliation'],
-  'exception.resolve': ['/exceptions'], 'validation.finalize': ['/validation-runs/1'],
+  'ledger.review': ['/journals'], 'exception.resolve': ['/exceptions'],
 }
 for (const stage of STEPS.filter(stage => stage !== 'payment.draft')) {
   it(`binds every ${stage} explanation to its screen source`, () => {
@@ -110,7 +112,7 @@ for (const stage of STEPS.filter(stage => stage !== 'payment.draft')) {
       const domain = scenarios.find(([route]) => route === path)![1]
       for (const step of workflowWalkthrough(stage, path, selected, corrected)) {
         const sources = step.scope === 'shell' ? [resolve(import.meta.dirname, '../../../app/shell/Sidebar.tsx')]
-          : step.selector === 'h1' && domain === 'contract' ? sourceFiles(domain).filter(file => file.endsWith('ContractDetailPage.tsx')) : sourceFiles(domain)
+          : step.selector === 'h1' && domain === 'contract' ? sourceFiles(domain).filter(file => file.endsWith('ContractDetailPage.tsx')) : [...sourceFiles(domain), ...(step.selector === '.filter-bar' ? [resolve(import.meta.dirname, '../../../components/FilterBar.tsx')] : [])]
         expect(countBinding(sources, step.selector), `${path} ${step.selector}`).toBe(1)
       }
     }

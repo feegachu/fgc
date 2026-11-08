@@ -50,6 +50,9 @@ export default function ContractFormPage() {
   const { id } = useParams()
   const [params] = useSearchParams()
   const returnTo = safeReturnTo(params.get('returnTo'), '/contracts')
+  const backPath = id ? returnLink(`/contracts/${encodeURIComponent(id)}`, returnTo) : returnTo
+  const month = params.get('month')
+  const exitTo = validMonth(month) ? withMonth(backPath, month, false) : backPath
   const [saveGuide] = useState(() => new SaveGuide())
   const [revision, setRevision] = useState(0)
   const detail = useQuery({
@@ -68,14 +71,16 @@ export default function ContractFormPage() {
   return (
     <div className="contract-form-page">
       <header className="page-header contract-form-page-header">
-        <ScreenHelp screenId="CONT-W03" saveGuide={saveGuide} />
         <h1 className="page-title">보험계약 {id ? '수정' : '등록'}</h1>
-        <Link data-guide-feature="features.contract.contract-form-page.link" className="button button-secondary" to={returnTo}>
-          <span className="material-symbols-rounded" aria-hidden="true">
-            arrow_back
-          </span>
-          목록으로
-        </Link>
+        <div className="page-header-actions">
+          <Link data-guide-feature="features.contract.contract-form-page.link" className="button button-secondary" to={exitTo}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              arrow_back
+            </span>
+            목록으로
+          </Link>
+          <ScreenHelp screenId="CONT-W03" saveGuide={saveGuide} />
+        </div>
       </header>
       {id && detail.isPending ? (
         <p role="status">계약을 불러오는 중입니다.</p>
@@ -93,6 +98,7 @@ export default function ContractFormPage() {
           contract={id ? detail.data : undefined}
           onReload={reload}
           saveGuide={saveGuide}
+          exitTo={exitTo}
         />
       )}
     </div>
@@ -104,11 +110,13 @@ function ContractEditor({
   contract,
   onReload,
   saveGuide,
+  exitTo,
 }: {
   id?: string
   contract?: ContractDetail
   onReload: () => Promise<void>
   saveGuide: SaveGuide
+  exitTo: string
 }) {
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -805,7 +813,7 @@ function ContractEditor({
                 최신 계약 다시 불러오기
               </Button>
             )}
-            <Link data-guide-feature="features.contract.contract-form-page.link-2" className="button button-secondary" to={returnTo}>
+            <Link data-guide-feature="features.contract.contract-form-page.link-2" className="button button-secondary" to={exitTo}>
               취소
             </Link>
             <Button data-guide-feature="features.contract.contract-form-page.button-4"

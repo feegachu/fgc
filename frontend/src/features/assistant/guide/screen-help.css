@@ -1,4 +1,6 @@
 .payment-guide-card.screen-step-guide {
+  box-sizing: border-box;
+  overflow-x: hidden;
   --pico-guide-accent: var(--color-fgc-blue);
   --pico-guide-ink: var(--color-fgc-ink);
   border-color: color-mix(in srgb, var(--color-fgc-blue) 25%, white);
@@ -98,6 +100,8 @@ body:has(.screen-step-guide[data-help-presentation='true'][data-guide-anchored='
   border-top: 1px solid var(--color-border-default);
 }
 .screen-step-guide .payment-guide-actions > button { flex: 1; }
+.screen-step-guide .payment-guide-actions > .disabled-button-hint { flex: 1; min-width: 0; }
+.screen-step-guide .payment-guide-actions > .disabled-button-hint > button { width: 100%; }
 .payment-guide-card.screen-step-guide button.button-secondary:not(:disabled):not(.is-disabled) { color: var(--color-fgc-blue); border-color: color-mix(in srgb, var(--color-fgc-blue) 25%, white); background: white; }
 .payment-guide-card.screen-step-guide button.button-ghost:not(:disabled):not(.is-disabled) { color: var(--color-fgc-blue); }
 .payment-guide-card.screen-step-guide button.screen-step-next:not(:disabled):not(.is-disabled) { background: var(--color-fgc-blue); border-color: var(--color-fgc-blue); color: white; }
@@ -115,18 +119,4 @@ body:has(.screen-step-guide[data-help-presentation='true'][data-guide-anchored='
   background: transparent;
   box-shadow: 0 0 0 3px #164d861f, 0 0 0 200vmax #17334b38;
   animation: none;
-}
-
-.guide-selection-updated { animation: guide-selection-update 1.2s ease-out; }
-@keyframes guide-selection-update {
-  from { outline: 2px solid var(--color-fgc-blue); outline-offset: 3px; }
-  to { outline: 2px solid transparent; outline-offset: 3px; }
-}
-@media (prefers-reduced-motion: reduce) { .guide-selection-updated { animation-duration: 0s; } }
-
-.guide-tree-controls [role='tree'] > li:first-child > .hierarchy-row > .hierarchy-toggle,
-.guide-tree-controls [role='tree'] > li:first-child > .hierarchy-row > .hierarchy-select .hierarchy-label {
-  outline: 2px solid var(--color-fgc-blue);
-  outline-offset: 3px;
-  border-radius: 4px;
 }

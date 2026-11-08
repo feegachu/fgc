@@ -4,7 +4,7 @@
   --pico-guide-ink: #244a69;
   --pico-guide-line: #b7d5ed;
 }
-body:has([data-guide-anchored='true']) .app-main {
+body:has([data-guide-anchored='true']):not(:has([data-guide-docked='true'])) .app-main {
   padding-bottom: calc(min(460px, 50dvh) + 48px);
 }
 .payment-guide-help { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }

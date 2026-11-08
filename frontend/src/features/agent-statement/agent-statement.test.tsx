@@ -14,7 +14,7 @@ import type { StatementDetail, StatementEntry, StatementList } from './api'
 // These tests exercise the original table API/actions. Explorer behavior has separate browser coverage.
 vi.mock('react-router', async () => {
   const actual = await vi.importActual<typeof import('react-router')>('react-router')
-  return { ...actual, useOutletContext: () => ({ ...actual.useOutletContext<object>(), helpVersion: 'before' }) }
+  return { ...actual, useOutletContext: () => ({ ...actual.useOutletContext<object>(), helpVersion: 'before', revised: false }) }
 })
 
 const agentUser = {

@@ -246,22 +246,42 @@ describe('Modal', () => {
     await user.keyboard('{Escape}')
     expect(close).toHaveBeenCalledOnce()
   })
-  it('배경 클릭은 옵션에 따라서만 닫는다', () => {
+  it('기본 모달은 내부 클릭을 유지하고 바깥 클릭으로 닫으며 명시적 잠금은 존중한다', () => {
     const close = vi.fn()
     const { rerender } = render(
       <Modal title="검증" open onClose={close}>
         <p>내용</p>
       </Modal>,
     )
-    fireEvent.click(screen.getByRole('dialog').parentElement!)
+    fireEvent.click(screen.getByText('내용'))
     expect(close).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('dialog').parentElement!)
+    expect(close).toHaveBeenCalledOnce()
+    close.mockClear()
     rerender(
-      <Modal title="검증" open closeOnBackdrop onClose={close}>
+      <Modal title="검증" open closeOnBackdrop={false} onClose={close}>
         <p>내용</p>
       </Modal>,
     )
     fireEvent.click(screen.getByRole('dialog').parentElement!)
-    expect(close).toHaveBeenCalledOnce()
+    expect(close).not.toHaveBeenCalled()
+  })
+  it('중첩 모달은 최상단 모달의 바깥 클릭만 처리한다', () => {
+    const outer = vi.fn(), inner = vi.fn()
+    function Dialogs() {
+      const [confirm, setConfirm] = useState(false)
+      return <Modal title="상세" open onClose={outer}>
+        <button onClick={() => setConfirm(true)}>확인 열기</button>
+        <Modal title="확인" open={confirm} onClose={inner}><p>확인 내용</p></Modal>
+      </Modal>
+    }
+    render(<Dialogs />)
+    fireEvent.click(screen.getByRole('button', { name: '확인 열기' }))
+    fireEvent.click(screen.getByRole('dialog', { name: '상세' }).parentElement!)
+    expect(outer).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('dialog', { name: '확인' }).parentElement!)
+    expect(inner).toHaveBeenCalledOnce()
+    expect(outer).not.toHaveBeenCalled()
   })
 })
 it('Toast 일반 알림은 5초 후 닫고 오류·로딩은 수동으로 닫는다', () => {

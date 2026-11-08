@@ -18,7 +18,7 @@ export function runHistoryGroups(runs: Run[]) {
     const root = group(key, label, members, [...new Set(members.map(run => run.paymentStage ?? ''))].map(stage => {
       const direction = members.filter(run => (run.paymentStage ?? '') === stage)
       const branch = group(`${key}:${stage}`, PAYMENT_STAGE[stage as keyof typeof PAYMENT_STAGE] ?? '지급 방향 확인 필요', direction,
-        direction.map(run => ({ id: `run:${run.reconciliationRunId}`, label: `${run.insurerName ?? '전체 보험회사'} #${run.reconciliationRunId}`, icon: null, className: 'reco-history-leaf',
+        direction.map(run => ({ id: `run:${run.reconciliationRunId}`, label: run.insurerName ?? '전체 보험회사', icon: null, className: 'reco-history-leaf',
           content: createElement(RunHistoryCard, { run }) })))
       return { ...branch, icon: null, meta: undefined }
     }))

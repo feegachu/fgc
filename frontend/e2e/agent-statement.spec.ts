@@ -25,12 +25,13 @@ for (const width of [320, 375, 768]) {
     })
     await page.goto('agent/statements?month=2026-07')
     const summary = page.getByRole('region', { name: '유형별 요약' })
-    await expect(summary.getByRole('article')).toHaveCount(4)
-    await expect(summary.getByRole('article', { name: '조정 요약' })).toContainText('-9,999,999,999,999')
+    await expect(summary.locator('.kpi-card')).toHaveCount(4)
+    await expect(summary.getByRole('region', { name: '조정', exact: true })).toContainText('-9,999,999,999,999')
+    await expect(summary.locator('.kpi-value .visually-hidden')).toHaveCount(0)
     await page.evaluate(() => document.fonts.ready)
     const metrics = await summary.evaluate((element) => {
       const summaryBox = element.getBoundingClientRect()
-      const cards = [...element.querySelectorAll<HTMLElement>('.ast-card')]
+      const cards = [...element.querySelectorAll<HTMLElement>('.kpi-card')]
       const canvas = document.createElement('canvas')
       canvas.width = canvas.height = 1
       const context = canvas.getContext('2d')!
@@ -54,17 +55,23 @@ for (const width of [320, 375, 768]) {
       return {
         right: summaryBox.right,
         sameColumn: cards.every((card) => Math.abs(card.getBoundingClientRect().left - cards[0].getBoundingClientRect().left) < 1),
-        textFits: cards.every((card) => [...card.querySelectorAll<HTMLElement>('.ast-card-amount, .ast-card-help, .ast-card-note, .ast-type')].every((text) => {
+        clipped: cards.flatMap(card => [...card.querySelectorAll<HTMLElement>('.kpi-value, .ast-kpi-note, .kpi-comparison, .kpi-label')].flatMap(text => {
+          const range = document.createRange(); range.selectNodeContents(text)
+          const box = card.getBoundingClientRect()
+          return text.scrollWidth > text.clientWidth + 1 || [...range.getClientRects()].some(rect => rect.left < box.left || rect.right > box.right)
+            ? [{ text: text.textContent, className: text.className, width: text.clientWidth, scroll: text.scrollWidth, whiteSpace: getComputedStyle(text).whiteSpace }] : []
+        })),
+        textFits: cards.every((card) => [...card.querySelectorAll<HTMLElement>('.kpi-value, .ast-kpi-note, .kpi-comparison, .kpi-label')].every((text) => {
           const range = document.createRange(); range.selectNodeContents(text)
           const box = card.getBoundingClientRect()
           return text.scrollWidth <= text.clientWidth + 1 && [...range.getClientRects()].every((rect) => rect.left >= box.left && rect.right <= box.right)
         })),
-        contrasts: [...element.querySelectorAll('.ast-card-help, .ast-card-note, .ast-type')].map(contrast),
+        contrasts: [...element.querySelectorAll('.ast-kpi-note, .kpi-comparison, .kpi-label')].map(contrast),
       }
     })
     expect(metrics.right).toBeLessThanOrEqual(width)
     if (width < 576) expect(metrics.sameColumn).toBe(true)
-    expect(metrics.textFits).toBe(true)
+    expect(metrics.textFits, JSON.stringify(metrics.clipped)).toBe(true)
     expect(Math.min(...metrics.contrasts)).toBeGreaterThanOrEqual(4.5)
     await page.screenshot({ path: `e2e-artifacts/773-statement-${width}.png`, fullPage: true })
   })

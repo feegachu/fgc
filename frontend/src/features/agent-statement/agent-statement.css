@@ -23,6 +23,12 @@
 
 .app-shell .page-content .ast-page > .ast-dashboard-summary { --kpi-columns: 4; }
 .ast-dashboard-summary .kpi-value { min-width: 0; overflow-wrap: anywhere; }
+.app-shell.is-agent .ast-dashboard-summary .kpi-value { white-space:normal; }
+.app-shell.is-agent .ast-dashboard-summary .kpi-card-footer { flex-direction:column; align-items:flex-start; }
+.ast-kpi-note { display:block; margin-top:4px; color:var(--color-text-secondary); font-size:11px; line-height:1.5; }
+@media (max-width: 35.9375rem) {
+  .app-shell.is-agent[data-ui-revision='after'] .page-content .ast-page > .ast-dashboard-summary { grid-template-columns:minmax(0, 1fr); }
+}
 @media (max-width: 74.9375rem) {
   .app-shell .page-content .ast-page > .ast-dashboard-summary { --kpi-columns: 2; }
 }

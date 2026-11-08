@@ -296,6 +296,18 @@ describe('VRUN-W01 실행 목록', () => {
 })
 
 describe('VRUN-W02 상세·실행·확정', () => {
+  it('상세는 실행 선택과 추가 목록 조회 없이 목록으로 돌아갈 수 있다', async () => {
+    detailHandlers()
+    const { actions, router } = renderAt('/app/validation-runs/7?month=2026-07')
+    const back = await screen.findByRole('link', { name: '목록으로' })
+    expect(screen.queryByLabelText('실행', { exact: true })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '이동' })).not.toBeInTheDocument()
+    expect(screen.queryByText('확정하면 이 실행의 결과는 고칠 수 없습니다.')).not.toBeInTheDocument()
+    expect(calls('GET /api/v1/validation-runs')).toHaveLength(0)
+    handlers['GET /api/v1/validation-runs/active-monthly'] = () => ({ exists: false })
+    await actions.click(back)
+    expect(router.state.location.pathname).toBe('/app/validation-runs')
+  })
   it('없는 실행은 404 안내를 보여 준다', async () => {
     handlers['GET /api/v1/validation-runs/99'] = () => {
       throw new ApiError({ code: 'FGC-COMMON-004', message: '없음' }, 'req-404', 404)

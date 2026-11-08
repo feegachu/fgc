@@ -100,7 +100,7 @@ function Detail({ item }: { item: ExceptionCase }) {
         {/* 차익거래 예외는 판정 사유 원문을 설명으로 저장한다. 개발 용어 구절만 쉬운 말로 바꾼다. */}
         <dd>{rateText(decisionReasonText(item.description))}</dd>
       </div>
-      <div className="exception-detail-wide">
+      <div className="exception-detail-wide" data-guide-target="exception.reference">
         <dt>참조</dt>
         <dd className="tabular-nums">
           {item.sourceLink ? (
@@ -116,7 +116,7 @@ function Detail({ item }: { item: ExceptionCase }) {
         </dd>
       </div>
       {item.capBasisLink && (
-        <div className="exception-detail-wide">
+        <div className="exception-detail-wide" data-guide-target="exception.basis">
           <dt>계산근거</dt>
           <dd>
             <Link data-guide-feature="features.exception.action-panel.link-2" className="button button-secondary" to={item.capBasisLink}>
