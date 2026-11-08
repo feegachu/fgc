@@ -170,8 +170,9 @@ test('실제 서버에서 두 한도를 따로 판정하고 자료 부족과 적
   await page.screenshot({ path: 'e2e-artifacts/729-contract-tab.png', fullPage: true })
   expect(sql('SELECT count(*) FROM fgc.acquisition_cost_check')).toBe(before)
 
-  // 탭의 링크는 이 계약으로 좁힌 전체 결과로 이동한다.
-  await panel.getByRole('link', { name: '전체 결과 보기' }).click()
+  // 상세의 전체 결과 링크는 제거하고, 독립 검증 화면의 계약 필터는 유지한다.
+  await expect(panel.getByRole('link', { name: '전체 결과 보기' })).toHaveCount(0)
+  await page.goto(`/acquisition-cost-checks?contractNo=${CONTRACT_NO}`)
   await expect(page.getByRole('heading', { name: '계약체결비용 한도 검증' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`contractNo=${CONTRACT_NO}`))
   await expect(page.getByRole('row', { name: new RegExp(BOUNDARY_CONTRACT_NO) })).toHaveCount(0)
