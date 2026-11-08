@@ -41,7 +41,9 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
     private final SchedulePreviewRepository previews;
     private final FeeRegimeSchedulePolicyService previewPolicies;
 
+    // 같은 클래스 안의 호출은 프록시를 거치지 않아 아래 메서드의 @Transactional이 적용되지 않는다. 진입점에서 경계를 둔다.
     @Override
+    @Transactional
     public StepProcessingResult regenerateSchedules(ValidationStepContext context) {
         return validateContractSchedules(context.validationRunId());
     }
