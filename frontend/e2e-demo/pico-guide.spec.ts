@@ -2,7 +2,7 @@ import { test, expect, login, api } from './fixtures'
 
 // SRC-028: real HTTP and catalog, AI UI enabled; provider-free fallback is intentional.
 for (const width of [1440, 390]) {
-  test(`피코 실서버 ${width}px: 키 없음 고정 안내와 읽기 튜토리얼`, async ({ page }, info) => {
+  test(`피코 실서버 ${width}px: 키 없음 고정 안내와 기존 도움말`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 900 })
     const errors: string[] = []
     const writes: string[] = []
@@ -30,25 +30,14 @@ for (const width of [1440, 390]) {
     await expect(pico.getByRole('button', { name: /^지급 초안 저장/ })).toHaveCount(0)
     await expect(pico.getByRole('button', { name: /^지급 사전검증/ })).toHaveCount(0)
     await pico.getByRole('button', { name: /^보험계약 검색\/선택/ }).click()
-    const tutorial = page.getByRole('region', { name: '업무 안내', exact: true })
-    await expect(tutorial.getByRole('heading', { name: '계약 검색', exact: true })).toBeVisible()
-    await expect.poll(async () => {
-      const target = await page.locator('[data-guide-feature="contract.filter.input.contractno"]').boundingBox()
-      const highlight = await page.locator('.payment-guide-spotlight').boundingBox()
-      const coach = await tutorial.boundingBox()
-      // Measure both offsets from the actual input: 10px highlight and 24px coach gap.
-      return target && highlight && coach ? Math.max(
-        Math.abs(highlight.y + highlight.height - target.y - target.height - 10),
-        Math.abs(coach.y - target.y - target.height - 24),
-      ) : 999
-    }).toBeLessThan(2)
-    await expect(tutorial.getByRole('button', { name: '이전 안내' })).toBeDisabled()
-    await tutorial.getByRole('button', { name: '확인했어요, 다음 안내' }).click()
-    await expect(tutorial.getByRole('heading', { name: '조회 결과 확인', exact: true })).toBeVisible()
-    await expect(tutorial.getByRole('button', { name: '확인했어요, 다음 안내' })).toBeEnabled()
-    await expect(tutorial.getByRole('button', { name: '현재 대상에서 다시 시작' })).toHaveCount(0)
+    const tutorial = page.locator('.screen-step-guide')
+    await expect(tutorial.getByRole('heading', { name: '계약 조회 조건', exact: true })).toBeVisible()
+    await expect(page.locator('.pico-guide-card')).toHaveCount(0)
+    await expect(tutorial.getByRole('button', { name: '이전', exact: true })).toBeDisabled()
+    await tutorial.getByRole('button', { name: '다음', exact: true }).click()
+    await expect(tutorial.getByRole('heading', { name: '계약 목록 읽기', exact: true })).toBeVisible()
     await page.screenshot({ path: info.outputPath(`pico-${width}.png`), fullPage: true })
-    await tutorial.getByRole('button', { name: '업무 안내 종료' }).click()
+    await tutorial.getByRole('button', { name: '종료', exact: true }).click()
     expect(writes).toEqual([])
     expect(errors).toEqual([])
   })
@@ -77,7 +66,7 @@ test('전체 업무 가이드를 보존하며 후속 채팅으로 전환한다',
 })
 
 for (const width of [1440, 390]) {
-  test(`피코 실서버 ${width}px: 저장 지급 계산 카드와 실제 도움말 연결`, async ({ page }, info) => {
+  test(`피코 실서버 ${width}px: 저장 지급 화면에서 기존 도움말 연결`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 900 })
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
@@ -116,30 +105,17 @@ for (const width of [1440, 390]) {
     await page.screenshot({ path: info.outputPath(`payment-launcher-${width}.png`), fullPage: true })
     await page.getByRole('button', { name: '업무 비서 AI 열기, 피코' }).click()
     const pico = page.getByRole('dialog', { name: '피코 업무 비서' })
-    const balancing = page.waitForResponse((response) => response.url().includes('/assistant/calculations') && response.request().postDataJSON()?.kind === 'ATTRIBUTION_BALANCE')
-    await pico.getByRole('button', { name: '귀속 차액 조회' }).click()
-    const balanceResponse = await balancing
-    expect(balanceResponse.ok(), await balanceResponse.text()).toBe(true)
-    expect((await balanceResponse.json()).data.kind).toBe('ATTRIBUTION_BALANCE')
-    const result = pico.getByRole('region', { name: '계산 조회 결과' })
-    await expect(result).toContainText('계산 조회 완료')
-    await expect(result).toContainText('20원')
-    await expect(result.locator('dl > div').filter({ has: page.getByText('지급액과 귀속 합계의 차이', { exact: true }) }).locator('dd')).toHaveText('0원')
-    await page.screenshot({ path: info.outputPath(`payment-calculation-${width}.png`), fullPage: true })
-    const candidacy = page.waitForResponse((response) => response.url().includes('/assistant/calculations') && response.request().postDataJSON()?.kind === 'PAYMENT_CANDIDATE')
-    await pico.getByRole('button', { name: '지급 후보 검토 조회' }).click()
-    const candidateResponse = await candidacy
-    expect(candidateResponse.ok(), await candidateResponse.text()).toBe(true)
-    expect((await candidateResponse.json()).data.kind).toBe('PAYMENT_CANDIDATE')
-    await expect(result).toBeVisible()
-    await expect(result).toContainText('저장 상태: 작성중')
+    await expect(pico.getByText('업무 계산 도우미', { exact: true })).toHaveCount(0)
+    await expect(pico.getByRole('button', { name: '귀속 차액 조회' })).toHaveCount(0)
     await pico.getByRole('tab', { name: '업무 안내', exact: true }).click()
     await pico.getByRole('button', { name: /^지급 초안 저장/ }).click()
-    const guide = page.getByRole('region', { name: '지급 업무 가이드' })
+    const guide = page.locator('.screen-step-guide')
     await expect(guide).toBeVisible()
-    await expect(page.getByRole('region', { name: '업무 안내' })).toHaveCount(0)
+    await expect(page.locator('.pico-guide-card')).toHaveCount(0)
+    await expect(page.getByRole('dialog', { name: '피코 업무 비서' })).toHaveCount(0)
+    await page.screenshot({ path: info.outputPath(`payment-page-help-${width}.png`), fullPage: true })
+    await guide.getByRole('button', { name: '종료', exact: true }).click()
     await page.getByRole('button', { name: '업무 비서 AI 열기, 피코' }).click()
-    await expect(guide.getByRole('button', { name: '펼치기' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: '피코에게 질문' })).toBeVisible()
     expect(writes).toEqual([])
     expect(errors).toEqual([])

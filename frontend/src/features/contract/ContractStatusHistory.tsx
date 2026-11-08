@@ -1,20 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
-import { ListPagination } from '../../components/ListPagination'
-import { Modal } from '../../components/Modal'
 import { StatusBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { ApiError } from '../../lib/api/errors'
 import { date, dateTime, int } from '../../lib/format'
 import { nameWithCode } from '../../lib/screenText'
-import { Amount } from '../cap/badges'
-import { contractEventsQuery, contractStatusEffectsQuery } from './api'
-import type { ContractStatusEffect, ContractStatusEvent } from './api'
-import { ContractFacts, ContractLoadState, QueryContent } from './detailParts'
+import { contractEventsQuery } from './api'
+import type { ContractStatusEvent } from './api'
+import { ContractLoadState, QueryContent } from './detailParts'
 import {
   contractErrorText,
   FOLLOW_UP_REFETCH_MS,
@@ -25,12 +22,9 @@ import {
 import type { StatusSort } from './detailState'
 import {
   contractStatusLabels,
-  effectEntityLabels,
-  effectStateLabel,
   eventFollowUpLabels,
   eventReasonLabels,
   followUpFailureText,
-  followUpEmptyEffects,
   processingJobLabels,
   processingStatusLabels,
   responseLabel,
@@ -58,14 +52,6 @@ const followUpTones: Record<string, StatusTone> = {
   SUCCEEDED: 'success',
 }
 const processingTones: Record<string, StatusTone> = { SUCCEEDED: 'success', FAILED: 'error' }
-const effectTones: Record<string, StatusTone> = {
-  HELD: 'review',
-  HOLD: 'review',
-  RELEASED: 'info',
-  PLANNED: 'info',
-  CANCELLED: 'neutral',
-  EXCLUDED: 'neutral',
-}
 
 const jobLabel = (job?: string) => processingJobLabels[job ?? ''] ?? '처리 작업'
 const transition = (event: ContractStatusEvent) =>
@@ -123,7 +109,7 @@ function FollowUpStatus({ event }: { event: ContractStatusEvent }) {
   )
 }
 
-function ProcessingList({ rows, label, attempts = false }: { rows: Processing[]; label: string; attempts?: boolean }) {
+function ProcessingList({ rows, label }: { rows: Processing[]; label: string }) {
   if (!rows.length) return null
   return (
     <ul className="contract-processing-list" aria-label={label}>
@@ -138,19 +124,16 @@ function ProcessingList({ rows, label, attempts = false }: { rows: Processing[];
           </StatusBadge>
           <time dateTime={row.processedAt}>{dateTime(row.processedAt)}</time>
           {row.summary && <span className="contract-follow-up-note">{summaryText(row.summary)}</span>}
-          {attempts && row.errorCode && (
-            <span className="contract-follow-up-note">실패 사유: {followUpFailureText(row.errorCode)}</span>
-          )}
         </li>
       ))}
     </ul>
   )
 }
 
-/** 표에는 작업별 마지막 행만 둔다. 시도 전체는 영향 창에서 본다. */
+/** 표에는 작업별 마지막 처리 결과를 표시한다. */
 const latestByJob = (rows: Processing[] = []) => [...new Map(rows.map((row) => [row.processingJob, row])).values()]
 
-const historyColumns = (onOpen: (eventId: number) => void): TableColumn<ContractStatusEvent>[] => [
+const historyColumns: TableColumn<ContractStatusEvent>[] = [
   { key: 'seq', label: '순번', width: '3.25rem', render: (row) => int(row.eventSeq) },
   {
     key: 'transition',
@@ -182,117 +165,7 @@ const historyColumns = (onOpen: (eventId: number) => void): TableColumn<Contract
       </div>
     ),
   },
-  {
-    key: 'effects',
-    label: '영향',
-    width: '6rem',
-    align: 'center',
-    render: (row) => (
-      <Button
-        data-guide-feature="features.contract.status-history.effects"
-        variant="ghost"
-        disabled={row.eventId == null}
-        aria-label={`변경 ${int(row.eventSeq)} 영향 보기`}
-        onClick={() => onOpen(row.eventId!)}
-      >
-        영향 보기
-      </Button>
-    ),
-  },
 ]
-
-const effectColumns: TableColumn<ContractStatusEffect>[] = [
-  {
-    key: 'target',
-    label: '대상',
-    width: '9rem',
-    render: (row) => effectEntityLabels[row.entityType ?? ''] ?? '확인 필요',
-  },
-  { key: 'previous', label: '이전 상태', width: '7rem', render: (row) => effectStateLabel(row, row.previousState) },
-  {
-    key: 'next',
-    label: '이후 상태',
-    width: '10rem',
-    render: (row) => (
-      <StatusBadge optionCount={Object.keys(effectTones).length} tone={effectTones[row.nextState ?? ''] ?? 'neutral'}>
-        {effectStateLabel(row, row.nextState)}
-      </StatusBadge>
-    ),
-  },
-  {
-    key: 'amount',
-    label: '금액',
-    width: '7rem',
-    align: 'number',
-    render: (row) => (row.amount == null ? NO_DATA : <Amount value={row.amount} />),
-  },
-  { key: 'reason', label: '처리/제외 사유', width: '20rem', render: (row) => row.reason || NO_DATA },
-]
-
-function StatusEffectsPanel({ id, event, onClose }: { id: string; event: ContractStatusEvent; onClose: () => void }) {
-  const [page, setPage] = useState(1)
-  const status = event.followUp?.status
-  const effects = useQuery(contractStatusEffectsQuery(id, event.eventId!, page, status))
-  return (
-    <Modal
-      open
-      title={`변경 ${int(event.eventSeq)} 영향`}
-      className="modal-large"
-      onClose={onClose}
-      footer={
-        <Button
-          data-guide-feature="features.contract.status-history.effects-close"
-          variant="secondary"
-          onClick={onClose}
-        >
-          닫기
-        </Button>
-      }
-    >
-      <ContractFacts
-        items={[
-          ['변경 전→후', transition(event)],
-          ['효력일시', dateTime(event.effectiveAt)],
-          ['접수일시', dateTime(event.receivedAt)],
-          ['처리일시', dateTime(event.recordedAt)],
-          ['처리자', registrant(event)],
-          ['사유', reasonText(event)],
-        ]}
-      />
-      <h3 className="contract-effects-heading">후속 처리</h3>
-      <div className="contract-follow-up">
-        <FollowUpStatus event={event} />
-        <ProcessingList rows={event.processings ?? []} label="처리 이력" attempts />
-      </div>
-      <QueryContent query={effects}>
-        {(data) => (
-          <>
-            <h3 className="contract-effects-heading">영향 {int(data.totalElements)}건</h3>
-            {effects.isPlaceholderData && (
-              <p className="contract-follow-up-note" role="status">
-                갱신 중입니다. 이전 결과를 표시합니다.
-              </p>
-            )}
-            <DataTable
-              className="contract-effects-table"
-              caption="변경 영향"
-              columns={effectColumns}
-              rows={data.content ?? []}
-              rowKey={(row) => `${row.entityType}-${row.entityId}-${row.processingJob}`}
-              emptyMessage={responseLabel(followUpEmptyEffects, status)}
-            />
-            <ListPagination
-              page={page}
-              totalPages={data.totalPages ?? 1}
-              label="변경 영향 페이지"
-              onPageChange={setPage}
-            />
-          </>
-        )}
-      </QueryContent>
-    </Modal>
-  )
-}
 
 export function ContractStatusHistory({ id, compact = false }: { id: string; compact?: boolean }) {
   const guideRoot = useRef<HTMLElement>(null)
@@ -314,10 +187,9 @@ export function ContractStatusHistory({ id, compact = false }: { id: string; com
       setPreviewCount(0)
       let count = 0
       timer = setInterval(() => {
-        count += 1
+        count = (count + 1) % 4
         setPreviewCount(count)
-        if (count === 3) clearInterval(timer)
-      }, 1200)
+      }, 960)
     }
     root.addEventListener('fgc-contract-status-start', start)
     root.addEventListener('fgc-contract-status-stop', stop)
@@ -337,14 +209,11 @@ export function ContractStatusHistory({ id, compact = false }: { id: string; com
     refetchInterval: (query) => (followUpRunning(query.state.data) ? FOLLOW_UP_REFETCH_MS : false),
   })
   const [sort, setSort] = useState<StatusSort>('effectiveAt')
-  const [selection, setSelection] = useState<{ eventId: number; open: boolean } | null>(null)
-  const columns = useMemo(() => historyColumns((eventId) => setSelection({ eventId, open: true })), [])
-  // 재조회 실패에도 보던 이력과 선택을 유지한다. 권한이 사라졌으면(403) 이전 결과를 계속 보여 주지 않는다.
+  // 재조회 실패에도 보던 이력을 유지한다. 권한이 사라졌으면(403) 이전 결과를 계속 보여 주지 않는다.
   const denied = history.error instanceof ApiError && history.error.status === 403
   const events = denied ? undefined : history.data
   const ordered = sortStatusEvents(events ?? [], compact ? 'effectiveAt' : sort)
   const previewBase = [...ordered].reverse().map(event => date(event.effectiveAt)).find(value => value !== '-') ?? '-'
-  const opened = selection?.open ? events?.find((event) => event.eventId === selection.eventId) : undefined
   return (
     <section
       ref={guideRoot}
@@ -410,10 +279,9 @@ export function ContractStatusHistory({ id, compact = false }: { id: string; com
             {!!ordered.length && <li className="contract-history-origin">
               <strong>{ordered[0].previousStatus ? responseLabel(contractStatusLabels, ordered[0].previousStatus, ordered[0].previousStatusLabel) : '최초'}</strong>
             </li>}
-            {ordered.map((event, index) => <li className={`contract-history-event${selection?.eventId === event.eventId ? " is-selected" : ""}`} key={event.eventId ?? index}>
+            {ordered.map((event, index) => <li className="contract-history-event" key={event.eventId ?? index}>
               <div className="contract-history-node-heading">
                 <strong>{responseLabel(contractStatusLabels, event.newStatus, event.newStatusLabel)}</strong>
-                {event.eventId != null && <Button data-guide-feature="features.contract-status-history.button-1" variant="secondary" aria-label={`변경 ${int(event.eventSeq)} 영향 보기`} onClick={() => setSelection({ eventId: event.eventId!, open: true })}>상세 보기</Button>}
               </div>
               <time dateTime={event.effectiveAt}>{dateTime(event.effectiveAt)}</time>
               <span>{reasonText(event)}</span>
@@ -431,23 +299,14 @@ export function ContractStatusHistory({ id, compact = false }: { id: string; com
           </ol> : <DataTable
             className="contract-history-table"
             caption="상태 변경"
-            columns={columns}
+            columns={historyColumns}
             rows={sortStatusEvents(events, sort)}
             rowKey={(row) => String(row.eventId ?? `${row.sourceSystem ?? ''}-${row.sourceEventKey ?? row.eventSeq}`)}
-            selectedKeys={selection ? [String(selection.eventId)] : []}
             emptyMessage="등록된 상태이력이 없습니다."
           />}
         </>
       ) : (
         <QueryContent query={history}>{() => null}</QueryContent>
-      )}
-      {opened && (
-        <StatusEffectsPanel
-          key={opened.eventId}
-          id={id}
-          event={opened}
-          onClose={() => setSelection({ eventId: opened.eventId!, open: false })}
-        />
       )}
     </section>
   )

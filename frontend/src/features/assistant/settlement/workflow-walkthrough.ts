@@ -5,7 +5,7 @@ import type { ScreenHelpStep } from '../guide/ScreenHelp'
 import { getScreenWalkthrough, guideSelector } from '../guide/page-guides'
 import { useSidebarStore } from '../../../stores/sidebar'
 
-export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'follow' | 'presentation' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent' | 'requireAction' | 'onEnter' | 'interaction' | 'concise' | 'liveDescriptionSelector'>> {
+export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'follow' | 'presentation' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent' | 'requireAction' | 'disabledReason' | 'waitForTarget' | 'onEnter' | 'interaction' | 'concise' | 'liveDescriptionSelector'>> {
   id: string
   selector: string
   title: string
@@ -14,7 +14,7 @@ export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'follo
   requiresSelectedTab?: boolean
   workflowInstruction?: string
   nextLabel?: string
-  scope?: 'shell'
+  scope?: 'shell' | 'dialog'
   destination?: WorkflowDestination
   firstMatch?: boolean
 }
@@ -42,7 +42,7 @@ function workflowInstructions(stage: SettlementStep, path: string, selectedExcep
         step('schedule.header', '[aria-labelledby="schedule-header-title"]', '계약과 지급단계를 확인하세요', '현재 계약과 지급단계가 맞는지 확인하세요. 4년·7년 예정은 지급 확정 흐름과 연결하지 않습니다.'),
         review('schedule.lines', '회차와 귀속일을 확인하세요', '회차별 지급 시점과 귀속일을 확인하세요. 일부 행만 보고 전체 회차를 확인한 것으로 판단하지 마세요.'),
         review('schedule.lines', '항목과 금액을 확인하세요', '회차별 수수료 항목과 예상 금액을 근거와 비교하세요. 예상 금액은 실제 지급 확정이 아닙니다.'),
-        step('schedule.versions', '[aria-labelledby="schedule-versions-title"]', '사용 중인 버전을 확인하세요', '버전 이력과 사용 여부를 확인하세요. 아래 확인 버튼은 최신 상태를 조회하며 스케줄을 확정하지 않습니다.'),
+        step('schedule.current', '[aria-labelledby="schedule-header-title"]', '사용 중인 스케줄을 확인하세요', '현재 버전과 사용 여부를 확인하세요. 확인 뒤 수수료 지급으로 이어갑니다.'),
       ]
     case 'payment.draft': return [] // Dedicated input-aware walkthrough.
     case 'payment.precheck':
@@ -115,6 +115,17 @@ function workflowInstructions(stage: SettlementStep, path: string, selectedExcep
 
 /** The pipeline calls each page's guide, adding only workflow-specific checks and handoffs. */
 export function workflowWalkthrough(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false, reuseContractDetail = true, batchPayment = false): WorkflowExplanation[] {
+  if (reuseContractDetail && path === '/exceptions' && (stage === 'reconciliation.review' || stage === 'exception.resolve')) {
+    if (selectedException) return [{
+      id: 'exception.reference', selector: '[data-guide-target="exception.reference"]', scope: 'dialog',
+      title: '참조 버튼에서 원인 확인', concise: true,
+      instruction: '참조 또는 계산근거 열기 버튼으로 원자료와 검출 이유를 확인할 수 있습니다.',
+      interaction: '필요한 처리와 정정은 담당자가 직접 진행합니다. 전체 업무 가이드는 여기서 마칩니다.',
+      presentation: { fixedCard: 'center', includeTarget: '[data-guide-target="exception.basis"]' },
+    }]
+    return sharedSteps('EXCP-W01').map(entry => entry.id === 'exception.list' ? { ...entry, requireAction: true,
+      disabledReason: '예외 행을 눌러 상세 모달을 열어 주세요.' } : entry)
+  }
   if (reuseContractDetail && stage === 'reconciliation.review') {
     if (path === '/reconciliations') return sharedSteps('RECO-W01')
     if (path === '/journals') return sharedSteps('LEDG-W01')
@@ -172,11 +183,6 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
           : path === '/reconciliations' ? 'RECO-W01' : path === '/exceptions' ? 'EXCP-W01' : ''
   const page = getScreenWalkthrough(screenId)
   const explanations = instructions.map(instruction => {
-    if (reuseContractDetail && stage === 'schedule.review' && instruction.id === 'schedule.versions') {
-      return { ...instruction, selector: '#schedule-versions-tab', title: '버전 비교', concise: true,
-        instruction: '버전비교 탭에서 생성 이력과 사용 중인 버전을 확인하세요.',
-        interaction: '확인한 뒤 수수료 지급으로 이어갑니다.', requiresSelectedTab: true }
-    }
     const shared = page.find(entry => guideSelector(entry) === instruction.selector)
     return shared ? { ...shared, ...instruction, title: shared.title, instruction: shared.instruction,
       workflowInstruction: instruction.instruction } : instruction
@@ -194,7 +200,7 @@ function menuHandoff(id: string, screen: string, label: string, destination: Wor
     title: label + '로 이어가기', concise: true, destination,
     instruction: '왼쪽 사이드바의 ' + label + ' 메뉴를 누르세요.',
     interaction: destination === 'validation-list' ? '선택한 지급 건을 모두 확정한 뒤 월 검증을 진행합니다.' : '이동한 화면의 도움말로 안내를 이어갑니다.',
-    presentation: { side: 'right' },
+    presentation: { side: 'right', preserveCardPosition: true, ...(destination === 'validation-list' ? { cardAlign: 'top' as const } : {}) },
     onEnter: () => {
       useSidebarStore.getState().setCollapsed(false, false)
       useSidebarStore.getState().setSection(screen === 'vrun-w01' ? 'compliance' : screen === 'reco-w01' ? 'ledger' : 'contracts', true)

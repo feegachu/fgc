@@ -7,6 +7,12 @@
   gap: var(--space-4);
 }
 
+/* 조회 완료로 버튼이 활성화될 때 색상이 서서히 나타나지 않도록 한다. */
+.schedule-page-header .button {
+  animation: none;
+  transition: none;
+}
+
 .schedule-results-card {
   overflow: hidden;
 }
@@ -225,32 +231,7 @@
   gap: 1rem;
   margin-left: auto;
 }
-.schedule-info-tabs {
-  display: flex;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  border: 1px solid var(--color-border-default);
-  border-radius: 0.5rem;
-  background: var(--color-bg-subtle);
-}
-.schedule-info-tabs button {
-  padding: 0.5rem 0.875rem;
-  border-radius: 0.375rem;
-  color: var(--color-text-secondary);
-  font-weight: 600;
-}
-.schedule-info-tabs button[aria-selected='true'] {
-  background: var(--color-bg-surface);
-  color: var(--color-fgc-blue);
-  box-shadow: 0 1px 4px #17334b1a;
-}
-.schedule-info-tabs button:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 1px;
-}
-.schedule-version-panel > .surface-header { padding-block: 0.75rem; }
-.schedule-version-viewport { max-height: 19rem; }
-.schedule-detail-card > [role='tabpanel'][hidden] { display: none; }
+
 
 .schedule-stage-field {
   gap: 0.25rem;
@@ -435,40 +416,7 @@
   width: 5.5rem;
 }
 
-.schedule-version-table {
-  min-width: 62rem;
-}
-
-.schedule-version-col-no {
-  width: 4.5rem;
-}
-.schedule-version-col-status {
-  width: 6rem;
-}
-.schedule-version-col-active {
-  width: 5.5rem;
-}
-.schedule-version-col-policy {
-  width: 11rem;
-}
-.schedule-version-col-reason {
-  width: 14rem;
-}
-.schedule-version-col-generated {
-  width: 9.5rem;
-}
-.schedule-version-col-lines {
-  width: 5.5rem;
-}
-.schedule-version-col-total {
-  width: 8.5rem;
-}
-
 /* 현재 보고 있는 버전 — 굵기만으로 구분하지 않는다. .is-selected 는 components.css:572. */
-.schedule-version-table tbody tr.is-selected td {
-  font-weight: 600;
-}
-
 @media (max-width: 47.9375rem) {
   .schedule-confirm-summary {
     grid-template-columns: 1fr;
@@ -482,13 +430,6 @@
  */
 .schedule-table-viewport:focus-visible,
 .schedule-line-viewport:focus-visible,
-.schedule-version-viewport:focus-visible,
-.schedule-row-button:focus-visible,
-.schedule-pagination .pagination-button:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: -2px;
-}
-
 .schedule-filter-bar :focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 1px;
@@ -528,3 +469,14 @@
 }
 
 .schedule-source-event { display: block; margin-top: 0.25rem; white-space: nowrap; }
+
+.schedule-summary-identity { min-width: 0; }
+.schedule-summary-label { margin: 0 0 5px; color: var(--color-text-secondary); font-size: 12px; }
+.schedule-summary-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.schedule-summary-title h2 { margin: 0; font-size: 20px; font-weight: 700; }
+.schedule-info-header { padding: 18px 16px; gap: 16px; }
+.schedule-info-actions { gap: 8px; }
+.schedule-row-button:focus-visible,
+.schedule-pagination .pagination-button:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: -2px; }
+.schedule-detail-kv { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-block: 12px; row-gap: 16px; }
+@media (max-width: 760px) { .schedule-detail-kv { grid-template-columns: repeat(2, minmax(0, 1fr)); } .schedule-info-actions { margin-left: 0; } }

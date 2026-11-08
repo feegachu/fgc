@@ -38,11 +38,6 @@ public class ScheduleJdbcBaseline {
         parameters.put("scheduleHeaderId", scheduleHeaderId);
         return jdbc.selectOne("com.susukkang.fgc.schedule.repository.ScheduleJdbcBaseline.selectScheduleDetailById", parameters);
     }
-    public List<ScheduleHeaderResponse> selectVersionsByScheduleHeaderId(Long scheduleHeaderId) {
-        var parameters = new HashMap<String, Object>();
-        parameters.put("scheduleHeaderId", scheduleHeaderId);
-        return jdbc.selectList("com.susukkang.fgc.schedule.repository.ScheduleJdbcBaseline.selectVersionsByScheduleHeaderId", parameters);
-    }
     public int insertAllScheduleLines(List<ScheduleLineInsertDTO> scheduleLineList) {
         var parameters = new HashMap<String, Object>();
         parameters.put("lines", scheduleLineList);

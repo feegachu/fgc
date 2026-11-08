@@ -9,6 +9,21 @@ beforeEach(() => {
   document.body.innerHTML = '<main id="main-content"><input name="contractDate" type="date" data-guide-feature="features.contract.contract-form-page.contract-date"><select name="insurerId" data-guide-feature="features.contract.contract-form-page.insurer-id"><option value="">선택</option><option value="1">보험회사</option></select><input name="productOfferingId" data-guide-feature="features.contract.contract-form-page.product-offering-id" role="combobox" data-selected-value=""></main>'
 })
 afterEach(() => { vi.restoreAllMocks(); document.body.innerHTML = '' })
+it.each(['reconciliation.review', 'exception.resolve'] as const)('ends %s in the selected exception modal without processing actions', async stage => {
+  const list = workflowWalkthrough(stage, '/exceptions', false)
+  expect(list.at(-1)).toMatchObject({ id: 'exception.list', requireAction: true, presentation: { rowLimit: 3, preventScroll: true } })
+  const modal = document.createElement('div')
+  modal.setAttribute('role', 'dialog')
+  modal.innerHTML = '<div data-guide-target="exception.reference"><a>참조 열기</a></div>'
+  document.body.append(modal)
+  const { result, rerender } = renderHook(({ selected }) => useWorkflowWalkthrough(stage, '/exceptions', selected), { initialProps: { selected: false } })
+  rerender({ selected: true })
+  await waitFor(() => expect(result.current.ready).toBe(true))
+  expect(result.current.step).toMatchObject({ id: 'exception.reference', scope: 'dialog' })
+  expect(result.current.total).toBe(1)
+  expect(result.current.last).toBe(true)
+  expect(result.current.target).toBe(modal.firstElementChild)
+})
 it('provides explanations for all eight remaining business stages', () => {
   for (const stage of STEPS.filter(value => value !== 'payment.draft')) {
     const steps = workflowWalkthrough(stage, stage === 'contract.create' ? '/contracts/new' : stage === 'schedule.review' ? '/schedules/1' : '/validation-runs/1', false)
@@ -59,7 +74,7 @@ it('calls the same contract page guide in order and adds a server-result gate at
   expect(steps[0].id).toContain('contract-date')
 })
 it('uses a separate correction handoff even when the resolved exception disappeared', () => {
-  const steps = workflowWalkthrough('exception.resolve', '/exceptions', true, true)
+  const steps = workflowWalkthrough('exception.resolve', '/exceptions', true, true, false)
   expect(steps).toHaveLength(1)
   expect(steps[0].id).toBe('exception.replacement')
   expect(steps[0].selector).toBe('h1')

@@ -110,7 +110,7 @@ export function ContractTabs({
       timer = setInterval(() => {
         if (document.querySelector('[role="dialog"]')) return
         setPreview(current => tabs[(tabs.findIndex(([name]) => name === (current ?? activeRef.current)) + 1) % tabs.length][0])
-      }, 3000)
+      }, 2000)
     }
     root.addEventListener('fgc-contract-tabs-start', start)
     root.addEventListener('fgc-contract-tabs-stop', stop)
@@ -199,7 +199,7 @@ export function ContractTabs({
                 <PanelHeading title="계약체결비용 한도">
                   선지급과 유지관리 예정 금액을 계약체결비용 한도와 각각 비교합니다.
                 </PanelHeading>
-                <ContractAcquisitionCost contractId={id} contractNo={contract.contractNo} concise={revised} />
+                <ContractAcquisitionCost contractId={id} concise={revised} />
               </>
             ) : name === 'ledger' ? (
               <LedgerTab id={id} />
@@ -420,14 +420,6 @@ function CapTab({ id }: { id: string }) {
       <PanelHeading title="1,200% 한도 검증" legacy>
         지급단계별 최신 판정을 합산하지 않고 각각 표시합니다.
       </PanelHeading>
-      <p className="guidance guidance-warning contract-tab-guidance">
-        <span className="material-symbols-rounded guidance-icon" aria-hidden="true">
-          warning
-        </span>
-        <span className="guidance-copy">
-          두 규제를 더하지 마세요, 보험회사→GA 한도와 GA→설계사 한도는 별개로 판정합니다.
-        </span>
-      </p>
       <div className="contract-tab-body">
         <QueryContent query={query}>
           {(rows) => (

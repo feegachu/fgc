@@ -70,45 +70,6 @@
   outline: 2px solid var(--color-border-focus);
   outline-offset: 3px;
 }
-.pico-launcher.pico-launcher-docked {
-  position: static;
-}
-
-.pico-launcher-docked .pico-launcher-button {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  width: auto;
-  height: 2rem;
-  padding-inline: var(--space-2);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-8);
-  background: var(--color-bg-surface);
-}
-
-.pico-launcher.pico-launcher-docked .pico-launcher-button img {
-  width: 1.5rem;
-  height: 1.5rem;
-  animation: none;
-  filter: none;
-}
-
-.pico-launcher-docked .pico-launcher-hint {
-  position: static;
-  padding: 0;
-  border: 0;
-  background: none;
-  animation: none;
-  box-shadow: none;
-}
-
-@media (max-width: 47.9375rem) {
-  .pico-launcher-docked .pico-launcher-hint {
-    display: none;
-  }
-}
-
-.pico-launcher-docked .pico-launcher-button:focus-visible,
 .pico-assistant-root button:focus-visible,
 .pico-assistant-root select:focus-visible,
 .pico-assistant-root summary:focus-visible {
@@ -143,15 +104,20 @@
   width: 41px;
   height: 41px;
   flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 3px;
+  overflow: hidden;
   background: #edf5fa;
   border: 1px solid #e1edf4;
   border-radius: var(--radius-12);
 }
 .pico-avatar img {
-  width: 49px;
-  height: 49px;
-  max-width: none;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
   object-fit: contain;
+  object-position: center;
 }
 .pico-panel-header h2 {
   margin: 0;
@@ -347,21 +313,42 @@
   overflow-wrap: anywhere;
 }
 .pico-source {
-  display: flex;
+  display: inline-flex;
   gap: 5px;
   align-items: center;
   background: #f3f7fa;
   border: 1px solid #e8eff5;
-  padding: 7px 8px;
+  padding: 3px 6px;
   border-radius: var(--radius-8);
   color: var(--color-steel-500);
-  font-size: 12px;
-  margin: 13px 0 12px;
+  font-size: 11px;
+  margin: 0 6px 6px 0;
+  max-width: 100%;
 }
 .pico-source .material-symbols-rounded {
   font-size: 13px;
   flex-shrink: 0;
 }
+.pico-answer-text { white-space: pre-wrap; min-height: 1.9em; }
+.pico-text-cursor { display: inline-block; width: 3px; height: 1em; margin-left: 3px; vertical-align: -0.1em; border-radius: 2px; background: var(--color-steel-500); animation: pico-cursor-blink 900ms ease-in-out infinite; }
+.pico-typing-indicator { display: flex; align-items: center; gap: 10px; min-height: 36px; color: var(--color-text-secondary); font-size: 12px; }
+.pico-typing-indicator > span { display: flex; gap: 4px; }
+.pico-typing-indicator i { width: 6px; height: 6px; border-radius: 50%; background: var(--color-steel-500); animation: pico-thinking 1.2s ease-in-out infinite; }
+.pico-typing-indicator i:nth-child(2) { animation-delay: 150ms; }
+.pico-typing-indicator i:nth-child(3) { animation-delay: 300ms; }
+.pico-answer-actions { display: grid; gap: 8px; margin-top: 12px; }
+.pico-answer-actions:empty { display: none; }
+.pico-guide-action { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--color-border-default); border-radius: var(--radius-8); background: var(--color-bg-surface); }
+.pico-guide-action-title { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.6; color: var(--color-text-primary); overflow-wrap: anywhere; }
+.pico-guide-action-title > .material-symbols-rounded { font-size: 16px; flex-shrink: 0; margin-top: 2px; }
+.pico-guide-action > .pico-guide-action-button { display: inline-flex; justify-content: center; align-items: center; gap: 5px; min-width: 88px; white-space: nowrap; font-size: 12px; }
+.pico-guide-action-button > .material-symbols-rounded { font-size: 16px; }
+.pico-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.pico-tabs button > .material-symbols-rounded { font-size: 16px; }
+.pico-tab-icon { width: 16px; height: 16px; flex-shrink: 0; }
+@keyframes pico-thinking { 0%, 70%, 100% { transform: translateY(0); opacity: .4; } 35% { transform: translateY(-4px); opacity: 1; } }
+@keyframes pico-cursor-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pico-typing-indicator i, .pico-text-cursor { animation: none; } }
 .pico-primary {
   display: flex;
   align-items: center;
@@ -526,13 +513,6 @@
   font-size: 12px;
   color: var(--color-steel-700);
   cursor: pointer;
-}
-.pico-context {
-  margin: 0 0 6px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-steel-700);
-  overflow-wrap: anywhere;
 }
 .pico-composer {
   position: relative;

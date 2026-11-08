@@ -122,11 +122,7 @@ const query = (url: string) => Object.fromEntries(new URLSearchParams(url.split(
 const toasts = () => useToastStore.getState().messages.map((message) => message.message)
 // 화면에 내부 번호가 없어 지금 보고 있는 스케줄은 버전 이력의 현재 행으로 확인한다.
 // 같은 행의 정책 이름(POL-2026-07 v3)에도 v3가 있어, 행 전체가 아니라 첫 칸의 버전만 본다.
-const currentVersion = () =>
-  within(screen.getByRole('table', { name: '같은 계약의 스케줄 버전 이력', hidden: true }))
-    .getAllByRole('row', { hidden: true })
-    .find((row) => row.getAttribute('aria-current') === 'true')
-    ?.querySelector('td')
+const currentVersion = () => [...document.querySelectorAll('.schedule-detail-kv > div')].find(row => row.querySelector('dt')?.textContent === '버전')?.querySelector('dd')
 
 const listPage = (content: ScheduleHeader[], extra = {}) => ({
   content,
@@ -391,9 +387,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     (current = detail({ scheduleVersionNo: 2 })): Handler =>
     (url) => {
       if (url === '/api/v1/schedules/11') return current
-      if (url === '/api/v1/schedules/11/versions') return versions
       if (url === '/api/v1/schedules/10') return { ...detail({ scheduleVersionNo: 1 }), header: versions[0] }
-      if (url === '/api/v1/schedules/10/versions') return versions
       return undefined
     }
 
@@ -468,9 +462,9 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     expect(url.searchParams.get('returnTo')).toBe('/schedules/11?month=2026-07')
   })
 
-  it('헤더·회차·합계·버전 이력을 1차와 같은 표기로 보여 준다', async () => {
-    const { actions } = renderAt('/schedules/11?month=2026-07', baseHandler())
-    expect(await screen.findByText('한빛생명, 종신보험')).toBeInTheDocument()
+  it('계약 정보와 회차·합계를 표시하고 버전비교 기능은 제공하지 않는다', async () => {
+    renderAt('/schedules/11?month=2026-07', baseHandler())
+    expect(await screen.findByText('종신보험')).toBeInTheDocument()
     const lines = screen.getByRole('table', { name: '회차별 예상 지급 금액' })
     expect(within(lines).getByText('1,000.1%')).toBeInTheDocument()
     expect(within(lines).getByRole('cell', { name: '요율' })).toBeInTheDocument()
@@ -478,30 +472,18 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     expect(within(lines).getAllByText('-100,000원')[0]).toHaveClass('is-negative-amount')
     // 합계는 서버 expectedTotal 이다.
     expect(lines.querySelector('tfoot')).toHaveTextContent('합계 (2줄)1,500,000원')
-    await actions.click(screen.getByRole('tab', { name: '버전비교' }))
-    const versionTable = await screen.findByRole('table', { name: '같은 계약의 스케줄 버전 이력' })
-    const currentRow = within(versionTable).getByRole('link', { name: 'v2' }).closest('tr')!
-    expect(currentRow).toHaveAttribute('aria-current', 'true')
-    expect(currentRow).toHaveClass('is-selected')
+    expect(screen.queryByRole('tablist', { name: '스케줄 정보 보기' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: '같은 계약의 스케줄 버전 이력' })).not.toBeInTheDocument()
   })
 
-  it('#2 지급단계 전환은 활성 버전 id 로, 버전 행은 해당 버전으로 이동한다', async () => {
+  it('지급단계 전환은 선택 단계의 사용 중인 스케줄로 이동한다', async () => {
     const { router, actions } = renderAt('/schedules/11?month=2026-07', (url) =>
       url === '/api/v1/schedules/11/active?paymentStage=INSURER_TO_GA' ? 10 : baseHandler()(url),
     )
-    await screen.findByText('한빛생명, 종신보험')
+    await screen.findByText('종신보험')
     await actions.selectOptions(screen.getByLabelText('지급단계'), 'INSURER_TO_GA')
     await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/10'))
-    await actions.click(screen.getByRole('tab', { name: '버전비교' }))
     await waitFor(() => expect(currentVersion()).toHaveTextContent('v1'))
-    await actions.click(screen.getByRole('tab', { name: '버전비교' }))
-    await actions.click(
-      within(await screen.findByRole('table', { name: '같은 계약의 스케줄 버전 이력' })).getByRole('link', {
-        name: 'v2',
-      }),
-    )
-    await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/11'))
-    await waitFor(() => expect(currentVersion()).toHaveTextContent('v2'))
   })
 
   it('지급단계 이동 대상이 없으면 경고하고 현재 단계를 유지한다', async () => {
@@ -510,7 +492,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
         throw new ApiError({ code: 'FGC-COMMON-002', message: '사용 중인 운영 스케줄이 없습니다.' }, 'r1', 404)
       return baseHandler()(url)
     })
-    await screen.findByText('한빛생명, 종신보험')
+    await screen.findByText('종신보험')
     await actions.selectOptions(screen.getByLabelText('지급단계'), 'INSURER_TO_GA')
     await waitFor(() => expect(toasts()).toContain('사용 중인 운영 스케줄이 없습니다. (요청번호: r1)'))
     expect(screen.getByLabelText('지급단계')).toHaveValue('GA_TO_FC')
@@ -525,14 +507,13 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
         return confirmed
           ? detail({ scheduleHeaderId: 12, status: 'CONFIRMED', statusLabel: '확정' })
           : { ...detail(), header: header(12, { scheduleVersionNo: 3 }) }
-      if (url === '/api/v1/schedules/12/versions') return [...versions, header(12, { scheduleVersionNo: 3 })]
       if (url === '/api/v1/schedules/12/confirm' && options?.method === 'POST') {
         confirmed = true
         return { ...detail(), header: header(12, { scheduleVersionNo: 3, status: 'CONFIRMED', statusLabel: '확정' }) }
       }
       return baseHandler()(url)
     })
-    await screen.findByText('한빛생명, 종신보험')
+    await screen.findByText('종신보험')
     await actions.click(screen.getByRole('button', { name: /새 버전 만들기/ }))
     const regenerate = await screen.findByRole('dialog', { name: '새 버전 만들기' })
     expect(within(regenerate).getByLabelText(/생성 사유/)).toHaveFocus()
@@ -542,7 +523,6 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     const regen = calls('/api/v1/schedules/11/regenerate')[0]
     expect(regen.options).toMatchObject({ method: 'POST', body: { reason: '2026-07 정책 개정' } })
     expect(toasts()).toContain('새 스케줄 버전을 만들었습니다. 새 버전으로 이동합니다.')
-    await actions.click(screen.getByRole('tab', { name: '버전비교' }))
     // 새 버전 상세와 버전 이력이 준비될 때까지 기다린다.
     await waitFor(() => expect(currentVersion()).toHaveTextContent('v3'), { timeout: 10_000 })
     // 버전 이력이 상세보다 먼저 올 수 있다. 상세까지 읽어 버튼이 켜진 뒤에 누른다.
@@ -561,7 +541,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
 
   it('#4 사유 미입력·41자 사유는 저장하지 않고 필드 오류를 보여 준다', async () => {
     const { actions } = renderAt('/schedules/11', baseHandler())
-    await screen.findByText('한빛생명, 종신보험')
+    await screen.findByText('종신보험')
     await actions.click(screen.getByRole('button', { name: /새 버전 만들기/ }))
     const dialog = await screen.findByRole('dialog', { name: '새 버전 만들기' })
     const submit = within(dialog).getByRole('button', { name: '새 버전 만들기' })
@@ -583,7 +563,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
         throw new ApiError({ code: 'FGC-COMMON-001', message: '입력값을 확인하세요.', field: 'reason' }, 'r2', 400)
       return baseHandler()(url)
     })
-    await screen.findByText('한빛생명, 종신보험')
+    await screen.findByText('종신보험')
     await actions.click(screen.getByRole('button', { name: /새 버전 만들기/ }))
     const dialog = await screen.findByRole('dialog', { name: '새 버전 만들기' })
     await actions.type(within(dialog).getByLabelText(/생성 사유/), '사유')
@@ -597,7 +577,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
       if (url.endsWith('/confirm')) throw new ApiError({ code: 'FGC-SCHE-001', message }, 'r3', 409)
       return baseHandler()(url)
     })
-    await screen.findByText('한빛생명, 종신보험')
+    await screen.findByText('종신보험')
     await actions.click(screen.getByRole('button', { name: '확정' }))
     const dialog = await screen.findByRole('dialog', { name: '이 스케줄을 확정할까요?' })
     await actions.click(within(dialog).getByRole('button', { name: '확정' }))
@@ -625,7 +605,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
 
   it('상세 CSV 는 회차 표 API 로 내려받는다', async () => {
     const { actions } = renderAt('/schedules/11', baseHandler())
-    await screen.findByText('한빛생명, 종신보험')
+    await screen.findByText('종신보험')
     const blob = vi.spyOn(apiClient, 'requestBlob').mockResolvedValue({ blob: new Blob(['a']), disposition: null })
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} }))
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
@@ -704,7 +684,7 @@ it('4년 정액 정책은 실제 정액·정책 회차 수를 표시하고 취�
   const data = detail({ contractId: 600, scheduleRegime: 'FOUR_YEAR_2027', schedulePurpose: 'SIMULATION', status: 'CANCELLED', installmentCount: 12, lineCount: 24 })
   data.lines = [{ ...data.lines![0], calculationType: 'FIXED', ratePct: undefined, fixedAmount: 12345 }]
   renderAt('/schedules/11', url => url === '/api/v1/schedules/11' ? data : [])
-  await screen.findByText('한빛생명, 종신보험')
+  await screen.findByText('종신보험')
   expect(screen.getByRole('cell', { name: '정액 12,345원' })).toBeVisible()
   expect(screen.getByText(/정책 정의 12회차/)).toBeVisible()
   expect(screen.queryByRole('button', { name: '4년 예정 새 버전 만들기' })).not.toBeInTheDocument()
@@ -717,13 +697,11 @@ it('regeneration help validates reason and waits for new server version before n
   const { router, actions } = renderAt('/schedules/11', (url) => {
     if (url.endsWith('/regenerate')) return { scheduleHeaderId: 12, versionNo: 3 }
     if (url === '/api/v1/schedules/12') return { ...detail(), header: header(12, { scheduleVersionNo: 3 }) }
-    if (url === '/api/v1/schedules/12/versions') return [header(12, { scheduleVersionNo: 3 })]
     if (url === '/api/v1/schedules/11') return detail({ scheduleVersionNo: 2 })
-    if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
     return undefined
   })
-  await screen.findByText('한빛생명, 종신보험')
-  await screen.findByText('한빛생명, 종신보험')
+  await screen.findByText('종신보험')
+  await screen.findByText('종신보험')
   await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
   const modal = within(screen.getByRole('dialog', { name: '새 버전 만들기' }))
   await actions.click(modal.getByRole('button', { name: '도움말' }))
@@ -752,11 +730,10 @@ it.each([
   const { actions, client } = renderAt('/schedules/11', (url) => {
     if (url.endsWith('/regenerate')) return receipt
     if (url === '/api/v1/schedules/11') return detail({ scheduleVersionNo: 2 })
-    if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
     return undefined
   })
   client.setQueryData(['schedules', 'receipt-check'], [])
-  await screen.findByText('한빛생명, 종신보험')
+  await screen.findByText('종신보험')
   await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
   const dialog = await screen.findByRole('dialog', { name: '새 버전 만들기' })
   const submit = within(dialog).getByRole('button', { name: '새 버전 만들기' })
@@ -777,10 +754,9 @@ it('blocks every close path while the new schedule version is being created', as
   const { actions } = renderAt('/schedules/11', (url) => {
     if (url.endsWith('/regenerate')) return new Promise(resolve => { finish = resolve })
     if (url === '/api/v1/schedules/11') return detail({ scheduleVersionNo: 2 })
-    if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
     return undefined
   })
-  await screen.findByText('한빛생명, 종신보험')
+  await screen.findByText('종신보험')
   await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
   const dialog = await screen.findByRole('dialog', { name: '새 버전 만들기' })
   await actions.type(within(dialog).getByLabelText(/생성 사유/), '원천 변경')

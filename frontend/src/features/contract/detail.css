@@ -173,7 +173,7 @@
   color: var(--color-fgc-blue);
   font-size: 12px;
 }
-.contract-history-demo-node { animation: contract-history-node-enter 700ms ease-out; }
+.contract-history-demo-node { animation: contract-history-node-enter 560ms ease-out; }
 .contract-history-timeline .contract-history-demo-node::before { background: none; border-left: 2px dashed var(--color-fgc-blue); }
 @keyframes contract-history-node-enter {
   from { opacity: 0; transform: translateY(-10px); }

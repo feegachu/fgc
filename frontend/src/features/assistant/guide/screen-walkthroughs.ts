@@ -1,5 +1,4 @@
 import type { ScreenHelpStep } from './ScreenHelp'
-import { previewTree, prepareReconciliationTree } from './tree-preview'
 import { menuStep } from './menu-handoff'
 import { validationWalkthrough } from './validation-walkthrough'
 
@@ -141,9 +140,6 @@ export const screenWalkthroughs: Record<string, readonly ScreenHelpStep[]> = {
     target('schedule.lines', '회차별 예정 금액',
       '회차별 지급일·수수료 항목·예상 금액입니다.',
       '각 회차의 금액과 상태를 비교하세요.'),
-    { ...region('schedule.versions', '#schedule-versions-tab', '버전 비교',
-      '버전비교 탭에서 이전 스케줄과 비교합니다.',
-      '비교할 버전을 골라 회차와 금액 차이를 확인하세요.'), anchor: undefined },
     target('schedule.generate', '새 버전 만들기',
       '현재 조건으로 새 스케줄 버전을 만듭니다.',
       '버튼을 누르고 생성 사유를 입력하세요.')),
@@ -152,7 +148,7 @@ export const screenWalkthroughs: Record<string, readonly ScreenHelpStep[]> = {
     { ...target('payment.results', '지급 상태와 금액', '계약별 지급 금액과 처리 상태를 확인하세요.', '목록의 앞 3개 행을 기준으로 살펴봅니다.'), anchor: 'start' },
     feature('features.transaction.transaction-list-page.context-link-2', '신규 지급 등록', '신규 등록을 눌러 지급 건을 작성하세요.', '계약을 고르면 설계사별 귀속행을 확인할 수 있습니다.'),
     { ...target('payment.rowActions', '지급 수정·삭제', '작성중인 지급 건은 수정하거나 삭제할 수 있습니다.', '맨 위 예시 행에서 버튼 위치를 확인하세요.'),
-      selector: '[data-guide-target="payment.results"]', anchor: 'start',
+      selector: '.transaction-guide-example', anchor: undefined, waitForTarget: true,
       onEnter: () => { window.dispatchEvent(new Event('fgc-payment-example-start')); return () => { window.dispatchEvent(new Event('fgc-payment-example-stop')) } } }
   ).map((step, index) => ({ ...step, presentation: { side: 'below', fixedCard: true, rowLimit: 3, scrollToTop: true, preserveCardPosition: index > 0 } })),
   'TRAN-W02': tour('지급 입력부터 확정까지',
@@ -222,10 +218,7 @@ export const screenWalkthroughs: Record<string, readonly ScreenHelpStep[]> = {
 
   'RECO-W01': tour('대사 실행과 결과',
     target('reconciliation.filters', '대사 실행 조건', '정산월·지급단계·보험회사를 선택하세요.', '조회는 이력을 찾고, 대사 실행은 새 결과를 만듭니다.'),
-    { ...target('reconciliation.history', '실행 이력 펼치기', '화살표(>)는 펼치기, 월 통합검증 이름은 전체 조회입니다.', '지급단계와 보험회사까지 펼쳐서 볼 수 있습니다.'),
-      onEnter: prepareReconciliationTree },
-    { ...region('reconciliation.summary', '.reco-guide-overview', '실행 이력과 결과 변화', '3초마다 월 통합검증 → 지급단계 → 보험회사를 선택합니다.', '실행 요약과 결과 목록이 함께 바뀌는 모습을 확인하세요.'),
-      onEnter: () => previewTree('reconciliation') },
+    target('reconciliation.history', '실행 이력 펼치기', '화살표(>)는 펼치기, 월 통합검증 이름은 전체 조회입니다.', '지급단계와 보험회사까지 직접 펼쳐서 볼 수 있습니다.'),
     menuStep('reconciliation.openLedger', 'ledg-w01', '검증원장', '/journals')
   ).map(step => ({ ...step, anchor: undefined, presentation: { fixedCard: 'right' as const, allowPageScroll: true } })),
   'RECO-W02.detail': tour('대사 원천 비교',
@@ -255,9 +248,9 @@ export const screenWalkthroughs: Record<string, readonly ScreenHelpStep[]> = {
       '유형별로 남은 예외 건수를 확인하세요.', '조회 조건에서 확인할 유형과 상태를 고르세요.'),
     target('exception.filters', '예외 조회 조건',
       '유형·상태·계약번호로 범위를 좁히세요.', '조회를 누르고 목록에서 한 건을 선택하세요.'),
-    region('exception.list', '.data-table-viewport', '예외 목록',
-      '심각도·상태·계약과 발생 원인을 확인하세요.', '한 건을 열고 상세 모달의 도움말에서 처리 방법을 확인하세요.')
-  ).map(step => ({ ...step, anchor: undefined, presentation: { fixedCard: 'right' as const, allowPageScroll: true } })),
+    target('exception.list', '예외 목록',
+      '앞의 세 건에서 심각도·상태·계약과 발생 원인을 확인하세요.', '확인할 예외 행을 눌러 상세 모달을 여세요.')
+  ).map(step => ({ ...step, anchor: undefined, presentation: { fixedCard: 'right' as const, rowLimit: 3, preventScroll: step.targetId === 'exception.list' } })),
   'EXCP-W01.action': tour('예외 처리 입력',
     feature('features.exception.action-panel.select', '처리 조치 선택',
       '현재 상태에서 가능한 조치를 고르세요.', '선택한 예외와 처리 대상을 확인하세요.'),
@@ -413,10 +406,10 @@ export const screenWalkthroughs: Record<string, readonly ScreenHelpStep[]> = {
       '선지급과 유지관리 각각의 금액·한도와 적용 근거를 확인합니다.')),
   'LEDG-W01': tour('검증원장 조회',
     region('ledger.filters', '.filter-bar', '분개 조회 조건', '기간·계약·상태로 조회할 분개를 찾으세요.', '계약별 보기에서 계약과 하위 분개를 살펴봅니다.'),
-    { ...target('ledger.overview', '계약과 분개 선택', '계약을 펼치고 날짜별 분개를 선택하세요.', '선택할 때마다 합계와 분개 내역이 함께 바뀝니다.'),
-      onEnter: () => previewTree('ledger') },
-    region('ledger.summary', '.ledger-contract-summary', '차변·대변 합계', '선택한 계약 또는 분개의 차변·대변을 확인하세요.', '계약을 다시 누르면 해당 계약의 전체 분개를 보여줍니다.'),
-    region('ledger.entries', '.ledger-journals', '분개 내역과 연결 근거', '아래 내역에서 계정과목·적요·금액을 확인하세요.', '분개번호를 누르면 연결 근거를 볼 수 있습니다.'),
+    target('ledger.overview', '계약과 분개 선택', '계약을 펼치고 날짜별 분개를 직접 선택하세요.', '아래 분개 내역에서 내용을 확인할 수 있습니다.'),
+    { ...region('ledger.entries', '.ledger-journals', '분개 내역과 연결 근거', '분개번호를 눌러 연결 근거와 작업 버튼을 여세요.', '역분개·재기표 기능을 확인하고 예외함으로 이어갑니다.'),
+      requireAction: true, advanceOnEvent: 'fgc-ledger-evidence-opened' },
+    { ...target('ledger.actions', '역분개와 재기표', '선택한 분개는 연결 근거 아래에서 역분개하거나 재기표할 수 있습니다.', '정정할 때 이 버튼을 사용하세요. 지금은 예외함으로 이어갑니다.'), waitForTarget: true },
     menuStep('ledger.openExceptions', 'excp-w01', '예외', '/exceptions')
   ).map(step => ({ ...step, anchor: undefined, presentation: { fixedCard: 'right' as const, allowPageScroll: true } })),
   'AUDT-W01': tour('감사 이력 조회',

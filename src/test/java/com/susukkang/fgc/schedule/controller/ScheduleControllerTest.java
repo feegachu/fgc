@@ -35,6 +35,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(ScheduleController.class)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class, FgcMessageResolver.class, ConstraintErrorCodeResolver.class, MessageSourceAutoConfiguration.class})
 class ScheduleControllerTest {
+    @Test
+    void versionComparisonEndpointIsRemoved() throws Exception {
+        mockMvc.perform(get("/api/v1/schedules/10/versions").with(user("viewer").roles("COMPLIANCE")))
+                .andExpect(status().isNotFound());
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -76,38 +81,6 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.data.header.scheduleRegimeLabel").value("4년 분급(2027)"))
                 .andExpect(jsonPath("$.data.header.schedulePurposeLabel").value("비교용"))
                 .andExpect(jsonPath("$.data.header.statusLabel").value("조정"));
-    }
-
-    @Test
-    void returnsScheduleVersionsForSameContractAndStage() throws Exception {
-        when(scheduleService.selectScheduleVersions(10L)).thenReturn(java.util.List.of(
-                ScheduleHeaderResponse.builder()
-                        .scheduleHeaderId(11L)
-                        .paymentStage(PaymentStage.INSURER_TO_GA)
-                        .scheduleRegime("SEVEN_YEAR_2029")
-                        .schedulePurpose("SIMULATION")
-                        .scheduleVersionNo(2)
-                        .status(ScheduleHeaderStatus.RESTARTED)
-                        .activeYn(true)
-                        .build(),
-                ScheduleHeaderResponse.builder()
-                        .scheduleHeaderId(10L)
-                        .scheduleVersionNo(1)
-                        .activeYn(false)
-                        .build()
-        ));
-
-        mockMvc.perform(get("/api/v1/schedules/{id}/versions", 10L)
-                        .with(user("viewer").roles("COMPLIANCE")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].scheduleHeaderId").value(11))
-                .andExpect(jsonPath("$.data[0].paymentStageLabel").value("보험회사→GA"))
-                .andExpect(jsonPath("$.data[0].scheduleRegimeLabel").value("7년 분급(2029)"))
-                .andExpect(jsonPath("$.data[0].schedulePurposeLabel").value("모의 계산용"))
-                .andExpect(jsonPath("$.data[0].statusLabel").value("재개"))
-                .andExpect(jsonPath("$.data[1].scheduleVersionNo").value(1));
-
-        verify(scheduleService).selectScheduleVersions(10L);
     }
 
     @Test

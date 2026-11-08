@@ -120,12 +120,6 @@ public class ScheduleController {
         return ApiResponse.success(scheduleService.findActiveOperationalScheduleId(scheduleHeaderId, paymentStage));
     }
 
-    @GetMapping("/{scheduleHeaderId}/versions")
-    public ApiResponse<java.util.List<ScheduleHeaderResponse>> getScheduleVersions(
-            @PathVariable Long scheduleHeaderId) {
-        return ApiResponse.success(scheduleService.selectScheduleVersions(scheduleHeaderId));
-    }
-
     /**
      * 설명 : 스케줄을 새 버전으로 재생성한다.
      *

@@ -36,7 +36,8 @@ it('opens closed-by-default chat, preserves the four removals and restores keybo
   expect(screen.queryByRole('group', { name: /버튼 색상|버튼 표시 방식/ })).not.toBeInTheDocument()
   expect(screen.queryByText('현재 보고 있는 업무')).not.toBeInTheDocument()
   // CMN-C04 (화면정의서 v3.0 :3267): one context line above the question box, not a card.
-  expect(screen.getByText(/^현재 화면 .+, 대상 선택 없음, 기준월 /)).toBeInTheDocument()
+  expect(screen.queryByText(/^현재 화면 .+, 대상 선택 없음, 기준월 /)).not.toBeInTheDocument()
+  expect(screen.queryByText('업무 계산 도우미')).not.toBeInTheDocument()
   expect(screen.queryByText('PICO WORKFLOW ASSISTANT')).not.toBeInTheDocument()
   expect(document.querySelector('.launcher-dot,.pico-launcher-dot,.live-dot')).not.toBeInTheDocument()
   await userEvent.keyboard('{Escape}')
