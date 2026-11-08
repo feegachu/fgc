@@ -534,6 +534,18 @@ test('전체 업무 가이드의 계약 상세 다음 단계는 카드와 다음
   expect(Math.abs(buttonAfter!.x - buttonBefore!.x)).toBeLessThanOrEqual(1)
   expect(Math.abs(buttonAfter!.y - buttonBefore!.y)).toBeLessThanOrEqual(1)
   await page.screenshot({ path: info.outputPath('workflow-fixed-after.png') })
+  await next.click()
+  await expect(guide.getByRole('heading', { name: '계약 상세 탭', exact: true })).toBeVisible()
+  expect((await guide.boundingBox())!.x).toBeGreaterThan(1440 / 2)
+  await next.click()
+  await expect(guide.getByRole('heading', { name: '계약 상태와 변경 이력', exact: true })).toBeVisible()
+  await expect.poll(async () => {
+    const coach = await guide.boundingBox(), history = await page.locator('[data-guide-target="contract.statusHistory"]').boundingBox()
+    return !!coach && !!history && coach.x + coach.width < history.x
+  }).toBe(true)
+  await expect(page.locator('[data-guide-target="contract.statusHistory"]').getByText('해지', { exact: true })).toBeVisible({ timeout: 10000 })
+  expect((await guide.boundingBox())!.x).toBeLessThan(1440 / 2)
+  await page.screenshot({ path: info.outputPath('workflow-history-left.png') })
 })
 
 
@@ -567,4 +579,7 @@ test('전체 업무 가이드는 보험료 입력부터 왼쪽에서 안내한�
   await guide.getByRole('button', { name: '다음', exact: true }).click()
   await expect(guide.getByRole('heading', { name: '계약 저장', exact: true })).toBeVisible()
   expect(await guide.boundingBox()).toEqual(leftPosition)
+  await expect(guide.getByRole('button', { name: '다음 업무', exact: true })).toBeDisabled()
+  await guide.locator('.disabled-button-hint').hover()
+  await expect(guide.getByRole('tooltip')).toHaveText('‘저장하고 예상 스케줄 만들기’를 먼저 눌러주세요.')
 })

@@ -22,6 +22,7 @@ import './settlement.css'
 import '../../transaction/payment-guide.css'
 import { Modal } from '../../../components/Modal'
 import { Button } from '../../../components/Button'
+import { DisabledButtonHint } from '../../../components/DisabledButtonHint'
 import { SettlementOverview } from './SettlementOverview'
 import { GuideStepContent } from '../guide/GuideStepContent'
 import { useDemoContractNumber } from './useDemoContractNumber'
@@ -85,8 +86,11 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
   const demoNumberStep = after && decision?.step === 'contract.create' && location.pathname === '/contracts/new'
     && explanation.step?.id === 'features.contract.contract-form-page.contract-no'
   const demoNumber = useDemoContractNumber(explanation.target, demoNumberStep && detailedWorkflow && !collapsed && !busy && !leave)
-  const coachSide = decision?.step === 'contract.create' && location.pathname === '/contracts/new'
-    && explanation.step?.presentation?.side === 'left' ? 'left' : 'right'
+  const waitingForContractSave = after && decision?.step === 'contract.create' && location.pathname === '/contracts/new'
+    && explanation.last && explanation.step?.id === 'contract.save'
+  const coachSide = explanation.step?.id === 'contract.statusHistory'
+    || decision?.step === 'contract.create' && location.pathname === '/contracts/new'
+      && explanation.step?.presentation?.side === 'left' ? 'left' : 'right'
   const position = useSpotlight(!collapsed ? activeTarget : null, card, detailedWorkflow,
     after ? { ...explanation.step?.presentation, fixedCard: coachSide } : detailedWorkflow ? explanation.step?.presentation : undefined)
   useGuideStep(explanation.step, explanation.target, explanation.next, detailedWorkflow && !collapsed && !busy && !leave)
@@ -742,7 +746,9 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
                 {explanation.status === 'PAUSED' && <Button variant="secondary" onClick={explanation.retry}>다시 찾기</Button>}
                 <div className="payment-guide-actions">
                   <Button variant="secondary" disabled={busy || explanation.index === 0} onClick={explanation.previous}>이전</Button>
-                  <Button className="screen-step-next" disabled={busy || !explanation.ready || !!explanation.step?.destination || !!explanation.step?.requireAction && explanation.target?.getAttribute('data-guide-completed') !== 'true'} onClick={() => explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{explanation.step?.destination ? '강조된 메뉴를 눌러주세요' : explanation.step?.nextLabel ?? (explanation.last ? decision?.step === 'validation.finalize' ? '완료 확인' : '다음 업무' : '다음')}</Button>
+                  <DisabledButtonHint disabled={waitingForContractSave} reason="‘저장하고 예상 스케줄 만들기’를 먼저 눌러주세요.">
+                  <Button className="screen-step-next" disabled={busy || waitingForContractSave || !explanation.ready || !!explanation.step?.destination || !!explanation.step?.requireAction && explanation.target?.getAttribute('data-guide-completed') !== 'true'} onClick={() => explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{explanation.step?.destination ? '강조된 메뉴를 눌러주세요' : explanation.step?.nextLabel ?? (explanation.last ? decision?.step === 'validation.finalize' ? '완료 확인' : '다음 업무' : '다음')}</Button>
+                  </DisabledButtonHint>
                 </div>
               </section>
             ) : <p>{decision?.reason}</p>}
