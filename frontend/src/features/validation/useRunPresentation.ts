@@ -12,14 +12,14 @@ export function useRunPresentation(status: string | undefined, current: number, 
   const buffering = active && arrival?.generation === generation && arrival.completed === completed
   useEffect(() => {
     if (!active) return
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduced = (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false)
     // Match the line's 300ms delay + 950ms travel, then visibly buffer.
     const timer = window.setTimeout(() => setArrival({ generation, completed }), reduced || completed === 0 ? 0 : 1250)
     return () => window.clearTimeout(timer)
   }, [active, generation, completed])
   useEffect(() => {
     if (!enabled || !buffering || completed >= confirmed) return
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduced = (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false)
     const timer = window.setTimeout(() => setFrame({ generation, completed: reduced ? confirmed : completed + 1 }), reduced ? 0 : 1200)
     return () => window.clearTimeout(timer)
   }, [enabled, buffering, completed, confirmed, generation])

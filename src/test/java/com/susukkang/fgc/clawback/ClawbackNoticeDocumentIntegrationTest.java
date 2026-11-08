@@ -138,8 +138,9 @@ class ClawbackNoticeDocumentIntegrationTest {
         assertThat(sha256(file.content())).isEqualTo(document.sha256());
         // 1000.4→1000 ×50% = 500. 금액·비율·정책은 계산판 snapshot 그대로다.
         String text = text(file.content());
-        assertThat(text).contains("환수 통지서", document.documentNo(), contractNo, "1,000원", "50%", "500원",
-                "계약 실효", "2026-04-01", calc.policyCode());
+        assertThat(text).contains("수수료 환수 안내 및", document.documentNo(), "1,000원", "50%", "500원", "계약 실효", "2026.04.01");
+        // 좁은 병합 셀의 긴 식별자는 줄바꿈되지만 내용은 보존한다.
+        assertThat(text.replaceAll("\\s+", "")).contains(contractNo, calc.policyCode());
         assertThat(caseState(calc.caseId())).isEqualTo(before);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.clawback_notice_delivery WHERE clawback_case_id=?",
                 Long.class, calc.caseId())).isZero();

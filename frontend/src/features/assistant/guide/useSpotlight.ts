@@ -3,15 +3,22 @@ import type { CSSProperties, RefObject } from 'react'
 import { useGuideScrollLock } from './useGuideScrollLock'
 
 const HIGHLIGHT_PADDING = 10
+export interface SpotlightPresentation {
+  side?: 'right' | 'left' | 'above' | 'below' | 'either'
+  includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean; rowLimit?: number
+  fixedCard?: boolean; scrollToTop?: boolean
+}
 
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>, detailed = false,
-  presentation?: { side?: 'right' | 'left' | 'above' | 'below' | 'either'; includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean; rowLimit?: number }) {
+  presentation?: SpotlightPresentation) {
   useGuideScrollLock(card)
   const full = Boolean(presentation), preferredSide = presentation?.side
   const includeLabel = presentation?.includeLabel
   const sideBoundary = presentation?.sideBoundary
   const preserveCardPosition = presentation?.preserveCardPosition
   const rowLimit = presentation?.rowLimit
+  const fixedCard = presentation?.fixedCard
+  const scrollToTop = presentation?.scrollToTop
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
     card: CSSProperties
@@ -137,11 +144,11 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
           const cardWidth = Math.min(420, side === 'right' ? rightRoom : side === 'left' ? leftRoom : workspaceRight - cardLeftBoundary - 24)
           const maxHeight = Math.max(160, height - topBoundary - 12)
           const cardHeight = Math.min(Math.max(card.current?.scrollHeight ?? 0, card.current?.offsetHeight ?? 0) || 280, maxHeight)
-          const cardLeft = side === 'right' ? context.right + 24 : side === 'left' ? context.left - cardWidth - 24
+          const cardLeft = fixedCard ? Math.max(cardLeftBoundary + 12, workspaceRight - cardWidth - 16) : side === 'right' ? context.right + 24 : side === 'left' ? context.left - cardWidth - 24
             : Math.max(cardLeftBoundary + 12, Math.min(rect.left, workspaceRight - cardWidth - 12))
-          let cardTop = side ? Math.max(topBoundary, Math.min(context.top, height - cardHeight - 12))
+          let cardTop = fixedCard ? height - cardHeight - 16 : side ? Math.max(topBoundary, Math.min(context.top, height - cardHeight - 12))
             : preferredSide === 'above' ? context.top - cardHeight - 24 : context.bottom + 24
-          if (!side && preferredSide !== 'below' && cardTop + cardHeight > height - 12) cardTop = context.top - cardHeight - 24
+          if (!fixedCard && !side && preferredSide !== 'below' && cardTop + cardHeight > height - 12) cardTop = context.top - cardHeight - 24
           cardTop = Math.max(topBoundary, Math.min(cardTop, height - cardHeight - 12))
           setPosition(previous => ({
             box: {
@@ -165,7 +172,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
               ? context.top < topBoundary ? context.top - topBoundary : Math.max(0, context.bottom - height + 20)
               : context.top < topBoundary || context.height > bottom - topBoundary
                 ? context.top - topBoundary : Math.max(0, context.bottom - bottom)
-            scrollSmoothly(offset)
+            scrollSmoothly(scrollToTop ? -window.scrollY : fixedCard ? Math.max(0, context.top - topBoundary) : offset)
           }
           return
         }
@@ -274,6 +281,6 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
     }
-  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary, preserveCardPosition, rowLimit])
+  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary, preserveCardPosition, rowLimit, fixedCard, scrollToTop])
   return position
 }

@@ -26,11 +26,11 @@ export function AnimatedRunChecklist({ completed, data, error, retry }: {
   useEffect(() => {
     if (next === undefined) return
     const timer = window.setTimeout(() => setRevealed(previous => [...previous, next]),
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650)
+      window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 0 : 650)
     return () => window.clearTimeout(timer)
   }, [next])
   const allShown = CONDITIONS.every((_item, index) => eligible.includes(index + 1) && revealed.includes(index + 1))
-  return <section data-guide-feature="features.validation.validation-run-detail-page.section-7" data-guide-target="validation.checklist" className="surface" aria-labelledby="vrun-checklist-title">
+  return <section data-guide-feature="features.validation.validation-run-detail-page.section-7" className="surface" aria-labelledby="vrun-checklist-title">
     <header className="surface-header">
       <h2 className="surface-title" id="vrun-checklist-title">확정 전 8단계 점검</h2>
       {allShown ? <StatusBadge tone={data?.passed ? 'success' : 'error'}>{data?.passed ? '8개 조건 모두 통과' : '미충족 조건 있음'}</StatusBadge>
@@ -45,7 +45,7 @@ export function AnimatedRunChecklist({ completed, data, error, retry }: {
           const to = result && !result.passed ? safeInternalLink(result.linkUrl) : null
           return <div className="vrun-checklist-item" data-guide-condition={no} key={no}>
             <span key={result ? String(result.passed) : 'pending'} className={`vrun-condition-icon ${result ? result.passed ? 'is-pass' : 'is-fail' : 'is-pending'}`} aria-hidden="true">
-              {!result ? '…' : result.passed ? <svg className="vrun-check-mark" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></svg>
+              {!result ? <svg className="vrun-pending-dots" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg> : result.passed ? <svg className="vrun-check-mark" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></svg>
                 : <svg className="vrun-condition-cross" viewBox="0 0 24 24" fill="none"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" /></svg>}
             </span>
             <div className="vrun-checklist-label">{no}. {result?.label ?? item.label}

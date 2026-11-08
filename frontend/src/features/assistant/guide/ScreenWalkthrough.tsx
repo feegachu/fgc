@@ -55,7 +55,7 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
   const position = useSpotlight(session && !covered && !folded ? target : null, card, true, step?.presentation)
   const close = () => { setSession(null); trigger?.focus() }
 
-  useGuideStep(step, target, sequence.next, Boolean(session && !covered && !folded))
+  useGuideStep(step, target, () => sequence.last ? close() : sequence.next(), Boolean(session && !covered && !folded))
 
   useEffect(() => {
     const other = (event: Event) => {
@@ -136,7 +136,8 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
           {!step.concise && index === 0 && <p className="screen-step-context">현재 표시된 요소를 안내합니다. 다른 탭이나 상세에서도 도움말을 다시 열어 보세요.</p>}
           <div className="payment-guide-actions">
             <Button variant="secondary" disabled={index === 0} onClick={sequence.previous}>이전</Button>
-            <Button className="screen-step-next" onClick={() => sequence.last ? close() : sequence.next()}>{sequence.last ? '안내 마치기' : '다음'}</Button>
+            <Button className="screen-step-next" disabled={step.requireAction && target?.getAttribute('data-guide-completed') !== 'true'}
+              onClick={() => sequence.last ? close() : sequence.next()}>{step.requireAction && target?.getAttribute('data-guide-completed') !== 'true' ? '실행 버튼을 눌러주세요' : sequence.last ? '안내 마치기' : '다음'}</Button>
           </div>
         </> : <>
           <h2>안내할 화면을 준비하고 있어요</h2>

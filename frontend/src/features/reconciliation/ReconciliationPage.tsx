@@ -39,6 +39,9 @@ import { Disclosure, Failure, Money, ResultBadge } from './display'
 import { sumAmounts } from './amounts'
 import { EMPTY, PAYMENT_STAGE, RESULT_TYPE, RUN_STATUS, text } from './labels'
 import { CompareModal } from './CompareModal'
+import { ViewModeSwitch } from '../../components/HierarchyTree'
+import { RunHistoryTree } from './RunHistoryTree'
+import { groupedResultQuery } from './api'
 import './reconciliation.css'
 
 const historyColumns: TableColumn<Run>[] = [
@@ -245,11 +248,15 @@ const revisedResultColumns = resultColumns.filter((column) => column.key !== 'pr
 
 /** RECO-W01: 실행/결과는 기존 API, 이력 status 기반으로 비동기 완료를 확인한다. */
 export default function ReconciliationPage() {
-  const { revised = false } = useOutletContext<ShellContext>()
+  const { revised = false, helpVersion } = useOutletContext<ShellContext>()
+  const enhanced = helpVersion === 'after'
+  const [historyView, setHistoryView] = useState<'tree' | 'table'>('tree')
+  const [group, setGroup] = useState<{ key: string; ids: string[]; scope: string } | null>(null)
   const month = useWorkspaceStore((state) => state.month)
   const { params, update } = useSearchParamsState(FILTER_KEYS)
   const criteria = criteriaFromParams(params, month)
-  const history = useQuery(historyQuery(criteria))
+  const history = useQuery(historyQuery(criteria, enhanced))
+  const groupScope = JSON.stringify([criteria.month, criteria.stage, criteria.insurer])
   const requestedRunId =
     !params.get('runMonth') || params.get('runMonth') === criteria.month ? positiveId(params.get('runId')) : ''
   const resultId = positiveId(params.get('resultId'))
@@ -271,7 +278,12 @@ export default function ReconciliationPage() {
   const status = selectedRun?.status
   const running = status === 'RUNNING' || status === 'CREATED'
   const resultSort = parseSort(params.get('resultSort'), RESULT_SORT_KEYS)
-  const results = useQuery(resultQuery(runId, type, resultPage, running, formatSort(resultSort)))
+  const groupIds = enhanced && group?.scope === groupScope ? group.ids : runId ? [runId] : []
+  const groupRunning = (history.data?.content ?? []).some(run => groupIds.includes(String(run.reconciliationRunId)) && ['RUNNING', 'CREATED'].includes(run.status ?? ''))
+  const useGroup = enhanced && (groupIds.length > 1 || onlyMismatch)
+  const individualResults = useQuery({ ...resultQuery(runId, type, resultPage, running, formatSort(resultSort)), enabled: !!runId && !useGroup })
+  const groupedResults = useQuery(groupedResultQuery(groupIds, type, resultPage, onlyMismatch, formatSort(resultSort), useGroup && !!groupIds.length, groupRunning))
+  const results = useGroup ? groupedResults : individualResults
   const client = useQueryClient()
   const canProcess = usePermission('canProcess')
   const [bulkMessage, setBulkMessage] = useState<{ runId: string; message: string } | null>(null)
@@ -326,7 +338,7 @@ export default function ReconciliationPage() {
   const filteredRows = (results.data?.items?.content ?? []).filter(
     (row) => !onlyMismatch || row.resultType !== 'MATCHED',
   )
-  const resultTotal = onlyMismatch && type === 'MATCHED'
+  const resultTotal = useGroup ? results.data?.items?.totalElements : onlyMismatch && type === 'MATCHED'
     ? 0
     : onlyMismatch && !type
       ? results.data?.summary?.exceptionCount
@@ -372,7 +384,7 @@ export default function ReconciliationPage() {
             if (canProcess && !execution.isPending) execution.mutate(input)
           }}
           bulkDisabled={
-            !canProcess ||
+            !canProcess || (enhanced && groupIds.length !== 1) ||
             !runId ||
             bulk.isPending ||
             execution.isPending ||
@@ -407,7 +419,7 @@ export default function ReconciliationPage() {
           대사 실행이 실패했습니다. 실행 이력을 확인하세요.
         </p>
       )}
-      <div className="reco-react-grid">
+      <div className={`reco-react-grid${enhanced ? ' reco-explorer-grid' : ''}`}>
         <section data-guide-feature="features.reconciliation.reconciliation-page.section-2"
           data-guide-target="reconciliation.results"
           className="surface reco-react-results"
@@ -451,7 +463,7 @@ export default function ReconciliationPage() {
           >
             <h2 className="surface-title">대사 결과</h2>
           </ListHeader>
-          {onlyMismatch && (
+          {onlyMismatch && !useGroup && (
             <p className="reco-react-note" role="status">
               불일치만 보기는 지금 페이지의 일치 행만 숨깁니다. 전체 불일치 건수는 실행 요약에서 확인하세요.
             </p>
@@ -501,35 +513,42 @@ export default function ReconciliationPage() {
           />
         </section>
         <section data-guide-feature="features.reconciliation.reconciliation-page.section-3" className="surface reco-react-history" aria-label="실행 이력" aria-busy={history.isFetching} data-guide-target="reconciliation.history">
-          <ListHeader className="reco-react-panel-header" total={history.data?.totalElements ?? 0} pageSize={20}>
+          <ListHeader className="reco-react-panel-header" total={history.data?.totalElements ?? 0} pageSize={20}
+            actions={enhanced && <ViewModeSwitch value={historyView} onChange={setHistoryView} label="실행 이력 보기 방식" />}>
             <h2 className="surface-title">실행 이력</h2>
           </ListHeader>
           <Failure error={history.error} />
-          <DataTable
+          {enhanced && historyView === 'tree' ? <RunHistoryTree runs={history.data?.content ?? []}
+            selectedId={group?.scope === groupScope ? group.key : `run:${runId}`} onSelect={(key, members) => {
+              if (!members.length) return
+              setGroup({ key, ids: members.map(run => String(run.reconciliationRunId)), scope: groupScope })
+              selectRun(members[0])
+            }} /> : <DataTable
             className="reco-react-history-table"
             emptyMessage={<div className="reco-react-empty">조건에 맞는 자료가 없습니다.</div>}
             columns={historyColumns}
             {...sortBinding(criteria.sort, HISTORY_SORT_KEYS, (sort) => update({ sort }))}
-            rows={history.data?.content ?? []}
+            rows={enhanced ? (history.data?.content ?? []).slice((criteria.page - 1) * 20, criteria.page * 20) : history.data?.content ?? []}
             rowKey={(row) => String(row.reconciliationRunId)}
             caption="검색조건에 해당하는 대사 실행 이력"
-            onRowClick={selectRun}
-            onRowActivate={selectRun}
+            onRowClick={row => { setGroup(null); selectRun(row) }}
+            onRowActivate={row => { setGroup(null); selectRun(row) }}
             rowClassName={(row) => (String(row.reconciliationRunId) === runId ? 'is-selected' : '')}
-          />
+          />}
 
-          <ReconciliationPagination
+          {(!enhanced || historyView === 'table') && <ReconciliationPagination
             label="실행 이력 페이지 이동"
             page={criteria.page}
             totalPages={history.data?.totalPages ?? 0}
             onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-          />
+          />}
         </section>
       </div>
       {resultId && (
         <CompareModal
           resultId={resultId}
           month={month}
+          revised={enhanced}
           onClose={() => update({ resultId: '' }, { resetPage: false })}
         />
       )}

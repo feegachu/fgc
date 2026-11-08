@@ -192,3 +192,12 @@
 }
 @media (prefers-reduced-motion: reduce) { .ast-view-slider { transition: none; } }
 .ast-list-tools { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.ast-explorer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ast-explorer-heading h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.ast-explorer-heading .ast-muted { margin-left: 10px; font-weight: 400; }
+.ast-tree-pane { min-width: 0; padding: 8px; max-height: 36rem; overflow: auto; border-right: 1px solid var(--color-border-default); background: var(--color-bg-subtle); }
+.ast-agent-area { padding: 14px; }
+.ast-agent-cards { gap: 10px; }
+.ast-agent-card { padding: 12px; gap: 8px; font-size: 13px; }
+.ast-agent-card-metric { font-size: 12px; }
+@media (max-width: 48rem) { .ast-tree-pane { max-height: 16rem; border-right: 0; border-bottom: 1px solid var(--color-border-default); } }

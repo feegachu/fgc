@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { PrecheckResultPanel } from './PrecheckResultPanel'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
@@ -13,11 +14,7 @@ import type { FormValues } from './form-model'
 
 export function GatePanel({ result }: { result: Precheck | null }) {
   return (
-    <section data-guide-feature="features.transaction.confirmation-panels.section"
-      data-guide-target="payment.precheck.result"
-      className="surface transaction-gate-panel"
-      aria-labelledby="transaction-gate-title"
-    >
+    <PrecheckResultPanel titleId="transaction-gate-title">
       <header className="surface-header transaction-surface-header">
         <h2 className="surface-title" id="transaction-gate-title">
           ③ 확정 전 6단계 점검
@@ -48,7 +45,7 @@ export function GatePanel({ result }: { result: Precheck | null }) {
           </div>
         ))}
       </div>
-    </section>
+    </PrecheckResultPanel>
   )
 }
 function AmountLine({ label, value, emphasize = false }: { label: string; value: unknown; emphasize?: boolean }) {

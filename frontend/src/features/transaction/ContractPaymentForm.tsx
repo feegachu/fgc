@@ -120,7 +120,7 @@ export function ContractPaymentForm({
   const settlementMonth = month
   const monthStart = `${month}-01`
   const monthEnd = `${month}-${new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()}`
-  const [attributionDate, setAttributionDate] = useState(monthStart)
+  const [attributionDateInput, setAttributionDate] = useState<string | null>(null)
   const [paymentDate, setPaymentDate] = useState(monthStart)
   const [installment, setInstallment] = useState('')
   const [excluded, setExcluded] = useState<number[]>([])
@@ -148,6 +148,9 @@ export function ContractPaymentForm({
   const contracts = useEntityChoices('contracts', { contractDateTo: monthEnd }, [contractId], true,
     row => !!row.contractDate && row.contractDate <= monthEnd)
   const selectedContract = contracts.data.find(row => String(row.contractId) === contractId)
+  const contractDate = selectedContract?.contractDate
+  const attributionMinimum = contractDate && contractDate > monthStart ? contractDate : monthStart
+  const attributionDate = attributionDateInput ?? attributionMinimum
   const contractAllowed = !!selectedContract?.contractDate && selectedContract.contractDate <= monthEnd
   const schedules = useQuery({
     ...contractSchedulesQuery(contractId, stage),
@@ -193,7 +196,7 @@ export function ContractPaymentForm({
     stage,
   )
   const itemSource = { ...items.source, label: (item: (typeof items.data)[number]) => item.itemName ?? '수수료 항목' }
-  const datesReady = [attributionDate, paymentDate].every((date) => validDate(date) && date.startsWith(`${month}-`))
+  const datesReady = attributionDate >= attributionMinimum && [attributionDate, paymentDate].every((date) => validDate(date) && date.startsWith(`${month}-`))
   const rowPayload = (line: ScheduleLine) => {
     if (!contractAllowed) throw new Error('기준 정산월까지 체결된 계약을 선택하세요.')
     if (!datesReady) throw new Error('귀속일과 지급 예정일을 기준 정산월 안에서 선택하세요.')
@@ -258,7 +261,7 @@ export function ContractPaymentForm({
     setInstallment('')
     setExcluded([])
     setEdits({})
-    setAttributionDate(monthStart)
+    setAttributionDate(null)
     setPaymentDate(monthStart)
     setChecks({})
     setError('')
@@ -276,7 +279,7 @@ export function ContractPaymentForm({
     try {
       await task()
       void client.invalidateQueries({ queryKey: ['transactions'], refetchType: 'none' })
-      if (action === 'save' || action === 'precheck') {
+      if (action === 'save' || action === 'precheck' || action === 'confirm') {
         editor.current?.querySelector('[data-guide-target="payment.batch.' + action + '"]')
           ?.dispatchEvent(new Event('fgc-payment-' + action + '-complete'))
       }
@@ -459,6 +462,7 @@ export function ContractPaymentForm({
                   onSelect={(value, row) => {
                     contracts.remember(row)
                     setContractId(value)
+                    setAttributionDate(null)
                     reset()
                   }}
                 />
@@ -520,14 +524,14 @@ export function ContractPaymentForm({
                 label="귀속일"
                 required
                 error={
-                  attributionDate && (!validDate(attributionDate) || !attributionDate.startsWith(`${month}-`))
-                    ? '기준 정산월 안에서 선택하세요.'
+                  attributionDate && (!validDate(attributionDate) || !attributionDate.startsWith(`${month}-`) || attributionDate < attributionMinimum)
+                    ? '계약일 이후, 기준 정산월 안에서 선택하세요.'
                     : undefined
                 }
               >
                 <input
                   type="date"
-                  min={monthStart}
+                  min={attributionMinimum}
                   max={monthEnd}
                   disabled={editingLocked}
                   value={attributionDate}
@@ -837,13 +841,14 @@ export function ContractPaymentForm({
           </>
         }
       >
-        <p>
-          {remaining.length}행 · {int(remaining.reduce((sum, line) => sum + Number(values(line).amount), 0))}원을
-          확정합니다.
-        </p>
-        <p>
-          행마다 최신 한도를 확인하며 순서대로 확정합니다. 중간에 차단되면 완료된 행은 유지하고 나머지는 중단합니다.
-        </p>
+        <div className="data-table-viewport"><table className="data-table contract-payment-confirm-table">
+          <caption className="visually-hidden">확정할 지급 내역</caption>
+          <thead><tr><th>설계사</th><th>수수료 항목</th><th>귀속금액</th></tr></thead>
+          <tbody>{remaining.map(line => <tr key={line.scheduleLineId}><td>{line.recipientName ?? 'GA'}</td>
+            <td>{items.data.find(item => String(item.commissionItemId) === values(line).item)?.itemName ?? line.commissionItemName}</td>
+            <td>{int(Number(values(line).amount))}원</td></tr>)}</tbody>
+          <tfoot><tr><th colSpan={2}>합계 · {remaining.length}행</th><td>{int(remaining.reduce((sum, line) => sum + Number(values(line).amount), 0))}원</td></tr></tfoot>
+        </table></div>
       </Modal>
     </div>
   )

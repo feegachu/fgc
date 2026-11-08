@@ -34,6 +34,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 
 /**
  * FUN-084 환수 통지서 발행(IF-API-73)과 이력(IF-API-86). 지정한 계산판 snapshot으로만 PDF를 만들고,
@@ -176,6 +177,21 @@ public class ClawbackNoticeDocumentService {
         var lines = calculation.lines().stream().map(line -> new ClawbackNoticePdfRenderer.Line(
                 itemNames.getOrDefault(line.commissionItemId(), "항목 " + line.commissionItemId()),
                 line.installmentNo(), line.basisAmount(), line.appliedRatePct(), line.clawbackAmount())).toList();
+        var rates = new java.util.ArrayList<ClawbackNoticePdfRenderer.RateBand>();
+        if (basis.get("rateTable") instanceof java.util.List<?> savedRates) {
+            for (Object saved : savedRates) {
+                if (!(saved instanceof Map<?, ?> row)) throw new IllegalStateException("계산판 환수율표를 읽을 수 없습니다.");
+                Long ruleId = row.get("ruleId") instanceof Number number ? number.longValue() : null;
+                Long itemId = row.get("commissionItemId") instanceof Number number ? number.longValue() : null;
+                rates.add(new ClawbackNoticePdfRenderer.RateBand(ruleId,
+                        itemId == null ? "전체 수수료 항목" : itemNames.getOrDefault(itemId, "항목 " + itemId),
+                        row.get("monthFrom") instanceof Number number ? number.intValue() : null,
+                        row.get("monthTo") instanceof Number number ? number.intValue() : null,
+                        new java.math.BigDecimal(String.valueOf(row.get("ratePct"))),
+                        calculation.lines().stream().anyMatch(line -> java.util.Objects.equals(line.clawbackRuleId(), ruleId)),
+                        (itemId != null ? 4 : 0) + (row.get("productOfferingId") != null ? 2 : 0) + (row.get("insurerId") != null ? 1 : 0)));
+            }
+        }
         return new ClawbackNoticePdfRenderer.Notice(documentNo, version, issuedAt, header.contractNo(),
                 header.insurerName(), header.productName(), header.agentCode(), header.agentName(),
                 triggerLabel(String.valueOf(basis.get("triggerType")), header.triggerStatus()),
@@ -185,7 +201,8 @@ public class ClawbackNoticeDocumentService {
                 basis.get("elapsedMonths") instanceof Number n ? n.intValue() : null,
                 "LINE_HALF_UP_WON".equals(basis.get("rounding")) ? "행별 원 단위 반올림(HALF_UP) 후 합산"
                         : String.valueOf(basis.get("rounding")),
-                lines, calculation.amount());
+                lines, calculation.amount(), List.copyOf(rates), basis.get("reason") instanceof String reason ? reason : null,
+                new ClawbackNoticePdfRenderer.Party(header.gaName(), header.branchName(), header.teamName()));
     }
 
     private static String triggerLabel(String triggerType, String newStatus) {

@@ -1,6 +1,7 @@
 import { nameWithCode } from '../../lib/screenText'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
@@ -15,10 +16,12 @@ export function CompareModal({
   resultId,
   month,
   onClose,
+  revised = false,
 }: {
   resultId: string
   month: string | null
   onClose: () => void
+  revised?: boolean
 }) {
   const detail = useQuery(detailQuery(resultId))
   return (
@@ -38,12 +41,14 @@ export function CompareModal({
       {detail.isPending ? (
         <p role="status">불러오는 중입니다.</p>
       ) : (
-        detail.data && <CompareContent detail={detail.data} month={month} />
+        detail.data && <CompareContent detail={detail.data} month={month} revised={revised} />
       )}
     </Modal>
   )
 }
-function CompareContent({ detail, month }: { detail: Detail; month: string | null }) {
+function CompareContent({ detail, month, revised }: { detail: Detail; month: string | null; revised: boolean }) {
+  const [tab, setTab] = useState(0)
+  const tabs = ['비교 요약', '예상 원천', '실제 지급', '차액·분류 근거', '관련 화면']
   const snapshot = detail.detailSnapshot
   const stage =
     snapshot != null &&
@@ -59,11 +64,19 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
   const href = (path: string) => (month ? withMonth(path, month) : path)
   return (
     <>
+      {revised && <div className="reco-detail-tabs" role="tablist" aria-label="대사 비교 상세 항목">
+        {tabs.map((label, index) => <button type="button" key={label} role="tab" id={`reco-tab-${index}`} aria-selected={tab === index}
+          aria-controls={`reco-panel-${index}`} tabIndex={tab === index ? 0 : -1} onClick={() => setTab(index)} onKeyDown={event => {
+            const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : null
+            if (next != null) { event.preventDefault(); setTab(next); document.getElementById(`reco-tab-${next}`)?.focus() }
+          }}>{label}</button>)}
+      </div>}
       <p>
         대사 결과, {PAYMENT_STAGE[stage as keyof typeof PAYMENT_STAGE] || stage || '지급단계 미확인'}
       </p>
       <p>예상 스케줄과 실제 지급 건을 항목별로 비교합니다.</p>
       <ResultBadge type={detail.resultType} label={detail.resultTypeLabel} />
+      <div id="reco-panel-0" role={revised ? 'tabpanel' : undefined} aria-labelledby={revised ? 'reco-tab-0' : undefined} hidden={revised && tab !== 0}>
       <dl className="reco-react-compare-summary">
         <div>
           <dt>계약, 항목, 회차</dt>
@@ -92,11 +105,13 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
           <dd>계약번호, 지급단계, 설계사, 수수료 항목, 회차</dd>
         </div>
       </dl>
-      <div className="reco-react-compare-grid">
-        <SourceSide title="예상" matches={expected} detail={detail} expected />
-        <SourceSide title="실제" matches={actual} detail={detail} expected={false} />
       </div>
-      <section data-guide-feature="features.reconciliation.compare-modal.section" data-guide-target="reconciliation.detail" className="surface reco-react-note" aria-label="차액 및 분류">
+      <div className={`reco-react-compare-grid${revised ? ' is-tabbed' : ''}`}>
+        <div id="reco-panel-1" role={revised ? 'tabpanel' : undefined} aria-labelledby={revised ? 'reco-tab-1' : undefined} hidden={revised && tab !== 1}><SourceSide title="예상" matches={expected} detail={detail} expected /></div>
+        <div id="reco-panel-2" role={revised ? 'tabpanel' : undefined} aria-labelledby={revised ? 'reco-tab-2' : undefined} hidden={revised && tab !== 2}><SourceSide title="실제" matches={actual} detail={detail} expected={false} /></div>
+      </div>
+      <section data-guide-feature="features.reconciliation.compare-modal.section" data-guide-target="reconciliation.detail" className="surface reco-react-note" aria-label="차액 및 분류"
+        id="reco-panel-3" role={revised ? 'tabpanel' : undefined} aria-labelledby={revised ? 'reco-tab-3' : undefined} hidden={revised && tab !== 3}>
         <p>
           예상 금액 <Money value={detail.expectedTotalAmount} />, 실제 금액 <Money value={detail.actualTotalAmount} />
         </p>
@@ -110,7 +125,7 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
         </p>
         <p>허용오차 0원, 시스템 계산 결과</p>
       </section>
-      <nav className="reco-react-links" aria-label="관련 화면">
+      <nav className="reco-react-links" aria-label="관련 화면" id="reco-panel-4" role={revised ? 'tabpanel' : undefined} aria-labelledby={revised ? 'reco-tab-4' : undefined} hidden={revised && tab !== 4}>
         {scheduleId != null && (
           <Link data-guide-feature="features.reconciliation.compare-modal.link" className="button button-secondary" to={href(`/schedules/${scheduleId}`)}>
             스케줄 상세

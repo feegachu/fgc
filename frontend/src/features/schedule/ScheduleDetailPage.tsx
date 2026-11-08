@@ -221,7 +221,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                 document.getElementById(`schedule-${next}-tab`)?.focus()
               }}>
               {(['info', 'versions'] as const).map(tab => <button type="button" role="tab" key={tab}
-                id={`schedule-${tab}-tab`} aria-controls={`schedule-${tab}-panel`} aria-selected={infoTab === tab}
+                id={tab === 'info' ? 'schedule-info-tab' : 'schedule-versions-tab'} aria-controls={`schedule-${tab}-panel`} aria-selected={infoTab === tab}
                 tabIndex={infoTab === tab ? 0 : -1} onClick={() => setInfoTab(tab)}>
                 {tab === 'info' ? '기준정보' : '버전비교'}
               </button>)}

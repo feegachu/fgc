@@ -56,7 +56,7 @@ import './transaction.css'
 import './form.css'
 
 export default function TransactionFormPage() {
-  const { user, month } = useOutletContext<ShellContext>()
+  const { user, month, helpVersion } = useOutletContext<ShellContext>()
   const [params] = useSearchParams()
   const id = params.get('id')
   const revisedGuide = params.get('guideMode') === 'after'
@@ -73,8 +73,8 @@ export default function TransactionFormPage() {
     return () => clearTimeout(timer)
   }, [fullFlow, mode, revisedGuide])
   const cancelMode = () => { setPendingMode(null); if (fullFlow) closeSettlementGuide() }
-  const actualMode = legacyEntry ? 'before' : fullFlow && revisedGuide ? 'after' : mode
-  const comparison = (busy: boolean) => <div role="group" aria-label="지급 등록 방식 비교" className="payment-registration-comparison">{(['before', 'after'] as const).map(value => <Button key={value} variant={actualMode === value ? 'primary' : 'secondary'} aria-pressed={actualMode === value} disabled={busy || legacyEntry || !!fullFlow} onClick={() => {
+  const actualMode = legacyEntry ? 'before' : fullFlow && revisedGuide ? 'after' : helpVersion ?? mode
+  const comparison = (busy: boolean) => helpVersion ? null : <div role="group" aria-label="지급 등록 방식 비교" className="payment-registration-comparison">{(['before', 'after'] as const).map(value => <Button key={value} variant={actualMode === value ? 'primary' : 'secondary'} aria-pressed={actualMode === value} disabled={busy || legacyEntry || !!fullFlow} onClick={() => {
     if (value === actualMode) return
     if (Object.keys(useUnsavedWorkStore.getState().owners).length) setPendingMode(value)
     else setMode(value)

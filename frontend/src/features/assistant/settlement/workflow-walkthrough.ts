@@ -5,7 +5,7 @@ import type { ScreenHelpStep } from '../guide/ScreenHelp'
 import { getScreenWalkthrough, guideSelector } from '../guide/page-guides'
 import { useSidebarStore } from '../../../stores/sidebar'
 
-export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'presentation' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent' | 'onEnter' | 'interaction' | 'concise' | 'liveDescriptionSelector'>> {
+export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'presentation' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent' | 'requireAction' | 'onEnter' | 'interaction' | 'concise' | 'liveDescriptionSelector'>> {
   id: string
   selector: string
   title: string

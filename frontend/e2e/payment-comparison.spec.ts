@@ -38,7 +38,8 @@ test('지급 등록 비교 안내는 앞 3개 행을 강조하고 안내 카드�
   const fourthRow = await page.locator('.contract-payment-preview-list > li').nth(3).boundingBox()
   const spotlight = await expected.boundingBox()
   expect(thirdRow && fourthRow && spotlight).toBeTruthy()
-  expect(spotlight!.y + spotlight!.height).toBeCloseTo(Math.min(900, thirdRow!.y + thirdRow!.height + 6), 0)
+  // SVG boundingBox includes the one-pixel outline around its geometric rectangle.
+  expect(Math.abs(spotlight!.y + spotlight!.height - Math.min(900, thirdRow!.y + thirdRow!.height + 6))).toBeLessThanOrEqual(1.1)
   expect(spotlight!.y + spotlight!.height).toBeLessThan(fourthRow!.y + fourthRow!.height)
   await page.screenshot({ path: info.outputPath('payment-comparison.png') })
 })

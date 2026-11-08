@@ -13,7 +13,7 @@ export const contractPaymentHelp: ScreenHelpStep[] = ([
   {
     targetId: 'payment.batch.lines',
     title: '설계사별 귀속행',
-    instruction: '예상 금액에서 같은 행의 귀속금액으로 네모가 이동합니다.',
+    instruction: '예상 스케줄과 같은 설계사의 귀속금액을 비교하세요.',
     interaction: '두 금액을 비교하고 필요한 귀속금액을 수정하세요.',
     presentation: { side: 'below', rowLimit: 3 },
     onEnter: () => {
@@ -43,13 +43,14 @@ export const contractPaymentHelp: ScreenHelpStep[] = ([
     title: '확정 전 6단계 점검',
     instruction: '입력·금액·저장·검증 결과를 차례로 확인하세요.',
     interaction: '확인 필요 항목을 수정하고 다시 저장·검증합니다.',
-    presentation: { side: 'left' },
+    presentation: { side: 'left', preserveCardPosition: true },
   },
   {
     targetId: 'payment.batch.confirm',
     title: '지급 확정',
+    advanceOnEvent: 'fgc-payment-confirm-complete',
     instruction: '검증을 통과하면 확정을 누르세요.',
     interaction: '확인창에서 대상 행과 총액을 확인한 뒤 확정합니다.',
-    presentation: { side: 'right' },
+    presentation: { side: 'right', preserveCardPosition: true },
   },
 ] satisfies Omit<ScreenHelpStep, 'group' | 'details'>[]).map((step) => ({ ...step, group: '계약별 지급 등록', details: [], concise: true }))

@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { PrecheckResultPanel } from './PrecheckResultPanel'
 import type { Precheck } from './form-api'
 import { gateStates } from './form-model'
 import { rateText } from '../../lib/format'
@@ -77,11 +78,7 @@ export function ContractPaymentGates({
     },
   ]
   return (
-    <section
-      className="surface transaction-gate-panel contract-payment-gates"
-      data-guide-target="payment.precheck.result"
-      aria-labelledby="contract-payment-gates-title"
-    >
+    <PrecheckResultPanel className="contract-payment-gates" titleId="contract-payment-gates-title">
       <header className="surface-header transaction-surface-header">
         <h2 className="surface-title" id="contract-payment-gates-title">
           ③ 확정 전 6단계 점검
@@ -118,6 +115,6 @@ export function ContractPaymentGates({
           </p>
         )}
       </div>
-    </section>
+    </PrecheckResultPanel>
   )
 }

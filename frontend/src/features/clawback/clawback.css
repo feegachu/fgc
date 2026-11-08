@@ -66,6 +66,12 @@
   align-items: center;
   gap: var(--space-3);
 }
+.claw-footer-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; width: 100%; }
+.claw-detail-tabs { display: flex; gap: 2px; overflow-x: auto; margin-bottom: 18px; border-bottom: 1px solid var(--color-border-default); }
+.claw-detail-tabs > button { flex: none; padding: 11px 15px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--color-text-secondary); font: inherit; font-size: 13px; cursor: pointer; }
+.claw-detail-tabs > button[aria-selected='true'] { border-bottom-color: var(--color-action-primary); color: var(--color-action-primary); font-weight: 700; }
+.claw-detail-tabs > button:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: -3px; }
+.claw-detail-modal [role='tabpanel'] { margin-top: 0; }
 @media (min-width: 48rem) {
   .claw-detail-modal .claw-detail-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));

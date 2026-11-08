@@ -682,6 +682,10 @@
   transition: background-color 400ms ease, border-color 400ms ease;
 }
 .vrun-check-mark { width: 1rem; height: 1rem; overflow: visible; }
+.vrun-pending-dots { display: block; width: 1rem; height: 1rem; flex: none; }
+.vrun-detail-page[data-presentation='after'] .vrun-dashboard-kpis .kpi-value-row { align-items: center; }
+.vrun-detail-page[data-presentation='after'] .vrun-dashboard-kpis .kpi-value { line-height: 1; }
+.vrun-detail-page[data-presentation='after'] .vrun-dashboard-kpis .kpi-unit { align-self: center; line-height: 1; padding: 0; }
 .vrun-check-mark path {
   fill: none;
   stroke: currentColor;
@@ -711,6 +715,8 @@
   gap: 0.75rem;
   padding: 0 1rem 1rem;
 }
+.vrun-bottom-actions { display: flex; justify-content: flex-end; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--color-border-default); }
+.vrun-condition-icon { display: inline-grid; place-items: center; line-height: 1; align-self: center; }
 .vrun-result-card {
   padding: 1rem;
   border: 1px solid var(--color-border-default);

@@ -16,6 +16,7 @@ import { useAgentOptions, useCommissionItems } from '../base/api'
 import { policyCodeLabel } from '../policies/labels'
 import { sourceOptions } from '../transaction/list-api'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
+import { StatementResults } from './StatementResults'
 import type { ScreenHelpStep } from '../assistant/guide/ScreenHelp'
 import { StatementExplorer, StatementViewSwitch } from './StatementExplorer'
 import {
@@ -78,8 +79,7 @@ const SOURCE_LABELS: Record<string, string> = {
 export default function AgentStatementPage() {
   const { month, user, revised, helpVersion } = useOutletContext<ShellContext>()
   const isAgent = user.roleCode === 'AGENT'
-  const [mode, setMode] = useState<'before' | 'after'>('after')
-  const enhanced = !isAgent && mode === 'after'
+  const enhanced = !isAgent && helpVersion !== 'before'
   const [view, setView] = useState<'tree' | 'table'>('tree')
   const currentView = useRef(view)
   useEffect(() => { currentView.current = view }, [view])
@@ -113,13 +113,13 @@ export default function AgentStatementPage() {
   const [params, setParams] = useSearchParams()
   const filters = readFilters(params, defaultMonth)
   const branchFilterKey = JSON.stringify([filters.month, filters.contractNo, filters.commissionItemId, filters.entryType])
-  const [branchSelection, setBranchSelection] = useState<{ id: number; filterKey: string } | null>(null)
+  const [branchSelection, setBranchSelection] = useState<{ id: number; filterKey: string; groupId?: string; agents?: number[]; label?: string } | null>(null)
   // 본인 화면에는 설계사 선택이 없다. 내부 조회에서만 agentId 를 고른다.
   const overview = useQuery(statementOverviewQuery(filters, enhanced))
   const overviewRows = overview.isError ? [] : overview.data ?? []
   const selectedBranchId = enhanced && view === 'tree' && branchSelection?.filterKey === branchFilterKey
     && (overview.isPending || overview.isError || overviewRows.some(row => row.branchId === branchSelection.id)) ? branchSelection.id : null
-  const branchRows = overviewRows.filter(row => row.branchId === selectedBranchId)
+  const branchRows = overviewRows.filter(row => branchSelection?.agents ? branchSelection.agents.includes(row.agentId) : row.branchId === selectedBranchId)
   const branchSummary: StatementSummary | undefined = selectedBranchId === null ? undefined : {
     payment: { amount: branchRows.reduce((sum, row) => sum + row.paymentAmount, 0), count: 0 },
     held: { amount: branchRows.reduce((sum, row) => sum + row.heldAmount, 0), count: 0 },
@@ -218,9 +218,6 @@ export default function AgentStatementPage() {
           )}
         </div>
         <div className="page-header-actions">
-        {!isAgent && <div className="ast-comparison" role="group" aria-label="수수료 명세 화면 비교">
-          {(['before', 'after'] as const).map(value => <Button key={value} variant={mode === value ? 'primary' : 'secondary'} aria-pressed={mode === value} onClick={() => setMode(value)}>{value === 'before' ? '수정 전' : '수정 후'}</Button>)}
-        </div>}
         {!isAgent && <ScreenHelp screenId="RPT-W02" walkthrough={enhanced && helpVersion === 'after' ? helpSteps : undefined} />}
         </div>
       </header>
@@ -236,11 +233,11 @@ export default function AgentStatementPage() {
           apply({ ...readFilters(new URLSearchParams(), defaultMonth), agentId: enhanced ? '' : filters.agentId })
         }}
       />
-      {(ready || selectedBranchId !== null) && <SummaryCards summary={branchSummary ?? list.data?.summary} basis={list.data?.basis} loading={selectedBranchId !== null ? overview.isPending : list.isPending} failed={selectedBranchId !== null ? overview.isError : list.isError} dashboardStyle={enhanced} scopeLabel={selectedBranchId !== null ? `${branchRows[0]?.branchName ?? '지사'} 전체 합계` : undefined} />}
+      {(ready || selectedBranchId !== null) && <SummaryCards summary={branchSummary ?? list.data?.summary} basis={list.data?.basis} loading={selectedBranchId !== null ? overview.isPending : list.isPending} failed={selectedBranchId !== null ? overview.isError : list.isError} dashboardStyle={enhanced} scopeLabel={selectedBranchId !== null ? `${branchSelection?.label ?? branchRows[0]?.branchName ?? '지사'} 전체 합계` : undefined} />}
       {enhanced && view === 'tree' && (overview.isPending || overview.isError ? <div className="surface ast-state" role={overview.isError ? 'alert' : 'status'}>
         {overview.isError ? statementError(overview.error) : '지점과 설계사 명세를 불러오는 중입니다.'}
         {overview.isError && <Button variant="secondary" onClick={() => void overview.refetch()}>다시 시도</Button>}
-      </div> : overviewRows.length ? <StatementExplorer key={`${filters.month}:${filters.contractNo}:${filters.commissionItemId}:${filters.entryType}`} viewControl={<StatementViewSwitch value={view} onChange={setView} />} rows={overviewRows} selectedId={selectedBranchId !== null ? null : agentId} selectedBranchId={selectedBranchId} onSelectBranch={id => setBranchSelection({ id, filterKey: branchFilterKey })} onSelect={id => apply({ ...filters, agentId: id, page: 1 })} /> : <p className="surface ast-state" role="status">조회 조건에 해당하는 설계사가 없습니다.</p>)}
+      </div> : overviewRows.length ? <StatementExplorer key={`${filters.month}:${filters.contractNo}:${filters.commissionItemId}:${filters.entryType}`} viewControl={<StatementViewSwitch value={view} onChange={setView} />} rows={overviewRows} selectedId={selectedBranchId !== null ? null : agentId} selectedBranchId={selectedBranchId} onSelectGroup={(groupId, members, label) => { if (members[0]) setBranchSelection({ id: members[0].branchId, filterKey: branchFilterKey, groupId, agents: members.map(row => row.agentId), label }) }} onSelectBranch={id => setBranchSelection({ id, filterKey: branchFilterKey })} onSelect={id => apply({ ...filters, agentId: id, page: 1 })} /> : <p className="surface ast-state" role="status">조회 조건에 해당하는 설계사가 없습니다.</p>)}
       {enhanced && view === 'table' && !ready && <div className="surface surface-header"><span>조회할 명세가 없습니다.</span><StatementViewSwitch value={view} onChange={setView} /></div>}
       {!ready && !enhanced ? (
         <p className="ast-state" role="status">
@@ -248,7 +245,7 @@ export default function AgentStatementPage() {
         </p>
       ) : ready && (!enhanced || view === 'table') ? (
         <>
-          <section data-guide-feature="features.agent-statement.agent-statement-page.list-panel" data-guide-target="statement.results" className="surface ast-list-panel" aria-labelledby="ast-list-title" aria-busy={list.isFetching}>
+          <StatementResults className="ast-list-panel" titleId="ast-list-title" busy={list.isFetching}>
             <header className="surface-header">
               <h2 className="surface-title" id="ast-list-title">
                 명세 내역
@@ -294,7 +291,7 @@ export default function AgentStatementPage() {
                 onPageChange={(next) => apply({ ...filters, page: next }, true)}
               />
             )}
-          </section>
+          </StatementResults>
           {entryKey && (
             <DetailPanel
               detail={detail.data}

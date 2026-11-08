@@ -7,7 +7,7 @@ import { Button } from '../../../components/Button'
 import { closeSettlementGuide, settlementEntry, subscribeSettlementEntry } from '../settlement/entry'
 import { GuideRuntime } from './runtime'
 import { GuideTargets } from './targets'
-import { useSpotlight } from './useSpotlight'
+import { useSpotlight, type SpotlightPresentation } from './useSpotlight'
 import type { GuideDefinition } from './types'
 import definitions from './screen-help.json'
 import guideMascot from '../assets/pico-guide.png'
@@ -31,7 +31,8 @@ export interface ScreenHelpStep {
   concise?: boolean
   /** Read the current preview's one-line explanation without changing the step. */
   liveDescriptionSelector?: string
-  presentation?: { side?: 'right' | 'left' | 'above' | 'below' | 'either'; includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean; rowLimit?: number }
+  presentation?: SpotlightPresentation
+  requireAction?: boolean
   openControl?: boolean
   advanceOnSelection?: boolean
   /** Advance only after the business handler reports successful completion. */

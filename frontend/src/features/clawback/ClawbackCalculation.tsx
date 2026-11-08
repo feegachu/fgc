@@ -1,5 +1,8 @@
 import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useContext, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { DisabledButtonHint } from '../../components/DisabledButtonHint'
+import { ClawbackActionPlacement } from './actionPlacement'
 import type { FormEvent } from 'react'
 import { Button } from '../../components/Button'
 import { DataTable } from '../../components/DataTable'
@@ -54,6 +57,7 @@ export function ClawbackCalculation({
   itemName: (commissionItemId?: number) => string
 }) {
   const client = useQueryClient()
+  const placement = useContext(ClawbackActionPlacement)
   const c = detail.candidate ?? {}
   const policies = detail.policyCandidates ?? []
   const canCalculate = c.allowedActions?.includes('CALCULATE') ?? false
@@ -104,6 +108,14 @@ export function ClawbackCalculation({
       : policyId == null
         ? '적용할 정책을 고르세요.'
         : '선택한 정책과 기지급 내역으로 계산합니다. 금액과 환수율은 직접 입력하지 않습니다.'
+  const formId = `claw-calculation-${c.candidateId}`
+  const reasonText = mutation.isPending ? '환수액을 계산하고 있습니다.' : issuingNotice ? 'PDF 발행을 마친 뒤 계산할 수 있습니다.'
+    : !canCalculate || !policies.length || policyId == null ? helper : !trimmed ? '계산 사유를 입력하세요.'
+      : !c.sourceVersion ? '최신 원천을 다시 조회하세요.' : ''
+  const action = <DisabledButtonHint disabled={!ready || mutation.isPending} reason={reasonText}>
+    <Button data-guide-feature="features.clawback.clawback-detail.button" type="submit" form={formId}
+      disabled={!ready} loading={mutation.isPending}>환수액 계산</Button>
+  </DisabledButtonHint>
   return (
     <section
       data-guide-feature="features.clawback.clawback-detail.section-2"
@@ -115,6 +127,7 @@ export function ClawbackCalculation({
       </h3>
       {!policies.length && <p className="claw-evidence-empty">적용 가능한 환수 정책 버전이 없습니다.</p>}
       <form
+        id={formId}
         data-guide-feature="features.clawback.clawback-calculation.form"
         className="claw-calculation-form"
         aria-label="환수액 계산"
@@ -176,14 +189,7 @@ export function ClawbackCalculation({
           </p>
         )}
         <div className="claw-calculation-actions">
-          <Button
-            data-guide-feature="features.clawback.clawback-detail.button"
-            type="submit"
-            disabled={!ready}
-            loading={mutation.isPending}
-          >
-            환수액 계산
-          </Button>
+          {placement.revised ? placement.calculation && createPortal(action, placement.calculation) : action}
           <p className="field-helper">{helper}</p>
         </div>
       </form>

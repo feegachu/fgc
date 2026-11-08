@@ -63,6 +63,10 @@ export interface StatementAgentOverview {
   branchId: number
   branchName: string
   organizationName: string
+  organizationId?: number
+  parentOrganizationId?: number | null
+  rankCode?: string | null
+  organizationPath?: { organizationId: number; parentId: number | null; organizationName: string; organizationType: string }[]
   contractCount: number
   entryCount: number
   paymentAmount: number

@@ -305,7 +305,7 @@ class ReconciliationRunControllerTest {
                 null, null,
                 10L, 9L, 1L,
                 java.math.BigDecimal.valueOf(100000), java.math.BigDecimal.valueOf(90000), java.math.BigDecimal.valueOf(10000),
-                java.math.BigDecimal.valueOf(90.0));
+                java.math.BigDecimal.valueOf(90.0), 1);
     }
 
     private static FgcUserDetails principal(String roleCode) {

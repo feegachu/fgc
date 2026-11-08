@@ -1,6 +1,10 @@
 .policy-page {
   gap: 20px;
 }
+.policy-panel-header.list-header { display: flex; justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: 14px; min-height: 52px; padding: 10px 16px; }
+.policy-panel-header .list-header-main, .policy-panel-header .list-header-aside { display: flex; align-items: center; flex-wrap: nowrap; gap: 12px; }
+.policy-panel-header .surface-title { font-size: 13px; white-space: nowrap; }
+.policy-panel-header .list-header-page-size, .policy-panel-header .list-header-total { font-size: 12px; white-space: nowrap; }
 .policy-page .policy-page-header {
   gap: 24px;
 }

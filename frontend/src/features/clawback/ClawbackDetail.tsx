@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ContextLink } from '../../components/ContextLink'
 import { DataTable } from '../../components/DataTable'
 import { CategoryBadge, StatusValue } from '../../components/StatusBadge'
@@ -30,6 +30,8 @@ function Evidence<T>({
   columns,
   rowKey,
   empty,
+  hidden = false,
+  tab,
 }: {
   scope: 'source' | 'payment' | 'schedule' | 'effects'
   title: string
@@ -37,9 +39,12 @@ function Evidence<T>({
   columns: TableColumn<T>[]
   rowKey: (row: T, index: number) => string
   empty: string
+  hidden?: boolean
+  tab?: string
 }) {
   return (
-    <section data-guide-feature={guideFeatureId('clawback.evidence', scope)} className="claw-evidence" aria-label={title}>
+    <section data-guide-feature={guideFeatureId('clawback.evidence', scope)} className="claw-evidence" aria-label={title}
+      hidden={hidden} id={tab ? `claw-panel-${scope}` : undefined} role={tab ? 'tabpanel' : undefined} aria-labelledby={tab}>
       <h3 className="claw-evidence-title">{title}</h3>
       {rows?.length ? (
         <DataTable
@@ -188,7 +193,9 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
     </div>
   )
 }
-export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
+export function ClawbackDetail({ detail, revised = false }: { detail: CandidateDetail; revised?: boolean }) {
+  const [activeTab, setActiveTab] = useState('summary')
+  const tabs = [['summary', '계약·검토 정보'], ['source', '원천 사건'], ['payment', '지급·귀속'], ['schedule', '지급 스케줄'], ['effects', '후속 처리']] as const
   const c = detail.candidate ?? {}
   const reasons = c.reviewReasons ?? []
   const policies = detail.policyCandidates ?? []
@@ -200,6 +207,16 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
   }
   return (
     <>
+      {revised && <div className="claw-detail-tabs" role="tablist" aria-label="환수 검토 근거">
+        {tabs.map(([key, label], index) => <button key={key} type="button" id={`claw-tab-${key}`} role="tab"
+          aria-selected={activeTab === key} aria-controls={`claw-panel-${key}`} tabIndex={activeTab === key ? 0 : -1}
+          onClick={() => setActiveTab(key)} onKeyDown={event => {
+            const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length
+              : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null
+            if (next != null) { event.preventDefault(); setActiveTab(tabs[next][0]); document.getElementById(`claw-tab-${tabs[next][0]}`)?.focus() }
+          }}>{label}</button>)}
+      </div>}
+      <div id={revised ? 'claw-panel-summary' : undefined} role={revised ? 'tabpanel' : undefined} aria-labelledby={revised ? 'claw-tab-summary' : undefined} hidden={revised && activeTab !== 'summary'}>
       <dl className="claw-detail-list">
         <Row label="후보 번호, 계약번호">
           {present(c.candidateId)},{' '}
@@ -245,8 +262,10 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
           )}
         </Row>
       </dl>
+      </div>
       <Evidence
         scope="source"
+        tab={revised ? 'claw-tab-source' : undefined} hidden={revised && activeTab !== 'source'}
         title="원천 사건, 검증 근거"
         rows={detail.sourceRefs}
         columns={sourceColumns(c)}
@@ -255,6 +274,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
       />
       <Evidence
         scope="payment"
+        tab={revised ? 'claw-tab-payment' : undefined} hidden={revised && activeTab !== 'payment'}
         title="연결 지급, 귀속"
         rows={detail.paymentAttributions}
         columns={paymentColumns(c, itemName)}
@@ -263,6 +283,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
       />
       <Evidence
         scope="schedule"
+        tab={revised ? 'claw-tab-schedule' : undefined} hidden={revised && activeTab !== 'schedule'}
         title="지급 스케줄"
         rows={detail.scheduleLines}
         columns={scheduleColumns}
@@ -271,6 +292,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
       />
       <Evidence
         scope="effects"
+        tab={revised ? 'claw-tab-effects' : undefined} hidden={revised && activeTab !== 'effects'}
         title="보류, 후속 처리 근거"
         rows={detail.effects}
         columns={effectColumns}

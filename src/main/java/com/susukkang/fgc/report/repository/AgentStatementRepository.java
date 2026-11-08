@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -164,6 +166,14 @@ public class AgentStatementRepository {
 
     /** 한 요청으로 전체 설계사를 조회하며, 개별 명세와 동일한 CTE/귀속 범위를 재사용한다. */
     public List<StatementAgentOverview> overview(Filter filter) {
+        Map<Long, StatementAgentOverview.OrganizationNode> organizations = new HashMap<>();
+        entityManager.createNativeQuery("SELECT organization_id,parent_id,organization_name,organization_type FROM fgc.organization")
+                .getResultList().forEach(value -> {
+                    Object[] row = (Object[]) value;
+                    long id = ((Number) row[0]).longValue();
+                    organizations.put(id, new StatementAgentOverview.OrganizationNode(id,
+                            row[1] == null ? null : ((Number) row[1]).longValue(), (String) row[2], (String) row[3]));
+                });
         StringBuilder aggregate = new StringBuilder(ENTRIES_CTE.replace(":agentId", "a.agent_id"))
                 .append("""
                         SELECT count(DISTINCT e.contract_id) AS contracts, count(*) AS entries,
@@ -179,7 +189,8 @@ public class AgentStatementRepository {
                 SELECT a.agent_id, a.agent_code, a.agent_name,
                        COALESCE(b.organization_id, o.organization_id),
                        COALESCE(b.organization_name, o.organization_name), o.organization_name,
-                       s.contracts, s.entries, s.payment, s.held, s.adjustment, s.clawback, s.missing
+                       s.contracts, s.entries, s.payment, s.held, s.adjustment, s.clawback, s.missing,
+                       o.organization_id, o.parent_id, a.rank_code
                   FROM fgc.agent a
                   JOIN fgc.organization o ON o.organization_id = a.organization_id
                   LEFT JOIN LATERAL (
@@ -209,11 +220,20 @@ public class AgentStatementRepository {
         query.setParameter("monthEnd", filter.month().withDayOfMonth(filter.month().lengthOfMonth()));
         return query.getResultList().stream().map(result -> {
             Object[] c = (Object[]) result;
+            List<StatementAgentOverview.OrganizationNode> path = new ArrayList<>();
+            Set<Long> seen = new HashSet<>();
+            Long organizationId = ((Number) c[13]).longValue();
+            while (organizationId != null && seen.add(organizationId) && organizations.containsKey(organizationId)) {
+                var organization = organizations.get(organizationId);
+                path.add(0, organization);
+                organizationId = organization.parentId();
+            }
             return new StatementAgentOverview(
                     ((Number) c[0]).longValue(), (String) c[1], (String) c[2], ((Number) c[3]).longValue(),
                     (String) c[4], (String) c[5], ((Number) c[6]).longValue(), ((Number) c[7]).longValue(),
                     (BigDecimal) c[8], (BigDecimal) c[9], (BigDecimal) c[10], (BigDecimal) c[11],
-                    ((Number) c[12]).longValue());
+                    ((Number) c[12]).longValue(), ((Number) c[13]).longValue(),
+                    c[14] == null ? null : ((Number) c[14]).longValue(), (String) c[15], List.copyOf(path));
         }).toList();
     }
 

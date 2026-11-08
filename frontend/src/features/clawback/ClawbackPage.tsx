@@ -13,6 +13,7 @@ import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { ListHeader } from '../../components/ListHeader'
 import { Modal } from '../../components/Modal'
+import { ClawbackActionPlacement } from './actionPlacement'
 import { useUnsavedWorkStore } from '../../stores/unsavedWork'
 import { today } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
@@ -39,7 +40,10 @@ const draftOf = (criteria: Criteria): Draft => {
   return rest
 }
 export default function ClawbackPage() {
-  const { month, user } = useOutletContext<ShellContext>()
+  const { month, user, helpVersion } = useOutletContext<ShellContext>()
+  const revised = helpVersion === 'after'
+  const [calculationHost, setCalculationHost] = useState<HTMLDivElement | null>(null)
+  const [documentHost, setDocumentHost] = useState<HTMLDivElement | null>(null)
   const calculating = useIsMutating({ mutationKey: ['clawback', 'calculate'] }) > 0
   const issuing = useIsMutating({ mutationKey: ['clawback', 'issue-notice'] }) > 0
   const processing = calculating || issuing
@@ -90,6 +94,7 @@ export default function ClawbackPage() {
   const dateError =
     draft.dateFrom && draft.dateTo && draft.dateFrom > draft.dateTo ? '종료일이 시작일보다 빠릅니다.' : ''
   return (
+    <ClawbackActionPlacement.Provider value={{ revised, calculation: calculationHost, document: documentHost }}>
     <div className="claw-page">
       <header className="page-header">
         <ScreenHelp screenId="CLAW-W01" />
@@ -266,7 +271,8 @@ export default function ClawbackPage() {
       </section>
       <Modal open={selected != null} title={`환수 상세 · ${selected?.contractNo ?? '계약 확인'}`}
         className="modal-large claw-detail-modal" onClose={closeDetail} closeOnEscape={!processing}
-        footer={<Button variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button>}>
+        footer={<div className="claw-footer-actions">{revised && <><div ref={setCalculationHost} /><div ref={setDocumentHost} /></>}
+          <Button variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button></div>}>
         <section data-guide-feature="features.clawback.clawback-page.section-2" className="claw-detail-panel" aria-labelledby="claw-detail-title">
           <header className="surface-header claw-panel-header">
             <h3 className="surface-title" id="claw-detail-title">후보 근거 · 환수 계산</h3>
@@ -288,7 +294,7 @@ export default function ClawbackPage() {
               </div>
             ) : detail.data ? (
               <>
-                <ClawbackDetail detail={detail.data} />
+                <ClawbackDetail key={selected?.candidateId} detail={detail.data} revised={revised} />
                 <ClawbackDocuments
                   key={`${selected?.candidateId}:${detail.data.latestCalculation?.calculationVersion}:${detail.data.candidate?.sourceVersion}`}
                   detail={detail.data}
@@ -307,5 +313,6 @@ export default function ClawbackPage() {
         <p>입력한 계산 사유가 저장되지 않았습니다. 창을 닫으면 작성 중인 내용이 사라집니다.</p>
       </Modal>
     </div>
+    </ClawbackActionPlacement.Provider>
   )
 }

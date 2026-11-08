@@ -31,6 +31,7 @@ import { FinalizeDialogs } from './FinalizeDialogs'
 import { ValidationRestartPanel } from './ValidationRestartPanel'
 import { RunStatusBadge } from './RunStatusBadge'
 import { failureText, MANUAL_STEP_FROM, progressText, STEP_NAMES, STEP_STATE_TEXT, stepState } from './steps'
+import type { StepState } from './steps'
 import { useRestartAttemptDeadline } from './useRestartAttemptDeadline'
 import { useRunPresentation } from './useRunPresentation'
 import { useRunProgressToast } from './useRunProgressToast'
@@ -104,6 +105,20 @@ function DetailBody({
   refetchDetail: () => void
 }) {
   const { month: shellMonth, helpVersion } = useOutletContext<ShellContext>()
+  const [guidePreview, setGuidePreview] = useState(false)
+  const [guideFrame, setGuideFrame] = useState(0)
+  useEffect(() => {
+    const start = () => { setGuideFrame(0); setGuidePreview(true) }
+    const stop = () => setGuidePreview(false)
+    window.addEventListener('fgc-validation-guide-preview-start', start)
+    window.addEventListener('fgc-validation-guide-preview-stop', stop)
+    return () => { window.removeEventListener('fgc-validation-guide-preview-start', start); window.removeEventListener('fgc-validation-guide-preview-stop', stop) }
+  }, [])
+  useEffect(() => {
+    if (!guidePreview) return
+    const timer = window.setInterval(() => setGuideFrame(value => (value + 1) % 9), 900)
+    return () => window.clearInterval(timer)
+  }, [guidePreview])
   const { user } = useAuth()
   const client = useQueryClient()
   const header = detail.header ?? {}
@@ -206,6 +221,7 @@ function DetailBody({
       setPreviousAttemptId(before?.restarting ? before.attemptId : null)
       setExecuted(true)
       setAttemptWaitGeneration((value) => value + 1)
+      document.querySelector('[data-guide-target="validation.execute"]')?.dispatchEvent(new Event('fgc-validation-execute-accepted'))
       if (!revised) toast('검증 실행을 시작했습니다. 진행률을 2초 간격으로 갱신합니다.', 'info')
     },
     onError: (error) => { executionGuide.fail(errorText(error)); toast(errorText(error), 'error') },
@@ -223,7 +239,40 @@ function DetailBody({
     { steps: STEP_NAMES, completed: displayed.completed, running: activeStepName ? STEP_NAMES.indexOf(activeStepName) : null, buffering: displayed.buffering })
 
   const link = (path: string) => (shellMonth ? withMonth(path, shellMonth) : path)
+  const progressDisplay = guidePreview ? { completed: guideFrame, buffering: true,
+    state: (step: number): StepState => step <= guideFrame ? 'done' : step === guideFrame + 1 ? 'running' : 'pending' } : displayed
 
+  const executionActions = (<div className="page-header-actions">
+            <Button data-guide-feature="features.validation.validation-run-detail-page.button-2"
+              variant="secondary"
+              className="vrun-row-button"
+              onClick={() => {
+                toast('최신 상태를 불러옵니다.', 'info', 2000)
+                refetchDetail()
+                if (polling) void progress.refetch()
+                void progress.refetch()
+                void checklist.refetch()
+              }}
+            >
+              <span className="material-symbols-rounded" aria-hidden="true">
+                refresh
+              </span>
+              새로고침
+            </Button>
+            {/* FAILED 월 실행은 같은 실행의 실패 지점부터 재시작한다(FUN-045). */}
+            <Button data-guide-feature="features.validation.validation-run-detail-page.button-3"
+              className="vrun-row-button"
+              data-guide-target="validation.execute" data-guide-completed={status !== 'CREATED' || executed} aria-describedby="execute-action-note"
+              loading={execute.isPending}
+              disabled={!canProcess || !canExecute || (executed && !finished)}
+              onClick={() => execute.mutate()}
+            >
+              <span className="material-symbols-rounded" aria-hidden="true">
+                play_arrow
+              </span>
+              실행
+            </Button>
+          </div>)
   return (
     <div className="vrun-page vrun-detail-page" data-presentation={revised ? 'after' : 'before'}>
       <header className="page-header">
@@ -288,37 +337,7 @@ function DetailBody({
           <h2 className="surface-title" id="vrun-stepper-title">
             진행 단계 (운영정책서 제43조)
           </h2>
-          <div className="page-header-actions">
-            <Button data-guide-feature="features.validation.validation-run-detail-page.button-2"
-              variant="secondary"
-              className="vrun-row-button"
-              onClick={() => {
-                toast('최신 상태를 불러옵니다.', 'info', 2000)
-                refetchDetail()
-                if (polling) void progress.refetch()
-                void progress.refetch()
-                void checklist.refetch()
-              }}
-            >
-              <span className="material-symbols-rounded" aria-hidden="true">
-                refresh
-              </span>
-              새로고침
-            </Button>
-            {/* FAILED 월 실행은 같은 실행의 실패 지점부터 재시작한다(FUN-045). */}
-            <Button data-guide-feature="features.validation.validation-run-detail-page.button-3"
-              className="vrun-row-button"
-              data-guide-target="validation.execute" aria-describedby="execute-action-note"
-              loading={execute.isPending}
-              disabled={!canProcess || !canExecute || (executed && !finished)}
-              onClick={() => execute.mutate()}
-            >
-              <span className="material-symbols-rounded" aria-hidden="true">
-                play_arrow
-              </span>
-              실행
-            </Button>
-          </div>
+          {!revised && executionActions}
         </header>
         <div className="surface-body">
           {revised && <div className="vrun-replay-toolbar">
@@ -366,26 +385,26 @@ function DetailBody({
             toast('재시작 요청을 접수했습니다. 실제 진행 상태를 확인합니다.', 'info')
           }} />}
           <p className="vrun-progress-line">
-            <span>{replaying ? (displayed.catchingUp ? '화면 재생' : replay.loop ? '3초 후 다시 재생' : '화면 재생 완료') : revised && presentation.catchingUp && status !== 'RUNNING' ? '완료된 단계 표시 중' : '진행률'}</span>
+            <span>{guidePreview ? '진행 표시 미리보기' : replaying ? (displayed.catchingUp ? '화면 재생' : replay.loop ? '3초 후 다시 재생' : '화면 재생 완료') : revised && presentation.catchingUp && status !== 'RUNNING' ? '완료된 단계 표시 중' : '진행률'}</span>
             <span className="vrun-progress-value" role="status" aria-live="polite">
-              {progressText(revised ? displayed.completed : currentStep)}
+              {progressText(revised ? progressDisplay.completed : currentStep)}
             </span>
           </p>
           <ol key={replaying ? `replay-${replayGeneration}` : 'live'} className="vrun-stepper" aria-label={replaying ? '저장된 검증 결과 재생' : '월 통합검증 10단계 진행 상태'}>
             {STEP_NAMES.map((name, index) => {
-              const state = revised ? displayed.state(index + 1) : stepState(index + 1, status, currentStep)
+              const state = revised ? progressDisplay.state(index + 1) : stepState(index + 1, status, currentStep)
               return (
                 <li
                   key={name}
                   className={`vrun-stepper-step ${state === 'pending' ? '' : `fgc-stepper__step--${state}`}`}
-                  data-buffering={state === 'running' && displayed.buffering}
+                  data-buffering={state === 'running' && progressDisplay.buffering}
                 >
                   <span className="vrun-stepper-dot" aria-hidden="true">
                     {revised && state === 'done' ? <svg className="vrun-check-mark" viewBox="0 0 24 24"><path d="m5 12 4 4 10-10" /></svg>
-                      : revised && state === 'running' && displayed.buffering ? <span className="vrun-step-spinner" />
+                      : revised && state === 'running' && progressDisplay.buffering ? <span className="vrun-step-spinner" />
                       : revised && state === 'failed' ? '×' : index + 1}
                   </span>
-                  {revised && index < STEP_NAMES.length - 1 && <span className={`vrun-step-connection${state === 'done' && displayed.state(index + 2) !== 'pending' ? ' is-filled' : ''}`} aria-hidden="true" />}
+                  {revised && index < STEP_NAMES.length - 1 && <span className={`vrun-step-connection${state === 'done' && progressDisplay.state(index + 2) !== 'pending' ? ' is-filled' : ''}`} aria-hidden="true" />}
                   <span className="vrun-stepper-label">
                     <span>{name}</span>
                     {index + 1 >= MANUAL_STEP_FROM && <span className="vrun-stepper-manual">사람이 수행</span>}
@@ -395,10 +414,11 @@ function DetailBody({
               )
             })}
           </ol>
+          {revised && <div className="vrun-bottom-actions">{executionActions}</div>}
         </div>
       </section>
 
-      <div className="vrun-results-layout">
+      <div className="vrun-results-layout" data-guide-target="validation.results">
       <div className="vrun-mid-grid">
         <TargetSection key={replaying ? `replay-targets-${replayGeneration}` : `targets-${attemptWaitGeneration}`} detail={resultDetail} revised={revised} ready={!revised || resultStep >= 2} />
         <SummarySection detail={resultDetail} status={status} completed={revised ? resultStep : undefined} />
@@ -407,7 +427,7 @@ function DetailBody({
       <ExceptionSection detail={resultDetail} openLink={link} completed={revised ? resultStep : undefined} />
 
       <div className="vrun-finalize-sidebar">
-      <ChecklistSection status={status} checklist={checklist} revised={revised} completed={resultStep} generation={`${attemptWaitGeneration}-${replaying ? replayGeneration : 'live'}`} />
+      <div data-guide-target="validation.checklist"><ChecklistSection status={status} checklist={checklist} revised={revised} completed={resultStep} generation={`${attemptWaitGeneration}-${replaying ? replayGeneration : 'live'}`} /></div>
 
       <FinalizeSection
         revised={revised}
@@ -699,7 +719,7 @@ function ChecklistSection({
     )
   }
   return (
-    <section data-guide-feature="features.validation.validation-run-detail-page.section-7" data-guide-target="validation.checklist" className="surface" aria-labelledby="vrun-checklist-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-7" className="surface" aria-labelledby="vrun-checklist-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-checklist-title">
           {revised ? '확정 전 8단계 점검' : '⑤ 확정 조건 (운영정책서 제44조, 8개 전부 통과해야 함)'}

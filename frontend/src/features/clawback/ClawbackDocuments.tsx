@@ -1,4 +1,7 @@
-import { useRef, useState } from 'react'
+import { useContext, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { DisabledButtonHint } from '../../components/DisabledButtonHint'
+import { ClawbackActionPlacement } from './actionPlacement'
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '../../components/Button'
 import { DataTable } from '../../components/DataTable'
@@ -30,6 +33,7 @@ export function ClawbackDocuments(props: Props) {
   return <NoticePanel {...props} />
 }
 function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
+  const placement = useContext(ClawbackActionPlacement)
   const candidate = detail.candidate
   const calculation = detail.latestCalculation
   const caseId = candidate?.clawbackCaseId ?? calculation?.clawbackCaseId
@@ -82,7 +86,8 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
     if (actionLock.current || blocked || !canIssue) return
     actionLock.current = true
     try {
-      await issue.mutateAsync()
+      const issued = await issue.mutateAsync()
+      if (placement.revised) await download(issued)
     } catch {
       /* 화면에 실패를 표시하고 같은 시도를 재시도하도록 멱등키를 보존한다. */
     } finally {
@@ -108,6 +113,16 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
     issue.reset()
     setDownloadError(null)
   }
+  const issueReason = !canIssue ? 'PDF 발행 권한이 없습니다.' : issuing || downloading ? 'PDF를 준비하고 있습니다.'
+    : !calculation ? '환수액을 먼저 계산하세요.' : !current ? '현재 원천으로 환수액을 다시 계산하세요.'
+      : conflict ? '최신 근거를 다시 조회한 뒤 발행하세요.' : history.error ? '발행 이력을 다시 조회하세요.'
+        : '최신 발행 조건을 확인하고 있습니다.'
+  const issueButton = canIssue && <DisabledButtonHint disabled={blocked || !!downloading} reason={issueReason}>
+    <Button data-guide-feature="clawback.documents.issue" loading={issuing || !!downloading} disabled={blocked || !!downloading} onClick={() => void generate()}>
+      {placement.revised ? issuing || downloading ? 'PDF 준비 중…' : 'PDF 출력' : issuing ? 'PDF 생성 중…'
+        : hasAttempt ? '발행 재시도' : history.data?.totalElements || issue.data ? '재발행' : 'PDF 생성'}
+    </Button>
+  </DisabledButtonHint>
   return (
     <section
       data-guide-feature="clawback.documents"
@@ -156,22 +171,7 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
         </p>
       ) : null}
       <div className="claw-calculation-actions">
-        {canIssue && (
-          <Button
-            data-guide-feature="clawback.documents.issue"
-            loading={issuing}
-            disabled={blocked}
-            onClick={() => void generate()}
-          >
-            {issuing
-              ? 'PDF 생성 중…'
-              : hasAttempt
-                ? '발행 재시도'
-                : history.data?.totalElements || issue.data
-                  ? '재발행'
-                  : 'PDF 생성'}
-          </Button>
-        )}
+        {placement.revised ? placement.document && createPortal(issueButton, placement.document) : issueButton}
         <Button
           data-guide-feature="clawback.documents.refresh"
           variant="secondary"

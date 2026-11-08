@@ -8,11 +8,11 @@ const versions: { value: HelpVersion; label: string }[] = [
   { value: 'after', label: '수정 후' },
 ]
 
-export function HelpComparison({ version, onChange }: { version: HelpVersion; onChange: (version: HelpVersion) => void }) {
+export function HelpComparison({ version, onChange, label = '도움말 비교' }: { version: HelpVersion; onChange: (version: HelpVersion) => void; label?: string }) {
   const name = useId()
 
   return (
-    <div className="help-comparison" role="radiogroup" aria-label="도움말 비교" data-version={version}>
+    <div className="help-comparison" role="radiogroup" aria-label={label} data-version={version}>
       {versions.map(item => (
         <label key={item.value}>
           <input className="visually-hidden" type="radio" name={name} checked={version === item.value} onChange={() => onChange(item.value)} />
