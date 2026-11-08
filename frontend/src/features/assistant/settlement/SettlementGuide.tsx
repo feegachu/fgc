@@ -375,7 +375,6 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         conditions: {
           AVAILABLE: () => 'SATISFIED',
           NOT_AUTOMATIC: () => 'WAITING_RESULT',
-          FINALIZED: () => (result.complete ? 'SATISFIED' : 'WAITING_RESULT'),
         },
         confirmLeave: async () => false,
         openScreen: async (screen, runtimeSignal) => {
@@ -413,7 +412,6 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         serverStateVersion: null,
       })
 
-      if (result.complete) await runner.next()
     } catch (failure) {
       if (!controller.signal.aborted && token === epoch.current)
         setError(failureText(failure, '최신 상태를 확인하지 못했습니다.'))
@@ -764,7 +762,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
                 <div className="payment-guide-actions">
                   <Button variant="secondary" disabled={busy || explanation.index === 0} onClick={explanation.previous}>이전</Button>
                   <DisabledButtonHint disabled={waitingForContractSave || actionPending} reason={waitingForContractSave ? '‘저장하고 예상 스케줄 만들기’를 먼저 눌러주세요.' : explanation.step?.disabledReason ?? '강조된 작업을 먼저 완료해 주세요.'}>
-                  <Button className="screen-step-next" disabled={busy || waitingForContractSave || !explanation.ready || !!explanation.step?.destination || !!explanation.step?.follow || actionPending} onClick={() => exceptionEnd ? close() : explanation.step?.follow ? void navigate(explanation.step.follow.path + '?month=' + selection.month) : explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{exceptionEnd && !actionPending ? '안내 마치기' : explanation.step?.destination || explanation.step?.follow ? '강조된 메뉴를 눌러주세요' : explanation.step?.follow?.label ?? explanation.step?.nextLabel ?? (explanation.last ? decision?.step === 'validation.finalize' ? '완료 확인' : '다음 업무' : '다음')}</Button>
+                  <Button className="screen-step-next" disabled={busy || waitingForContractSave || !explanation.ready || !!explanation.step?.destination || !!explanation.step?.follow || actionPending} onClick={() => exceptionEnd ? close() : explanation.step?.follow ? void navigate(explanation.step.follow.path + '?month=' + selection.month) : explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{exceptionEnd && !actionPending ? '안내 마치기' : explanation.step?.destination || explanation.step?.follow ? '강조된 메뉴를 눌러주세요' : explanation.step?.follow?.label ?? explanation.step?.nextLabel ?? (explanation.last ? '다음 업무' : '다음')}</Button>
                   </DisabledButtonHint>
                 </div>
               </section>

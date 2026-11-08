@@ -13,8 +13,8 @@ export const STEPS = [
   'payment.confirm',
   'validation.execute',
   'reconciliation.review',
+  'ledger.review',
   'exception.resolve',
-  'validation.finalize',
 ] as const
 export type SettlementStep = (typeof STEPS)[number]
 export interface Selection {
@@ -68,7 +68,6 @@ export interface Evidence {
 export interface Decision {
   step: SettlementStep
   reason: string
-  complete?: boolean
   correctionPending?: boolean
 }
 export function decide(selection: Selection, evidence: Evidence, role: string): Decision {
@@ -107,7 +106,7 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     if (payment.status === 'CANCELLED')
       return { ...at(
         'exception.resolve',
-        '기존 지급이 취소되었습니다. 원래 건 정정 결과의 확정된 지급 번호를 선택한 뒤 새 월 검증을 실행하고 재대사 결과를 확인하세요.',
+        '기존 지급이 취소되었습니다. 예외함의 참조에서 원인을 확인하세요. 필요한 처리와 정정은 안내 종료 후 담당자가 직접 진행합니다.',
       ), correctionPending: true }
     if (payment.status !== 'DRAFT') throw new Error('현재 지급 상태는 이 흐름에서 처리할 수 없습니다.')
     if (evidence.paymentGuide && !evidence.paymentGuide.saved)
@@ -150,9 +149,7 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     paymentChangedAt > validationStartedAt
   )
     throw new Error('지급 변경 이전에 시작한 검증은 재사용할 수 없습니다. 새 월 검증을 생성·실행한 뒤 선택하세요.')
-  if (run.status === 'FINALIZED')
-    return { ...at('validation.finalize', '최종 확정된 결과를 확인했습니다.'), complete: true }
-  if (run.status !== 'COMPLETED')
+  if (!['COMPLETED', 'FINALIZED'].includes(run.status ?? ''))
     return at(
       'validation.execute',
       run.status === 'FAILED'
@@ -192,24 +189,8 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
       'reconciliation.review',
       '대사 요약과 미해결 예외를 다시 조회하세요. 자료 누락은 0건으로 처리하지 않습니다.',
     )
-  if (summary.exceptionCount > 0 || summary.matchedCount !== summary.resultCount || evidence.openExceptions > 0)
-    return at(
-      'exception.resolve',
-      '불일치나 미해결 예외가 있습니다. 원래 건을 정정하고 필요한 재검증과 재대사를 수행한 뒤 새 결과를 선택하세요.',
-    )
-  if (!['GA_ADMIN', 'SYSTEM_ADMIN'].includes(role))
-    return at(
-      'validation.finalize',
-      '최종 확정은 GA관리자나 시스템관리자에게 맡기세요. 역할을 자동 전환하지 않습니다.',
-    )
-  const checklist = evidence.checklist
-  if (
-    !checklist ||
-    checklist.validationRunId !== selection.validationRunId ||
-    checklist.conditions?.length !== 8 ||
-    !checklist.passed ||
-    checklist.conditions.some((condition) => condition.passed !== true)
-  )
-    return at('validation.finalize', '최종 확정 조건 8개를 확인하고 차단 사유를 처리하세요.')
-  return at('validation.finalize', '8개 조건을 통과했습니다. 최종 확정 버튼으로 직접 확정하세요.')
+  const reason = summary.exceptionCount > 0 || summary.matchedCount !== summary.resultCount || evidence.openExceptions > 0
+    ? '불일치나 미해결 예외가 있습니다. 검증원장에서 분개와 연결 근거를 확인하고 예외함 참조 안내로 이어갑니다.'
+    : '대사 결과를 확인했습니다. 검증원장의 분개와 예외함 참조 안내로 이어갑니다.'
+  return at('ledger.review', role === 'COMPLIANCE' ? '조회 권한으로 ' + reason : reason)
 }

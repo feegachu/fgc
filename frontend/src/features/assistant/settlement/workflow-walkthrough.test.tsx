@@ -9,7 +9,7 @@ beforeEach(() => {
   document.body.innerHTML = '<main id="main-content"><input name="contractDate" type="date" data-guide-feature="features.contract.contract-form-page.contract-date"><select name="insurerId" data-guide-feature="features.contract.contract-form-page.insurer-id"><option value="">선택</option><option value="1">보험회사</option></select><input name="productOfferingId" data-guide-feature="features.contract.contract-form-page.product-offering-id" role="combobox" data-selected-value=""></main>'
 })
 afterEach(() => { vi.restoreAllMocks(); document.body.innerHTML = '' })
-it.each(['reconciliation.review', 'exception.resolve'] as const)('ends %s in the selected exception modal without processing actions', async stage => {
+it.each(['reconciliation.review', 'ledger.review', 'exception.resolve'] as const)('ends %s in the selected exception modal without processing actions', async stage => {
   const list = workflowWalkthrough(stage, '/exceptions', false)
   expect(list.at(-1)).toMatchObject({ id: 'exception.list', requireAction: true, presentation: { rowLimit: 3, preventScroll: true } })
   const modal = document.createElement('div')
@@ -31,7 +31,7 @@ it('provides explanations for all eight remaining business stages', () => {
     expect(steps.every(step => step.selector && step.title && step.instruction)).toBe(true)
   }
   expect(workflowWalkthrough('contract.create', '/contracts/new', false)).toHaveLength(9)
-  expect(workflowWalkthrough('validation.finalize', '/validation-runs/1', false)).toHaveLength(11)
+  expect(workflowWalkthrough('ledger.review', '/journals', false).at(-1)?.follow?.path).toBe('/exceptions')
 })
 it('requires explicit next and a real SearchSelect selection rather than typed text', async () => {
   const { result } = renderHook(() => useWorkflowWalkthrough('contract.create', '/contracts/new', false))
@@ -73,11 +73,12 @@ it('calls the same contract page guide in order and adds a server-result gate at
   expect(steps.at(-1)?.workflowInstruction).toContain('서버의 계약과 스케줄')
   expect(steps[0].id).toContain('contract-date')
 })
-it('uses a separate correction handoff even when the resolved exception disappeared', () => {
+it('ends cancelled-payment guidance at the exception reference without correction controls', () => {
   const steps = workflowWalkthrough('exception.resolve', '/exceptions', true, true, false)
   expect(steps).toHaveLength(1)
-  expect(steps[0].id).toBe('exception.replacement')
-  expect(steps[0].selector).toBe('h1')
+  expect(steps[0].id).toBe('exception.reference')
+  expect(steps[0].scope).toBe('dialog')
+  expect(steps[0].instruction).toContain('참조')
 })
 it('explains returned results rather than searching for inputs after successful navigation', () => {
   expect(workflowWalkthrough('contract.create', '/contracts/4', false, false, false)[0].id).toBe('saved')
