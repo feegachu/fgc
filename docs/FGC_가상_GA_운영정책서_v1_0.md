@@ -887,7 +887,7 @@ DRAFT 생성
 
 - 보장성보험. 일반손해보험·자동차보험·저축성은 `NOT_APPLICABLE`(제34조)
 - 해지·실효를 포함한다. 실효계약은 납입최고·해지통보 시기와 관계없이 **실효사유 발생 시(상태 사건 효력일)** 를 해지시점으로 본다(SRC-025 Q12)
-- 피보험자 사망·보험금 지급사유로 인한 소멸, 납입면제 특약 기능에 따른 전부·일부 해지는 제외한다(SRC-025 Q12 `[FAQ-2차]`). **현재 미구현** — 상태 사유 코드에 이 구분이 없다. 2차에서 사유 코드를 추가하기 전까지 이런 계약은 시연 데이터에 넣지 않는다
+- 피보험자 사망·보험금 지급사유로 인한 소멸, 납입면제 특약 기능에 따른 전부·일부 해지는 제외한다(SRC-025 Q12 `[FAQ-2차]`). **현재 미구현** — 상태 사유 코드에 이 구분이 없다. 2차에서 사유 코드를 추가하기 전까지 이런 계약은 시연 데이터에 넣지 않는다. 현행 표준내부통제기준(2026.7.1 시행) 제46조②1호도 피보험자 사망으로 계약이 소멸될 때의 지급기준을 수수료 지급기준에 적게 한다(SRC-081). 보험금 지급·면책 사유의 특약 소멸과 보험료 납입면제를 처리하지 않은 보험회사가 2026-10-26 제재를 받았다(SRC-089). 사유 코드는 발표 뒤 과제로 둔다(2026-11-08 PM 결정)
 - 증권번호 기준으로 주계약과 특약을 합산한다(제11조)
 - 2026-03-01 이후 체결 신계약 — SRC-022 부칙 제1조①, SRC-025 Q11. 이 날짜는 `ARBITRAGE` 정책의 `ARBITRAGE_EFFECTIVE_CONTRACT_DATE` 파라미터로 관리한다(#475). TM·방송 승인 대리점의 2027-01-01 특례는 FGC 범위 밖(SRC-036)
 - 계약 전 기간 점검
@@ -1030,7 +1030,7 @@ FGC의 법규준수용 차익거래 검증은 `GA_TO_FC`를 기본 지급단계�
 | `INSURER_STATEMENT` (정규화 적재분 · 2차 AI 문서 입력분) | `statement_batch` 필수 · `statement_type='INSURER_COMMISSION'` · 상태 `AVAILABLE`/`VALIDATED`/`RECONCILED` · `data_origin` `NORMALIZED_DB`/`SEED`(2차 제안 `AI_INTAKE`) | `commission_transaction.insurer_id` | `payment_stage='INSURER_TO_GA'` · `cashflow_type='PAYMENT'` · `status='CONFIRMED'` · 귀속 `attribution_scope='CONTRACT'` | `ACTUAL_INSURER_STATEMENT` POSTED |
 | `GA_MANUAL_PAYMENT` (TRAN-W02 수기 등록분) | 없음 (`statement_batch_id IS NULL`) | 귀속 계약의 보험회사에서 유도해 `insurer_id`에 저장 | 위와 같음 | `ACTUAL_INSURER_STATEMENT` POSTED |
 
-`DEDUCTION` 행, `INSURER_ADJUSTMENT`·`INSURER_CLAWBACK` 명세는 현재 기표·대사 대상이 아니다(`InsurerGaReconciliationRepository`, `JournalPostingSourceQueryRepository`). 적재는 되지만 검증되지 않으므로 화면에 '후속 검증 대기'로 따로 보여 준다(제55조 4). 차감·환수 명세의 대사 규칙은 근거 없음 — 확인 필요.
+`DEDUCTION` 행, `INSURER_ADJUSTMENT`·`INSURER_CLAWBACK` 명세는 현재 기표·대사 대상이 아니다(`InsurerGaReconciliationRepository`, `JournalPostingSourceQueryRepository`). 적재는 되지만 검증되지 않으므로 화면에 '후속 검증 대기'로 따로 보여 준다(제55조 4). 차감·환수 명세의 대사 규칙은 아직 없다. 업계 표준위탁계약은 보험회사가 돌려받을 수수료를 익월 지급 수수료에서 차감한다(SRC-088 406쪽 제10조②, 416쪽 부속약정서 제4조①). GA→설계사 대사도 지급(`PAYMENT`)만 비교하므로(`GaFcReconciliationRepository`), 환수·상계를 차감으로 끝낸 불일치는 대사를 다시 돌리면 다시 검출된다. 차감을 대사에 넣는 규칙은 FUN-056(환수 통지·이의·확정·상계, v3.0 미진행)과 함께 발표 뒤에 정한다. 그때까지 차감으로 처리를 끝낸 불일치는 사유와 증빙을 적어 반려로 닫는다(업무 규칙 아님 — 가상 GA 정책으로 정함, 사용자·관리자 매뉴얼 2-8절).
 
 수기 등록분을 대사 대상으로 인정하는 것은 제7조 정규화 전제의 예외이며, 근거분류는 제3조의 `PROJECT_ASSUMPTION`이다. 1차는 파일 업로드·스테이징을 만들지 않으므로 COR-010과 충돌하지 않는다. 정규화 적재분은 명세 묶음 요건을 완화하지 않는다 — 적재 경로의 무결성은 그대로 강제한다.
 
