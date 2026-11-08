@@ -197,15 +197,11 @@ class ScheduleRepositoryIntegrationTest {
             assertThat(queryRepository.selectByCondition(byContract, 3, (long) Integer.MAX_VALUE + 1)).isEmpty();
 
             for (Long headerId : List.of(gaHeaderId, regeneratedId, activeHeaderId(contractId, PaymentStage.INSURER_TO_GA))) {
-                assertSame(baseline.selectVersionsByScheduleHeaderId(headerId),
-                        queryRepository.selectVersionsByScheduleHeaderId(headerId));
                 assertSame(baseline.selectScheduleDetailById(headerId), queryRepository.selectScheduleDetailById(headerId));
                 assertSame(baseline.selectScheduleHeaderById(headerId), queryRepository.selectScheduleHeaderById(headerId));
                 assertSame(baseline.selectScheduleLinesByScheduleId(headerId),
                         queryRepository.selectScheduleLinesByScheduleId(headerId));
             }
-            assertThat(queryRepository.selectVersionsByScheduleHeaderId(regeneratedId))
-                    .extracting(ScheduleHeaderResponse::getScheduleVersionNo).containsExactly(2, 1);
             for (PaymentStage stage : PaymentStage.values()) {
                 assertSame(baseline.selectByContractIdAndPaymentStage(contractId, stage),
                         queryRepository.selectByContractIdAndPaymentStage(contractId, stage));
@@ -220,7 +216,6 @@ class ScheduleRepositoryIntegrationTest {
             // 없는 대상은 기존처럼 null·빈 목록·1번 버전이다.
             assertThat(queryRepository.selectScheduleDetailById(-1L)).isNull();
             assertThat(queryRepository.selectScheduleHeaderById(-1L)).isNull();
-            assertThat(queryRepository.selectVersionsByScheduleHeaderId(-1L)).isEmpty();
             assertThat(queryRepository.selectByContractIdAndPaymentStage(-1L, PaymentStage.GA_TO_FC)).isNull();
             assertThat(queryRepository.selectNextScheduleVersionNo(-1L, PaymentStage.GA_TO_FC)).isEqualTo(1);
             assertThat(queryRepository.selectActiveOperationalPolicyVersionId(-1L, PaymentStage.GA_TO_FC)).isNull();

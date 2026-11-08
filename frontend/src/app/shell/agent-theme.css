@@ -2,6 +2,27 @@
 .agent-topbar { display: flex; align-items: stretch; gap: 18px; min-width: 0; height: 100%; }
 .agent-top-title { display: flex; align-items: center; padding-left: 24px; font-size: 16px; font-weight: 700; white-space: nowrap; }
 
+.app-shell.is-agent[data-ui-revision='after'] {
+  --color-fgc-blue: #7f57ac;
+  --color-fgc-ink: #21174b;
+  --color-fgc-surface: #f8f4ff;
+}
+.app-shell.is-agent[data-ui-revision='after'] .contract-detail-primary .contract-detail-tabs,
+.app-shell.is-agent[data-ui-revision='after'] .contract-history-compact .contract-history-panel-header {
+  width: fit-content;
+  max-width: 100%;
+}
+.app-shell.is-agent[data-ui-revision='after'] .contract-detail-primary .contract-detail-tabs .tab-button {
+  flex: 0 0 auto;
+  min-width: 7rem;
+}
+.app-shell.is-agent[data-ui-revision='after'] .contract-detail-primary .contract-detail-tabs .tab-button[aria-selected='true'],
+.app-shell.is-agent[data-ui-revision='after'] .contract-history-compact .contract-history-panel-header h3 {
+  min-width: 7rem;
+  background: var(--color-action-subtle);
+  color: var(--color-text-link);
+}
+
 /*
  * app-theme.css 의 파랑 포인트를 채도·명도는 그대로 두고 색상(hue)만 +44° 돌린 값이다.
  * 기준: #0046ff(224°) → #7500ff(268°, 기존 설계사 보라 #7f57ac 의 색상).

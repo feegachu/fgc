@@ -1,5 +1,5 @@
 import { SettlementGuide } from '../../features/assistant/settlement/SettlementGuide'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useWorkspaceStore, validMonth, withMonth } from '../../stores/workspace'
 import { useSidebarStore } from '../../stores/sidebar'
@@ -19,7 +19,7 @@ import './kpi-designs.css'
 import './agent-theme.css'
 import './app-theme.css'
 const AssistantDemoMount = lazy(() => import('../../features/assistant/PicoAssistant').then((module) => ({ default: module.AssistantDemoMount })))
-const WorkspaceGuide = lazy(() => import('../../features/assistant/WorkspaceGuide').then((module) => ({ default: module.WorkspaceGuide })))
+const PageHelpLauncher = lazy(() => import('../../features/assistant/PageHelpLauncher').then((module) => ({ default: module.PageHelpLauncher })))
 
 export interface ShellContext {
   user: ShellUser
@@ -32,11 +32,10 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const location = useLocation()
   const navigate = useNavigate()
   const current = screenFor(location.pathname)
-  const [picoLauncherHost, setPicoLauncherHost] = useState<HTMLDivElement | null>(null)
   const month = useWorkspaceStore((state) => state.month)
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
-  const revised = user.roleCode !== 'AGENT'
+  const revised = user.roleCode !== 'AGENT' || current?.id !== 'AGNT-W01'
   const helpVersion: HelpVersion = 'after'
   const errorTitle = useErrorTitleStore((state) => state.title)
   const { loggingOut, logout } = useLogout()
@@ -104,7 +103,6 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             <WorkspaceTabs activeId={current?.id} />
           )}
           <div className="app-header-actions">
-            {current?.id === 'SCHE-W02' && <div ref={setPicoLauncherHost} />}
             <div className="app-header-field">
               <span className="app-header-field-label">기준 정산월</span>
               {month && (
@@ -140,8 +138,8 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       </div>
       {(import.meta.env.VITE_ASSISTANT_AI === 'true' || import.meta.env.VITE_ASSISTANT_DEMO === 'true') && (
         <Suspense fallback={null}>
-          <AssistantDemoMount user={user} loggingOut={loggingOut} screenId={current?.id} screenContext={location.pathname + location.search} launcherHost={current?.id === 'SCHE-W02' ? picoLauncherHost : null} />
-          {!loggingOut && import.meta.env.VITE_ASSISTANT_AI === 'true' && <WorkspaceGuide user={user} />}
+          <AssistantDemoMount user={user} loggingOut={loggingOut} screenId={current?.id} screenContext={location.pathname + location.search} />
+          {!loggingOut && import.meta.env.VITE_ASSISTANT_AI === 'true' && <PageHelpLauncher user={user} />}
         </Suspense>
       )}
       <DraftNavigationGuard />

@@ -282,6 +282,7 @@
   justify-content: center;
   gap: var(--space-1);
 }
+.transaction-row-actions > .button { min-width: 0; padding: 5px 8px; white-space: nowrap; }
 
 .transaction-delete {
   color: var(--color-status-error-text);
@@ -289,12 +290,4 @@
 
 .transaction-guide-actions {
   border-radius: 6px;
-  animation: transaction-guide-actions-reveal 250ms 800ms both;
-}
-@keyframes transaction-guide-actions-reveal {
-  from { outline: 2px solid transparent; outline-offset: 2px; }
-  to { outline: 2px solid var(--color-fgc-blue); outline-offset: 2px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .transaction-guide-actions { animation-duration: 0ms; }
 }

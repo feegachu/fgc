@@ -76,28 +76,29 @@ export default function AgentStatementPage() {
     {
       targetId: 'statement.filters',
       title: '조회 조건',
-      instruction: '기준월과 설계사, 계약번호로 조회 범위를 정합니다.',
+      instruction: isAgent ? '기준월과 계약번호로 본인의 명세 조회 범위를 정합니다.' : '기준월과 설계사, 계약번호로 조회 범위를 정합니다.',
       interaction: '조건을 선택하고 조회를 누르세요.',
     },
     {
       targetId: 'features.agent-statement.agent-statement-page.summary',
       attribute: 'data-guide-feature',
       title: '지급·보류·조정·환수',
-      instruction: '선택한 지사·설계사의 합계를 확인합니다.',
-      interaction: '지사는 전체 합계, 설계사는 개인 통계입니다.',
+      instruction: isAgent ? '본인의 지급·보류·조정·환수 합계를 확인합니다.' : '선택한 지사·설계사의 합계를 확인합니다.',
+      interaction: isAgent ? '유형별 금액과 건수를 확인하세요.' : '지사는 전체 합계, 설계사는 개인 통계입니다.',
     },
     {
       targetId: 'statement.results',
-      title: '지점과 설계사 명세',
-      instruction: '트리에서 지점·설계사별 내역을 확인합니다.',
+      title: isAgent ? '본인 계약별 명세' : '지점과 설계사 명세',
+      instruction: isAgent ? '계약·수수료 항목별 금액과 계산 근거를 확인합니다.' : '트리에서 지점·설계사별 내역을 확인합니다.',
       interaction: '표에서는 계약별 금액과 근거를 볼 수 있습니다.',
       onEnter: () => {
+        if (isAgent) return
         const original = currentView.current
         const timer = window.setInterval(() => setView(previous => previous === 'tree' ? 'table' : 'tree'), 3000)
         return () => { clearInterval(timer); setView(original) }
       },
     },
-  ].map(step => ({ ...step, group: '설계사 수수료 명세', details: [], concise: true } as ScreenHelpStep)), [])
+  ].map(step => ({ ...step, group: '설계사 수수료 명세', details: [], concise: true } as ScreenHelpStep)), [isAgent])
   const defaultMonth = month || today().slice(0, 7)
   const [params, setParams] = useSearchParams()
   const filters = readFilters(params, defaultMonth)
@@ -205,7 +206,7 @@ export default function AgentStatementPage() {
           )}
         </div>
         <div className="page-header-actions">
-        {!isAgent && <ScreenHelp screenId="RPT-W02" walkthrough={enhanced && helpVersion === 'after' ? helpSteps : undefined} />}
+        {(!isAgent || revised) && <ScreenHelp screenId="RPT-W02" walkthrough={(enhanced || isAgent && revised) && helpVersion === 'after' ? helpSteps : undefined} />}
         </div>
       </header>
       <StatementFiltersBar
@@ -220,7 +221,7 @@ export default function AgentStatementPage() {
           apply({ ...readFilters(new URLSearchParams(), defaultMonth), agentId: enhanced ? '' : filters.agentId })
         }}
       />
-      {(ready || selectedBranchId !== null) && <SummaryCards summary={branchSummary ?? list.data?.summary} basis={list.data?.basis} loading={selectedBranchId !== null ? overview.isPending : list.isPending} failed={selectedBranchId !== null ? overview.isError : list.isError} dashboardStyle={enhanced} scopeLabel={selectedBranchId !== null ? `${branchSelection?.label ?? branchRows[0]?.branchName ?? '지사'} 전체 합계` : undefined} />}
+      {(ready || selectedBranchId !== null) && <SummaryCards summary={branchSummary ?? list.data?.summary} basis={list.data?.basis} loading={selectedBranchId !== null ? overview.isPending : list.isPending} failed={selectedBranchId !== null ? overview.isError : list.isError} dashboardStyle={enhanced || isAgent && revised} showNotes={isAgent} scopeLabel={selectedBranchId !== null ? `${branchSelection?.label ?? branchRows[0]?.branchName ?? '지사'} 전체 합계` : undefined} />}
       {enhanced && view === 'tree' && (overview.isPending || overview.isError ? <div className="surface ast-state" role={overview.isError ? 'alert' : 'status'}>
         {overview.isError ? statementError(overview.error) : '지점과 설계사 명세를 불러오는 중입니다.'}
         {overview.isError && <Button data-guide-feature="features.agent-statement-page.button-1" variant="secondary" onClick={() => void overview.refetch()}>다시 시도</Button>}
@@ -309,6 +310,7 @@ function SummaryCards({
   loading,
   failed,
   dashboardStyle = false,
+  showNotes = false,
   scopeLabel,
 }: {
   summary?: StatementSummary
@@ -316,6 +318,7 @@ function SummaryCards({
   loading: boolean
   failed: boolean
   dashboardStyle?: boolean
+  showNotes?: boolean
   scopeLabel?: string
 }) {
   const cards: [EntryType, keyof StatementSummary, string, string][] = [
@@ -337,10 +340,10 @@ function SummaryCards({
             unit={bucket ? '원' : undefined}
             format={int}
             zero={bucket?.amount === 0}
-            footer={<span className="kpi-comparison" title={scopeLabel ?? note}>
+            footer={<><span className="kpi-comparison" title={scopeLabel ?? note}>
               {scopeLabel ?? <>{bucket ? `${int(bucket.count)}건` : ''}
               {basis?.dateBasis[type] ? ` · ${basis.dateBasis[type]}` : ''}</>}
-            </span>}
+            </span>{showNotes && <span className="ast-kpi-note">{note}</span>}</>}
           />
         })}
       </section>

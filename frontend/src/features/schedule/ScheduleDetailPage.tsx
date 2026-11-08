@@ -4,12 +4,10 @@ import { SaveGuide } from '../assistant/guide/save-guide'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useUnsavedWork } from '../../stores/unsavedWork'
-import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useLocation } from 'react-router'
 import { paymentEntryHref, safeReturnTo } from '../transaction/payment-entry'
 import { Button } from '../../components/Button'
-import { CellDisclosure } from '../../components/CellDisclosure'
 import { Modal } from '../../components/Modal'
 import { ApiError } from '../../lib/api/client'
 import { exportCsv } from '../../lib/exportCsv'
@@ -23,7 +21,6 @@ import {
   REASON_MAX,
   regenerateSchedule,
   scheduleDetailQuery,
-  scheduleVersionsQuery,
 } from './api'
 import type { ScheduleHeader } from './api'
 import { ActiveBadge, ClassificationBadge, RegimeEvidence, ScheduleStatusBadge } from './badges'
@@ -51,7 +48,6 @@ const join = (...parts: unknown[]) =>
 const Money = ({ amount }: { amount: unknown }) => (
   <span className={isNegative(amount) ? 'is-negative-amount' : undefined}>{amount == null ? '자료 없음' : won(amount)}</span>
 )
-const Text = ({ content }: { content: unknown }) => <CellDisclosure singleLine preview={value(content)} />
 
 function InlineState({ message, error, onRetry }: { message: string; error?: boolean; onRetry?: () => void }) {
   return (
@@ -79,11 +75,8 @@ function ScheduleDetailView({ id }: { id: string }) {
   const location = useLocation()
   const canProcess = usePermission('canProcess')
   const detail = useQuery({ ...scheduleDetailQuery(id), enabled: validId })
-  // 1차처럼 헤더를 받은 뒤에 버전 이력을 부른다.
-  const versions = useQuery({ ...scheduleVersionsQuery(id), enabled: detail.isSuccess })
   const header = detail.data?.header
   const lines = detail.data?.lines ?? []
-  const [infoTab, setInfoTab] = useState<'info' | 'versions'>('info')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [regenerateOpen, setRegenerateOpen] = useState(false)
   const previewForm = useRef<HTMLFieldSetElement>(null)
@@ -148,7 +141,6 @@ function ScheduleDetailView({ id }: { id: string }) {
   return (
     <div className="schedule-detail-page">
       <header className="page-header schedule-page-header">
-        <ScreenHelp screenId="SCHE-W02" />
         <div className="page-header-copy">
           <h1 className="page-title">예상 스케줄 상세</h1>
         </div>
@@ -157,8 +149,36 @@ function ScheduleDetailView({ id }: { id: string }) {
             className="button button-secondary"
             to={safeReturnTo(new URLSearchParams(location.search).get('returnTo'), '/schedules')}
           >
+            <span className="material-symbols-rounded" aria-hidden="true">
+              arrow_back
+            </span>
             목록으로
           </Link>
+          <ScreenHelp screenId="SCHE-W02" />
+        </div>
+      </header>
+
+      {header && detail.isFetching && <InlineState message="스케줄을 갱신 중입니다. 최신 상태를 확인한 후 처리할 수 있습니다." />}
+      {header && loadError && <InlineState message={loadError} error onRetry={retry} />}
+
+      {/* 비활성 사유는 title 이 아니라 가시 텍스트로 둔다 — 비활성 버튼은 포커스가 가지 않는다. */}
+      {showNote && (
+        <p className="schedule-action-note" id="schedule-action-note" role="status">
+          {reasons.join(' ')}
+        </p>
+      )}
+
+      <section data-guide-feature="features.schedule.schedule-detail-page.section" className="surface schedule-detail-card" aria-labelledby="schedule-header-title">
+        <header className="surface-header schedule-info-header">
+          <div className="schedule-summary-identity">
+            <p className="schedule-summary-label">계약번호</p>
+            <div className="schedule-summary-title">
+              <h2 id="schedule-header-title">{value(header?.contractNo)}</h2>
+              {header && <><ScheduleStatusBadge code={header.status} label={responseLabel(header.statusLabel, SCHEDULE_STATUS, header.status)} /><ActiveBadge active={header.activeYn} /></>}
+            </div>
+          </div>
+          {/* 지급단계는 이동 컨트롤이다(화면정의서 SCHE-W02, IF-API-28C). */}
+          <div className="schedule-info-actions">
           <Button data-guide-feature="features.schedule.schedule-detail-page.button-2"
             variant="secondary"
             loading={exporting.isPending}
@@ -191,40 +211,6 @@ function ScheduleDetailView({ id }: { id: string }) {
             </span>
             확정
           </Button>
-        </div>
-      </header>
-
-      {header && detail.isFetching && <InlineState message="스케줄을 갱신 중입니다. 최신 상태를 확인한 후 처리할 수 있습니다." />}
-      {header && loadError && <InlineState message={loadError} error onRetry={retry} />}
-
-      {/* 비활성 사유는 title 이 아니라 가시 텍스트로 둔다 — 비활성 버튼은 포커스가 가지 않는다. */}
-      {showNote && (
-        <p className="schedule-action-note" id="schedule-action-note" role="status">
-          {reasons.join(' ')}
-        </p>
-      )}
-
-      <section data-guide-feature="features.schedule.schedule-detail-page.section" className="surface schedule-detail-card" aria-labelledby="schedule-header-title">
-        <header className="surface-header schedule-info-header">
-          <h2 className="surface-title" id="schedule-header-title">
-            스케줄 기본정보
-          </h2>
-          {/* 지급단계는 이동 컨트롤이다(화면정의서 SCHE-W02, IF-API-28C). */}
-          <div className="schedule-info-actions">
-            <div className="schedule-info-tabs" role="tablist" aria-label="스케줄 정보 보기"
-              onKeyDown={event => {
-                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-                event.preventDefault()
-                const next = event.key === 'Home' ? 'info' : event.key === 'End' ? 'versions' : infoTab === 'info' ? 'versions' : 'info'
-                setInfoTab(next)
-                document.getElementById(`schedule-${next}-tab`)?.focus()
-              }}>
-              {(['info', 'versions'] as const).map(tab => <button data-guide-feature="features.schedule-detail-page.button-1" type="button" role="tab" key={tab}
-                id={tab === 'info' ? 'schedule-info-tab' : 'schedule-versions-tab'} aria-controls={`schedule-${tab}-panel`} aria-selected={infoTab === tab}
-                tabIndex={infoTab === tab ? 0 : -1} onClick={() => setInfoTab(tab)}>
-                {tab === 'info' ? '기준정보' : '버전비교'}
-              </button>)}
-            </div>
             <div className="filter-field schedule-stage-field">
               <label className="filter-field-label" htmlFor="schedule-stage">
                 지급단계
@@ -245,7 +231,7 @@ function ScheduleDetailView({ id }: { id: string }) {
             </div>
           </div>
         </header>
-        <div className="surface-body" role="tabpanel" id="schedule-info-panel" aria-labelledby="schedule-info-tab" hidden={infoTab !== 'info'}>
+        <div className="surface-body">
           {header ? (
             <HeaderSummary header={header} />
           ) : (
@@ -255,82 +241,6 @@ function ScheduleDetailView({ id }: { id: string }) {
               onRetry={validId && detail.isError ? retry : undefined}
             />
           )}
-        </div>
-        <div role="tabpanel" id="schedule-versions-panel" aria-labelledby="schedule-versions-tab" hidden={infoTab !== 'versions'}>
-          <section data-guide-feature="features.schedule.schedule-detail-page.section-3" className="schedule-version-panel" aria-labelledby="schedule-versions-title">
-            <header className="surface-header">
-              <h2 className="surface-title" id="schedule-versions-title">
-                버전 비교
-              </h2>
-              <p className="schedule-detail-note">지난 버전은 지우지 않고 남겨 둡니다</p>
-            </header>
-            <div
-              className="data-table-viewport schedule-version-viewport"
-              tabIndex={0}
-              role="region"
-              aria-label="스케줄 버전 비교 표"
-            >
-              <table data-guide-feature="features.schedule.schedule-detail-page.table-2" className="data-table schedule-version-table" aria-busy={versions.isFetching}>
-                <caption className="visually-hidden">같은 계약의 스케줄 버전 이력</caption>
-                <colgroup>
-                  {['no', 'status', 'active', 'policy', 'reason', 'generated', 'lines', 'total'].map((name) => (
-                    <col key={name} className={`schedule-version-col-${name}`} />
-                  ))}
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th scope="col" className="is-left">
-                      버전
-                    </th>
-                    <th scope="col" className="is-center">
-                      상태
-                    </th>
-                    <th scope="col" className="is-center">
-                      사용중
-                    </th>
-                    <th scope="col">정책버전</th>
-                    <th scope="col">생성 사유</th>
-                    <th scope="col">생성 일시</th>
-                    <th scope="col" className="is-left">
-                      회차 수
-                    </th>
-                    <th scope="col" className="is-number">
-                      예상 총액
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {versions.isError ? (
-                    <StateRow columns={8}>
-                      <InlineState
-                        message={errorText(versions.error, '버전 이력을 불러오지 못했습니다.')}
-                        error
-                        onRetry={() => void versions.refetch()}
-                      />
-                    </StateRow>
-                  ) : !versions.data ? (
-                    <StateRow columns={8}>
-                      <InlineState message="버전 이력을 불러오는 중입니다." />
-                    </StateRow>
-                  ) : versions.data.length === 0 ? (
-                    <StateRow columns={8}>
-                      <p className="schedule-inline-state is-empty" role="status">
-                        같은 계약의 스케줄 버전이 없습니다.
-                      </p>
-                    </StateRow>
-                  ) : (
-                    versions.data.map((version) => (
-                      <VersionRow
-                        key={version.scheduleHeaderId}
-                        version={version}
-                        current={String(version.scheduleHeaderId) === id}
-                      />
-                    ))
-                  )}
-                </tbody>
-              </table>
-        </div>
-      </section>
         </div>
       </section>
 
@@ -385,7 +295,6 @@ function ScheduleDetailView({ id }: { id: string }) {
           onConfirm={async () => {
             const result = await confirmSchedule(id)
             client.setQueryData(scheduleDetailQuery(id).queryKey, result)
-            void client.invalidateQueries({ queryKey: ['schedules', 'versions'] })
             void client.invalidateQueries({ queryKey: ['schedules', 'list'] })
             setConfirmOpen(false)
             toast('스케줄을 확정했습니다. 이제 금액을 고칠 수 없습니다. 바꾸려면 새 버전을 만드세요.', 'success', 4500)
@@ -413,22 +322,16 @@ function ScheduleDetailView({ id }: { id: string }) {
   )
 }
 
-const StateRow = ({ columns, children }: { columns: number; children: ReactNode }) => (
-  <tr className="schedule-state-row">
-    <td colSpan={columns}>{children}</td>
-  </tr>
-)
-
 function HeaderSummary({ header }: { header: ScheduleHeader }) {
   return (
     <dl className="schedule-detail-kv">
       <div>
-        <dt>계약번호</dt>
-        <dd className="tabular-nums">{value(header.contractNo)}</dd>
+        <dt>보험회사</dt>
+        <dd>{value(header.insurerName)}</dd>
       </div>
       <div>
-        <dt>보험회사, 상품</dt>
-        <dd>{join(header.insurerName, header.productName)}</dd>
+        <dt>상품</dt>
+        <dd>{value(header.productName)}</dd>
       </div>
       <div>
         <dt>
@@ -453,21 +356,6 @@ function HeaderSummary({ header }: { header: ScheduleHeader }) {
         <dd className="tabular-nums">{versionText(header.scheduleVersionNo)}</dd>
       </div>
       <div>
-        <dt>상태</dt>
-        <dd>
-          <ScheduleStatusBadge
-            code={header.status}
-            label={responseLabel(header.statusLabel, SCHEDULE_STATUS, header.status)}
-          />
-        </dd>
-      </div>
-      <div>
-        <dt>사용중</dt>
-        <dd>
-          <ActiveBadge active={header.activeYn} />
-        </dd>
-      </div>
-      <div>
         <dt>정책버전</dt>
         <dd className="tabular-nums">{value(header.policyVersionLabel)}</dd>
       </div>
@@ -476,38 +364,6 @@ function HeaderSummary({ header }: { header: ScheduleHeader }) {
         <dd>{join(generationReason(header.generationReason), dateTime(header.generatedAt))}</dd>
       </div>
     </dl>
-  )
-}
-
-function VersionRow({ version, current }: { version: ScheduleHeader; current: boolean }) {
-  return (
-    <tr className={current ? 'is-selected' : undefined} aria-current={current || undefined}>
-      <td className="is-left">
-        <Link data-guide-feature="features.schedule.schedule-detail-page.link-3" className="tabular-nums" to={`/schedules/${encodeURIComponent(String(version.scheduleHeaderId))}`}>
-          {versionText(version.scheduleVersionNo)}
-        </Link>
-      </td>
-      <td className="is-center">
-        <ScheduleStatusBadge
-          code={version.status}
-          label={responseLabel(version.statusLabel, SCHEDULE_STATUS, version.status)}
-        />
-      </td>
-      <td className="is-center">
-        <ActiveBadge active={version.activeYn} />
-      </td>
-      <td>
-        <Text content={version.policyVersionLabel} />
-      </td>
-      <td>
-        <Text content={generationReason(version.generationReason)} />
-      </td>
-      <td>{dateTime(version.generatedAt)}</td>
-      <td className="is-left tabular-nums">{int(version.installmentCount)}</td>
-      <td className="is-number tabular-nums">
-        <Money amount={version.expectedTotal} />
-      </td>
-    </tr>
   )
 }
 

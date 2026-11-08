@@ -25,6 +25,8 @@ export const contractPaymentHelp: ScreenHelpStep[] = ([
   {
     targetId: 'payment.batch.save',
     title: '임시저장',
+    requireAction: true,
+    disabledReason: '귀속금액을 확인하고 임시저장을 완료해야 다음 단계로 이동할 수 있습니다.',
     advanceOnEvent: 'fgc-payment-save-complete',
     instruction: '귀속금액을 확인하고 임시저장을 누르세요.',
     interaction: '작성중으로 저장되며, 지급은 확정되지 않습니다.',
@@ -33,6 +35,8 @@ export const contractPaymentHelp: ScreenHelpStep[] = ([
   {
     targetId: 'payment.batch.precheck',
     title: '사전검증',
+    requireAction: true,
+    disabledReason: '사전검증을 실행하고 선택한 모든 행이 통과해야 다음 단계로 이동할 수 있습니다.',
     advanceOnEvent: 'fgc-payment-precheck-complete',
     instruction: '임시저장 후 사전검증을 누르세요.',
     interaction: '차단된 행은 오른쪽 점검표에서 원인을 확인합니다.',
@@ -48,11 +52,13 @@ export const contractPaymentHelp: ScreenHelpStep[] = ([
   {
     targetId: 'payment.batch.confirm',
     title: '지급 확정',
+    requireAction: true,
+    disabledReason: '확인창에서 지급 확정을 완료해야 월 통합검증으로 이동할 수 있습니다.',
     advanceOnEvent: 'fgc-payment-confirm-complete',
     instruction: '검증을 통과하면 확정을 누르세요.',
     interaction: '확인창에서 대상 행과 총액을 확인한 뒤 확정합니다.',
     presentation: { side: 'right', preserveCardPosition: true },
   },
-] satisfies Omit<ScreenHelpStep, 'group' | 'details'>[]).map((step) => ({ ...step, group: '계약별 지급 등록', details: [], concise: true,
-  presentation: { ...step.presentation, fixedCard: 'right' as const, preventScroll: true,
-    cardAnchor: ['payment.batch.contract', 'payment.batch.lines'].includes(step.targetId) ? '.contract-payment-gates' : '[data-guide-target="payment.batch.lines"]' } }))
+] satisfies Omit<ScreenHelpStep, 'group' | 'details'>[]).map((step, index) => ({ ...step, group: '계약별 지급 등록', details: [], concise: true,
+  presentation: { ...step.presentation, fixedCard: index < 2 ? 'right' as const : 'left' as const,
+    cardAlign: index < 2 ? 'top' as const : undefined, preserveCardPosition: index > 2, preventScroll: true } }))

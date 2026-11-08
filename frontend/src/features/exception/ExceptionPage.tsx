@@ -291,7 +291,7 @@ export function ExceptionPage() {
         </div>
       ) : (
         <>
-            <section data-guide-feature="features.exception.exception-page.section-2" className="surface">
+            <section data-guide-feature="features.exception.exception-page.section-2" data-guide-target="exception.list" data-guide-completed={!search.isPending && !search.isError && rows.length === 0} className="surface">
               <ListHeader total={data?.totalElements ?? 0} pageSize={20}>
                 <span className="surface-title">예외 목록</span>
               </ListHeader>

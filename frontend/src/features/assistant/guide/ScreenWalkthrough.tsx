@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } fro
 import type { Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '../../../components/Button'
+import { DisabledButtonHint } from '../../../components/DisabledButtonHint'
 import { closeSettlementGuide, settlementEntry, subscribeSettlementEntry } from '../settlement/entry'
 import guideMascot from '../assets/pico-guide.png'
 import type { ScreenHelpStep } from './ScreenHelp'
@@ -40,8 +41,8 @@ function resolveTarget(trigger: HTMLElement, step: ScreenHelpStep) {
 }
 
 /** Explanation only: advancing a step never activates a save guide or a business control. */
-export function ScreenWalkthrough({ title, steps, disabled, triggerRef, autoStart, onFollow }: {
-  title: string; steps: readonly ScreenHelpStep[]; disabled?: boolean; triggerRef?: Ref<HTMLButtonElement>; autoStart?: boolean; onFollow?: (follow: NonNullable<ScreenHelpStep['follow']>) => void
+export function ScreenWalkthrough({ title, screenId, variant, steps, disabled, triggerRef, autoStart, onFollow }: {
+  title: string; screenId?: string; variant?: string; steps: readonly ScreenHelpStep[]; disabled?: boolean; triggerRef?: Ref<HTMLButtonElement>; autoStart?: boolean; onFollow?: (follow: NonNullable<ScreenHelpStep['follow']>) => void
 }) {
   const autoTrigger = useRef<HTMLButtonElement | null>(null)
   useImperativeHandle(triggerRef, () => autoTrigger.current!)
@@ -77,7 +78,7 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef, autoStar
   const position = useSpotlight(session && !covered && !folded ? target : null, card, true, step?.presentation)
   const close = () => { setSession(null); trigger?.focus() }
 
-  useGuideStep(step, target, () => sequence.last ? close() : sequence.next(), Boolean(session && !covered && !folded))
+  const actionPending = useGuideStep(step, target, () => sequence.last ? close() : sequence.next(), Boolean(session && !covered && !folded))
 
   useEffect(() => {
     const other = (event: Event) => {
@@ -135,7 +136,7 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef, autoStar
   }, [session, step, ownerDialog, trigger])
 
   return <>
-    <button type="button" className="button button-secondary screen-help-trigger" disabled={disabled} aria-expanded={Boolean(session)}
+    <button type="button" className="button button-secondary screen-help-trigger" data-screen-help={screenId} data-screen-help-variant={variant ?? ''} disabled={disabled} aria-expanded={Boolean(session)}
       ref={autoTrigger}
       onClick={event => {
         if (session) { close(); return }
@@ -143,7 +144,7 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef, autoStar
         setTrigger(current); setOwnerDialog(current.closest('[role="dialog"]'))
         document.dispatchEvent(new CustomEvent('fgc-screen-help-open', { detail: current }))
         closeSettlementGuide()
-        const available = steps.filter(item => item.scope === 'shell' && item.follow || resolveTarget(current, item))
+        const available = steps.filter(item => item.waitForTarget || item.scope === 'shell' && item.follow || resolveTarget(current, item))
         setSessionId(value => value + 1); setFolded(false); setCovered(false); setSession(available)
         setTarget(available[0] ? resolveTarget(current, available[0]) : null)
       }}>
@@ -171,8 +172,10 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef, autoStar
           {!step.concise && index === 0 && <p className="screen-step-context">현재 표시된 요소를 안내합니다. 다른 탭이나 상세에서도 도움말을 다시 열어 보세요.</p>}
           <div className="payment-guide-actions">
             <Button variant="secondary" disabled={index === 0} onClick={sequence.previous}>이전</Button>
-            <Button className="screen-step-next" disabled={!!step.follow || step.requireAction && target?.getAttribute('data-guide-completed') !== 'true'}
-              onClick={() => sequence.last ? close() : sequence.next()}>{step.requireAction && target?.getAttribute('data-guide-completed') !== 'true' ? '실행 버튼을 눌러주세요' : step.follow ? '강조된 메뉴를 눌러주세요' : sequence.last ? '안내 마치기' : '다음'}</Button>
+            <DisabledButtonHint disabled={actionPending || !!step.follow} reason={step.disabledReason ?? (step.follow ? '강조된 메뉴를 누르면 다음 업무로 이동합니다.' : '강조된 작업을 먼저 완료해 주세요.')}>
+            <Button className="screen-step-next" disabled={!!step.follow || actionPending}
+              onClick={() => sequence.last ? close() : sequence.next()}>{step.follow ? '강조된 메뉴를 눌러주세요' : sequence.last ? '안내 마치기' : '다음'}</Button>
+            </DisabledButtonHint>
           </div>
         </> : <>
           <h2>안내할 화면을 준비하고 있어요</h2>

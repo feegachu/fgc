@@ -358,13 +358,6 @@ public class ScheduleService {
         return detail ;
     }
 
-    public List<ScheduleHeaderResponse> selectScheduleVersions(Long scheduleHeaderId) {
-        if (scheduleHeaderId == null) {
-            throw validationException(SCHEDULE_HEADER_ID, "스케줄 헤더 ID는 필수입니다.");
-        }
-        return scheduleQueryRepository.selectVersionsByScheduleHeaderId(scheduleHeaderId);
-    }
-
     /** 같은 계약에서 선택한 지급단계의 사용 중인 운영 스케줄 헤더를 찾는다. */
     @Transactional(readOnly = true)
     public Long findActiveOperationalScheduleId(Long scheduleHeaderId, PaymentStage paymentStage) {

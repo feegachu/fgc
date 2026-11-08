@@ -574,18 +574,6 @@ class ScheduleServiceTest {
     }
 
     @Test
-    void selectsAllVersionsForScheduleContractAndStage() {
-        List<ScheduleHeaderResponse> versions = List.of(
-                ScheduleHeaderResponse.builder().scheduleHeaderId(11L).scheduleVersionNo(2).build(),
-                ScheduleHeaderResponse.builder().scheduleHeaderId(10L).scheduleVersionNo(1).build()
-        );
-        given(scheduleQueryRepository.selectVersionsByScheduleHeaderId(10L)).willReturn(versions);
-
-        assertThat(scheduleService.selectScheduleVersions(10L)).containsExactlyElementsOf(versions);
-        verify(scheduleQueryRepository).selectVersionsByScheduleHeaderId(10L);
-    }
-
-    @Test
     void generatesFixedRulesWithoutResolvingRateBasis() {
         InsuranceContract contract = withContractId(10L, InsuranceContract.builder()
                 .contractDate(LocalDate.of(2026, 8, 10))

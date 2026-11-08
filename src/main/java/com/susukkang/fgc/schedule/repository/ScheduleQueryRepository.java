@@ -34,7 +34,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * 설명 : 예상 스케줄 목록·상세·버전과 생성·확정에 필요한 현재 상태를 조회한다.
+ * 설명 : 예상 스케줄 목록·상세와 생성·확정에 필요한 현재 상태를 조회한다.
  * 모든 결과는 엔티티가 아닌 DTO로 읽는다. 계약 행 잠금 뒤 재조회가 영속성 컨텍스트의 이전 상태를
  * 재사용하지 않고 항상 DB의 최신 커밋 값을 보게 하기 위해서다.
  *
@@ -50,7 +50,7 @@ public class ScheduleQueryRepository {
     private final EntityManager entityManager;
     private final JPAQueryFactory queryFactory;
 
-    // 목록·버전·상세가 공유하는 헤더 집계. 헤더 PK로 묶으므로 헤더 컬럼은 함수 종속으로 선택된다.
+    // 목록·상세가 공유하는 헤더 집계. 헤더 PK로 묶으므로 헤더 컬럼은 함수 종속으로 선택된다.
     // 모든 쿼리는 리터럴만 이어 붙인 컴파일 시점 상수다. 입력값은 전부 바인딩 파라미터로만 전달한다.
     private static final String HEADER_COLUMNS = """
              sh.paymentStage, sh.scheduleRegime,
@@ -73,14 +73,6 @@ public class ScheduleQueryRepository {
               LEFT JOIN ScheduleLine sl ON sl.scheduleHeaderId = sh.scheduleHeaderId
             """;
     private static final String GROUP_BY = " GROUP BY sh.scheduleHeaderId, c.contractNo, pv.policyName, pv.versionNo";
-    private static final String VERSIONS_QUERY = HEADER_SELECT_SIMPLE + LINE_JOIN + """
-             WHERE EXISTS (SELECT 1 FROM ScheduleHeader t
-                            WHERE t.scheduleHeaderId = :scheduleHeaderId
-                              AND t.contractId = sh.contractId
-                              AND t.paymentStage = sh.paymentStage
-                              AND t.schedulePurpose = sh.schedulePurpose
-                              AND (t.scenarioCode = sh.scenarioCode OR (t.scenarioCode IS NULL AND sh.scenarioCode IS NULL)))
-            """ + GROUP_BY + " ORDER BY sh.scheduleVersionNo DESC, sh.scheduleHeaderId DESC";
     private static final String DETAIL_QUERY = HEADER_SELECT_DETAIL + LINE_JOIN
             + " WHERE sh.scheduleHeaderId = :scheduleHeaderId" + GROUP_BY + ", i.insurerName, p.productName";
     private static final String ACTIVE_DETAIL_QUERY = HEADER_SELECT_SIMPLE + LINE_JOIN + """
@@ -109,13 +101,6 @@ public class ScheduleQueryRepository {
         return queryFactory.select(scheduleHeader.count()).from(scheduleHeader)
                 .join(insuranceContract).on(insuranceContract.contractId.eq(scheduleHeader.contractId))
                 .where(searchFilters(condition)).fetchOne();
-    }
-
-    /** 대상 헤더와 같은 계약·지급단계의 모든 버전(용도 무관)을 최신 버전부터 조회한다. */
-    public List<ScheduleHeaderResponse> selectVersionsByScheduleHeaderId(Long scheduleHeaderId) {
-        return entityManager.createQuery(VERSIONS_QUERY, Object[].class)
-                .setParameter("scheduleHeaderId", scheduleHeaderId)
-                .getResultList().stream().map(ScheduleQueryRepository::toHeader).toList();
     }
 
     /** 헤더(보험사·상품 포함) 1건과 회차를 줄 번호 순으로 조회한다. 헤더가 없으면 null. */

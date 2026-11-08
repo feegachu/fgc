@@ -17,6 +17,7 @@ export function useWorkflowWalkthrough(stage: SettlementStep | undefined, path: 
     // contract to load before taking the snapshot; don't include hidden panels.
     const capture = () => {
       const visible = catalogue.filter(entry => {
+        if (entry.waitForTarget) return true
         if (entry.scope === 'shell') return true
         const root = document.getElementById('main-content')
         const nodes = [...(root?.querySelectorAll<HTMLElement>(entry.selector) ?? [])].filter(node => {

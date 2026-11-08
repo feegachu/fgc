@@ -15522,33 +15522,6 @@
         "tags" : [ "schedule-controller" ]
       }
     },
-    "/api/v1/schedules/{scheduleHeaderId}/versions" : {
-      "get" : {
-        "operationId" : "getScheduleVersions",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "scheduleHeaderId",
-          "required" : true,
-          "schema" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseListScheduleHeaderResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "schedule-controller" ]
-      }
-    },
     "/api/v1/transactions" : {
       "get" : {
         "operationId" : "search_1",

@@ -7,11 +7,10 @@ type Geometry = { width: number; height: number; panels: Box[]; amounts: Box[] }
 /** The comparison is visual only; it never copies an expected amount into a payment. */
 export function ContractPaymentComparison({ root }: { root: RefObject<HTMLDivElement | null> }) {
   const maskId = useId()
-  const [phase, setPhase] = useState<'waiting' | 'expected' | 'actual'>('waiting')
+  const [phase, setPhase] = useState<'expected' | 'actual'>('expected')
   useEffect(() => {
-    const show = setTimeout(() => setPhase('expected'), 1450)
-    const move = setTimeout(() => setPhase('actual'), 3000)
-    return () => { clearTimeout(show); clearTimeout(move) }
+    const timer = setTimeout(() => setPhase('actual'), 1100)
+    return () => clearTimeout(timer)
   }, [])
   const [geometry, setGeometry] = useState<Geometry | null>(null)
 
@@ -107,7 +106,7 @@ export function ContractPaymentComparison({ root }: { root: RefObject<HTMLDivEle
       </defs>
       <rect width="100%" height="100%" fill="#17334b38" mask={`url(#${maskId})`} />
       {geometry.panels.map(({ key, ...bounds }) => <rect key={key} className="contract-comparison-panel-reveal" {...bounds} rx="10" fill="none" stroke="var(--color-fgc-blue)" strokeWidth="2" />)}
-      {phase !== 'waiting' && geometry.amounts.length === 2 && (() => {
+      {geometry.amounts.length === 2 && (() => {
         const bounds = geometry.amounts[phase === 'actual' ? 1 : 0]
         return <rect className="contract-comparison-moving-amount"
           style={{ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }}

@@ -655,16 +655,6 @@
     "element": "Button"
   },
   {
-    "id": "features.acquisition-cost.contract-acquisition-cost.link",
-    "file": "features/acquisition-cost/ContractAcquisitionCost.tsx",
-    "element": "Link"
-  },
-  {
-    "id": "features.acquisition-cost.contract-acquisition-cost.results",
-    "file": "features/acquisition-cost/ContractAcquisitionCost.tsx",
-    "element": "Link"
-  },
-  {
     "id": "features.acquisition-cost.contract-acquisition-cost.select",
     "file": "features/acquisition-cost/ContractAcquisitionCost.tsx",
     "element": "select"
@@ -1565,11 +1555,6 @@
     "element": "table"
   },
   {
-    "id": "features.contract-status-history.button-1",
-    "file": "features/contract/ContractStatusHistory.tsx",
-    "element": "Button"
-  },
-  {
     "id": "features.contract.contract-detail-page.button",
     "file": "features/contract/ContractDetailPage.tsx",
     "element": "Button"
@@ -1858,16 +1843,6 @@
     "id": "features.contract.contract-tabs.section-5",
     "file": "features/contract/ContractTabs.tsx",
     "element": "section"
-  },
-  {
-    "id": "features.contract.status-history.effects",
-    "file": "features/contract/ContractStatusHistory.tsx",
-    "element": "Button"
-  },
-  {
-    "id": "features.contract.status-history.effects-close",
-    "file": "features/contract/ContractStatusHistory.tsx",
-    "element": "Button"
   },
   {
     "id": "features.dashboard.agent-overview.active",
@@ -2695,11 +2670,6 @@
     "element": "summary"
   },
   {
-    "id": "features.schedule-detail-page.button-1",
-    "file": "features/schedule/ScheduleDetailPage.tsx",
-    "element": "button"
-  },
-  {
     "id": "features.schedule.schedule-detail-page.button",
     "file": "features/schedule/ScheduleDetailPage.tsx",
     "element": "Button"
@@ -2750,11 +2720,6 @@
     "element": "Link"
   },
   {
-    "id": "features.schedule.schedule-detail-page.link-3",
-    "file": "features/schedule/ScheduleDetailPage.tsx",
-    "element": "Link"
-  },
-  {
     "id": "features.schedule.schedule-detail-page.regenerate-reason",
     "file": "features/schedule/ScheduleDetailPage.tsx",
     "element": "textarea"
@@ -2775,19 +2740,9 @@
     "element": "section"
   },
   {
-    "id": "features.schedule.schedule-detail-page.section-3",
-    "file": "features/schedule/ScheduleDetailPage.tsx",
-    "element": "section"
-  },
-  {
     "id": "features.schedule.schedule-detail-page.table",
     "file": "features/schedule/ScheduleLinesTable.tsx",
     "element": "div"
-  },
-  {
-    "id": "features.schedule.schedule-detail-page.table-2",
-    "file": "features/schedule/ScheduleDetailPage.tsx",
-    "element": "table"
   },
   {
     "id": "features.schedule.schedule-list-page.button",
@@ -3245,11 +3200,6 @@
     "element": "Button"
   },
   {
-    "id": "features.validation.validation-run-detail-page.button-4",
-    "file": "features/validation/ValidationRunDetailPage.tsx",
-    "element": "Button"
-  },
-  {
     "id": "features.validation.validation-run-detail-page.button-5",
     "file": "features/validation/ValidationRunDetailPage.tsx",
     "element": "Button"
@@ -3278,11 +3228,6 @@
     "id": "features.validation.validation-run-detail-page.link-3",
     "file": "features/validation/AnimatedRunChecklist.tsx",
     "element": "Link"
-  },
-  {
-    "id": "features.validation.validation-run-detail-page.pick-run",
-    "file": "features/validation/ValidationRunDetailPage.tsx",
-    "element": "select"
   },
   {
     "id": "features.validation.validation-run-detail-page.section",
@@ -3413,16 +3358,6 @@
     "id": "ledger.explorer.all-entries",
     "file": "features/ledger/LedgerExplorer.tsx",
     "element": "Button"
-  },
-  {
-    "id": "ledger.explorer.button-1",
-    "file": "features/ledger/LedgerExplorer.tsx",
-    "element": "button"
-  },
-  {
-    "id": "ledger.explorer.button-2",
-    "file": "features/ledger/LedgerExplorer.tsx",
-    "element": "button"
   },
   {
     "id": "ledger.explorer.button-3",

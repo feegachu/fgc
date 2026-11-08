@@ -86,7 +86,7 @@ export function ContractPaymentGates({
       </header>
       <div className="surface-body transaction-gate-list" aria-live="polite">
         {steps.map((step, index) => (
-          <div key={step.label} style={{ '--check-delay': (index * 300) + 'ms' } as CSSProperties} className={`transaction-gate-step transaction-gate-${step.state}`}>
+          <div key={step.label} style={{ '--check-delay': (index * 80) + 'ms' } as CSSProperties} className={`transaction-gate-step transaction-gate-${step.state}`}>
             <span key={step.state} className="material-symbols-rounded transaction-gate-icon" aria-hidden="true">
               {step.state === 'pass' ? (
                 <svg className="contract-payment-check" viewBox="0 0 24 24" fill="none">

@@ -9,10 +9,10 @@ export const titles = [
   '지급 확정',
   '월 통합검증',
   '대사 확인',
-  '예외 처리',
-  '최종 확정',
+  '검증원장',
+  '예외함 확인',
 ]
-export const FLOW_VERSION = '3.0.1'
+export const FLOW_VERSION = '3.1.0'
 export type WorkflowDestination = 'schedule-list' | 'payment-list' | 'payment-form' | 'validation-list' | 'reconciliation'
 export function destinations(selection: Selection, destination?: WorkflowDestination) {
   const query = (path: string, extra: Record<string, string> = {}) =>
@@ -60,19 +60,15 @@ export function destinations(selection: Selection, destination?: WorkflowDestina
           : {}),
       }),
     },
+    'ledger.review': { screen: 'LEDG-W01', target: 'ledger.overview', path: query('/journals', selection.contractId ? { contractId: String(selection.contractId) } : {}) },
     'exception.resolve': {
       screen: 'EXCP-W01',
-      target: 'exception.action',
+      target: 'exception.list',
       path: query('/exceptions', {
         validationMonth: `${selection.month}-01`,
         status: 'OPEN',
         ...(selection.exceptionId ? { selected: String(selection.exceptionId) } : {}),
       }),
-    },
-    'validation.finalize': {
-      screen: 'VRUN-W02',
-      target: 'validation.finalize',
-      path: query(`/validation-runs/${selection.validationRunId}`),
     },
   } satisfies Record<SettlementStep, { screen: string; target: string; path: string }>
 }
@@ -83,7 +79,7 @@ export function settlementCatalog(selection: Selection, destination?: WorkflowDe
     guideVersion: FLOW_VERSION,
     title: '전체 업무 가이드',
     keywords: ['계약', '정산', '전체 흐름'],
-    exampleQuestions: ['계약부터 최종 확정까지 안내해 주세요.'],
+    exampleQuestions: ['계약부터 예외함 확인까지 안내해 주세요.'],
     roles: ['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE'],
     requiredEntities: [],
     steps: STEPS.map((stepId, index) => ({
@@ -92,7 +88,7 @@ export function settlementCatalog(selection: Selection, destination?: WorkflowDe
       targetId: routes[stepId].target,
       instruction: titles[index],
       entryConditionId: 'AVAILABLE',
-      completionConditionId: stepId === 'validation.finalize' ? 'FINALIZED' : 'NOT_AUTOMATIC',
+      completionConditionId: 'NOT_AUTOMATIC',
       next: [],
     })),
   }

@@ -583,6 +583,12 @@ function TransactionForm({
           <h1 className="page-title">지급 건 등록, 귀속, 확정</h1>
         </div>
         <div className="page-header-actions">
+          <Link data-guide-feature="features.transaction.transaction-form-page.link-2" className="button button-secondary" to={returnTo}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              arrow_back
+            </span>
+            목록으로
+          </Link>
           <ScreenHelp screenId="TRAN-W02" disabled={fullFlow || helpOpen} triggerRef={help} legacyTrigger={<button data-guide-feature="features.transaction.transaction-form-page.button-2"
             ref={help}
             type="button"
@@ -592,14 +598,11 @@ function TransactionForm({
             aria-expanded={helpOpen}
             onClick={() => { useWorkflowGuide.getState().clear(); setInitialWorkflowId(null); setHelpOpen(true) }}
           >
+            <span className="material-symbols-rounded" aria-hidden="true">
+              help
+            </span>
             도움말
           </button>} />
-          <Link data-guide-feature="features.transaction.transaction-form-page.link-2" className="button button-secondary" to={returnTo}>
-            <span className="material-symbols-rounded" aria-hidden="true">
-              arrow_back
-            </span>{' '}
-            목록으로
-          </Link>
         </div>
       </header>
       {(loading || referenceError) && (

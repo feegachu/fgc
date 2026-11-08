@@ -34,7 +34,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --no-audit
       - name: Scoped conversation, current-state entry and payment observer regression
-        run: npx vitest run src/features/transaction/transaction-form.test.tsx src/features/transaction/payment-guide.test.ts src/features/assistant/PicoLiveConversation.test.tsx src/features/assistant/PicoGuideStartButton.test.tsx --maxWorkers=2
+        run: npx vitest run src/features/transaction/transaction-form.test.tsx src/features/transaction/payment-guide.test.ts src/features/assistant/PicoLiveConversation.test.tsx src/features/assistant/PageHelpLauncher.test.tsx --maxWorkers=2
       - name: Normal frontend build and generated API check
         run: npm run build && npm run check:api
   assistant-regression:

@@ -489,7 +489,7 @@ describe('CONT-W02 계약체결비용 영역', () => {
     })
     const router = createMemoryRouter(
       [
-        { path: '/contracts/10', element: <ContractAcquisitionCost contractId="10" contractNo="ACQ-001" /> },
+        { path: '/contracts/10', element: <ContractAcquisitionCost contractId="10" /> },
         { path: '/acquisition-cost-checks', element: <h1>검증 목록 화면</h1> },
       ],
       { initialEntries: ['/contracts/10'] },
@@ -516,9 +516,9 @@ describe('CONT-W02 계약체결비용 영역', () => {
     expect(posts(request as never)).toHaveLength(0)
   })
 
-  it('검증 요청 뒤 다시 조회해 저장 결과를 보이고 전체 결과로 이동한다', async () => {
+  it('검증 요청 뒤 저장 결과를 보이고 전체 결과 링크는 표시하지 않는다', async () => {
     let stored: AcquisitionCheck[] = []
-    const { request, router, user } = mountContract((_, options) => {
+    const { request, user } = mountContract((_, options) => {
       if (options?.method === 'POST') {
         stored = [violation]
         return envelope(violation)
@@ -528,8 +528,7 @@ describe('CONT-W02 계약체결비용 영역', () => {
     await user.click(await screen.findByRole('button', { name: '검증 요청' }))
     expect(await screen.findByRole('article', { name: '선지급 총액 한도 결과' })).toBeInTheDocument()
     expect((posts(request as never)[0][1] as { body: unknown }).body).toEqual({ contractId: 10, paymentStage: 'GA_TO_FC' })
-    await user.click(screen.getByRole('link', { name: '전체 결과 보기' }))
-    expect(router.state.location.search).toBe('?contractNo=ACQ-001')
+    expect(screen.queryByRole('link', { name: '전체 결과 보기' })).not.toBeInTheDocument()
   })
 
   it('요청 실패의 다시 시도는 같은 키로 다시 보내고 409의 다시 조회는 결과만 새로 읽는다', async () => {

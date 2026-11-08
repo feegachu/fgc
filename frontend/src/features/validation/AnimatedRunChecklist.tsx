@@ -16,8 +16,8 @@ const CONDITIONS = [
   { label: '같은 검증월에 이미 확정된 실행이 없는가', step: 8 },
 ]
 
-export function AnimatedRunChecklist({ completed, data, error, retry }: {
-  completed: number; data?: FinalizeChecklist; error?: string; retry: () => void
+export function AnimatedRunChecklist({ completed, data, error, retry, onPresented }: {
+  completed: number; data?: FinalizeChecklist; error?: string; retry: () => void; onPresented?: () => void
 }) {
   const [revealed, setRevealed] = useState<number[]>([])
   const eligible = CONDITIONS.map((_item, index) => index + 1)
@@ -30,6 +30,12 @@ export function AnimatedRunChecklist({ completed, data, error, retry }: {
     return () => window.clearTimeout(timer)
   }, [next])
   const allShown = CONDITIONS.every((_item, index) => eligible.includes(index + 1) && revealed.includes(index + 1))
+  useEffect(() => {
+    if (!allShown || !onPresented) return
+    // The last revealed check still needs to finish drawing before completion is announced.
+    const timer = window.setTimeout(onPresented, window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 0 : 650)
+    return () => window.clearTimeout(timer)
+  }, [allShown, onPresented])
   return <section data-guide-feature="features.validation.validation-run-detail-page.section-7" className="surface" aria-labelledby="vrun-checklist-title" data-guide-checklist-ready={allShown}>
     <header className="surface-header">
       <h2 className="surface-title" id="vrun-checklist-title">확정 전 8단계 점검</h2>
