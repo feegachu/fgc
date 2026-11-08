@@ -1464,7 +1464,14 @@ class PolicyWorkflowIntegrationTest {
         assertThat(next.path("versionNo").asLong()).isEqualTo(2);
         assertThat(scheduleRead("/api/v1/schedules/" + header).path("header").path("activeYn").asBoolean()).isFalse();
         assertThat(scheduleRead("/api/v1/schedules/" + header).path("lines").size()).isEqualTo(lineCount);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.schedule_header WHERE contract_id=(SELECT contract_id FROM fgc.schedule_header WHERE schedule_header_id=?) AND payment_stage=(SELECT payment_stage FROM fgc.schedule_header WHERE schedule_header_id=?)", Integer.class, header, header)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM fgc.schedule_header version
+                JOIN fgc.schedule_header source ON source.schedule_header_id = ?
+                 AND version.contract_id = source.contract_id
+                 AND version.payment_stage = source.payment_stage
+                 AND version.schedule_purpose = source.schedule_purpose
+                 AND version.scenario_code IS NOT DISTINCT FROM source.scenario_code
+                """, Integer.class, header)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT active_yn FROM fgc.schedule_header WHERE schedule_header_id=?", Boolean.class, operational)).isTrue();
         long current = next.path("scheduleHeaderId").asLong();
         payload.put("expectedSourceVersion", scheduleRead("/api/v1/schedules/" + current).path("previewContext").path("expectedSourceVersion").asText());

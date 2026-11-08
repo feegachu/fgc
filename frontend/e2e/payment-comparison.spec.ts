@@ -47,7 +47,8 @@ test('지급 안내의 다음은 저장·검증 통과·확정 완료 전까지 
   await expect(card.getByRole('heading', { name: '사전검증', exact: true })).toBeVisible()
   await expect.poll(async () => {
     const bounds = await card.boundingBox()
-    return !!bounds && Math.abs(bounds.x - savedPosition!.x) < 2 && Math.abs(bounds.y - savedPosition!.y) < 2
+    return !!bounds && Math.abs(bounds.x - savedPosition!.x) < 2
+      && Math.abs(bounds.y + bounds.height - savedPosition!.y - savedPosition!.height) < 2
   }).toBe(true)
   await expect(next).toBeDisabled()
   await page.locator('[data-guide-target="payment.batch.precheck"]').click()

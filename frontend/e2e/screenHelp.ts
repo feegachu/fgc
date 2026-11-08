@@ -49,13 +49,13 @@ export async function readDetailedHelp(page: Page, trigger: Locator, minSteps: n
       await finish.click()
       break
     }
-    const gate = card.getByRole('button', { name: /실행 버튼을 눌러주세요|강조된 메뉴를 눌러주세요/ })
-    if (await gate.count()) {
-      await expect(gate).toBeDisabled()
+    const next = card.getByRole('button', { name: /^(다음|실행 버튼을 눌러주세요|강조된 메뉴를 눌러주세요)$/ })
+    if (await next.isDisabled()) {
+      await expect(card.locator('.disabled-button-hint')).toHaveCount(1)
       await card.getByRole('button', { name: '종료', exact: true }).click()
       break
     }
-    await card.getByRole('button', { name: '다음', exact: true }).click()
+    await next.click()
   }
   expect(titles.length).toBeGreaterThanOrEqual(minSteps)
   await expect(card).toHaveCount(0)

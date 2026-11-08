@@ -3,7 +3,7 @@ import { test, expect, login, api, completeMonthly, sql } from './fixtures'
 import { selectEntity } from '../e2e/selectEntity'
 import catalog from '../src/features/assistant/workflow-guides.v1.json' with { type: 'json' }
 
-// SRC-028: real catalog + real HTTP/DOM. A passed partial scenario is not a completed tutorial.
+// SRC-028: real catalog + real HTTP/DOM; verify each entry opens its existing page help.
 // This suite never clicks business save/execute/confirm actions; only test setup may write.
 const month = '2026-07'
 const guides = catalog.filter((guide) => guide.enabled)
