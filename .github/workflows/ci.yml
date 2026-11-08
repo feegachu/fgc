@@ -76,6 +76,25 @@ jobs:
         if: needs.changes.outputs.run_checks == 'true'
         run: ./gradlew build
 
+      - name: Verify API image from tested WAR
+        if: needs.changes.outputs.run_checks == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/api-image"
+          cp build/libs/fgc-0.0.1-SNAPSHOT.war "$RUNNER_TEMP/api-image/"
+          docker build --pull --target ci-runtime -f Containerfile.api -t fgc-api:ci "$RUNNER_TEMP/api-image"
+          docker run --rm --entrypoint cat fgc-api:ci /usr/local/tomcat/webapps/ROOT.war \
+            | cmp - build/libs/fgc-0.0.1-SNAPSHOT.war
+
+      - name: Upload tested API WAR
+        if: needs.changes.outputs.run_checks == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: api-war
+          path: build/libs/fgc-0.0.1-SNAPSHOT.war
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
       # Dependabot/fork PR의 토큰은 read-only이므로, 권한 있는 별도 workflow_run이
       # 이 아티팩트를 읽어 동일 커밋에 "테스트 결과" 체크를 게시한다.
       - name: Upload JUnit XML
@@ -232,6 +251,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download tested API WAR from this run
+        if: needs.changes.outputs.run_checks == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: api-war
+          path: ${{ runner.temp }}/api-image
       - name: Build both images
         if: needs.changes.outputs.run_checks == 'true'
         env:
@@ -243,14 +268,18 @@ jobs:
           cp .containerignore .dockerignore
           case "$PICO_ASSISTANT_AI" in true|false) ;; *) echo 'FGC_ASSISTANT_AI_ENABLED must be true or false' >&2; exit 1 ;; esac
           for app in api web; do
-            web_build_args=()
+            build_args=()
+            context="$RUNNER_TEMP/api-image"
             if [[ "$app" == web ]]; then
-              web_build_args+=(--build-arg "VITE_ASSISTANT_AI=$PICO_ASSISTANT_AI")
+              build_args+=(--build-arg "VITE_ASSISTANT_AI=$PICO_ASSISTANT_AI")
+              context=.
+            else
+              build_args+=(--target ci-runtime)
             fi
-            docker build --pull "${web_build_args[@]}" \
+            docker build --pull "${build_args[@]}" \
               --label org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}" \
               --label org.opencontainers.image.revision="$GITHUB_SHA" \
-              -f "Containerfile.$app" -t "$REGISTRY/$app:sha-$GITHUB_SHA" .
+              -f "Containerfile.$app" -t "$REGISTRY/$app:sha-$GITHUB_SHA" "$context"
           done
       - name: Scan API
         if: needs.changes.outputs.run_checks == 'true'
