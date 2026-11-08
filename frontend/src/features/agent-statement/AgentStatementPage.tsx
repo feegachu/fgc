@@ -223,7 +223,7 @@ export default function AgentStatementPage() {
       {(ready || selectedBranchId !== null) && <SummaryCards summary={branchSummary ?? list.data?.summary} basis={list.data?.basis} loading={selectedBranchId !== null ? overview.isPending : list.isPending} failed={selectedBranchId !== null ? overview.isError : list.isError} dashboardStyle={enhanced} scopeLabel={selectedBranchId !== null ? `${branchSelection?.label ?? branchRows[0]?.branchName ?? '지사'} 전체 합계` : undefined} />}
       {enhanced && view === 'tree' && (overview.isPending || overview.isError ? <div className="surface ast-state" role={overview.isError ? 'alert' : 'status'}>
         {overview.isError ? statementError(overview.error) : '지점과 설계사 명세를 불러오는 중입니다.'}
-        {overview.isError && <Button variant="secondary" onClick={() => void overview.refetch()}>다시 시도</Button>}
+        {overview.isError && <Button data-guide-feature="features.agent-statement-page.button-1" variant="secondary" onClick={() => void overview.refetch()}>다시 시도</Button>}
       </div> : overviewRows.length ? <StatementExplorer key={`${filters.month}:${filters.contractNo}:${filters.commissionItemId}:${filters.entryType}`} viewControl={<StatementViewSwitch value={view} onChange={setView} />} rows={overviewRows} selectedId={selectedBranchId !== null ? null : agentId} selectedBranchId={selectedBranchId} onSelectGroup={(groupId, members, label) => { if (members[0]) setBranchSelection({ id: members[0].branchId, filterKey: branchFilterKey, groupId, agents: members.map(row => row.agentId), label }) }} onSelectBranch={id => setBranchSelection({ id, filterKey: branchFilterKey })} onSelect={id => apply({ ...filters, agentId: id, page: 1 })} /> : <p className="surface ast-state" role="status">조회 조건에 해당하는 설계사가 없습니다.</p>)}
       {enhanced && view === 'table' && !ready && <div className="surface surface-header"><span>조회할 명세가 없습니다.</span><StatementViewSwitch value={view} onChange={setView} /></div>}
       {!ready && !enhanced ? (
@@ -329,9 +329,9 @@ function SummaryCards({
       <section data-guide-feature="features.agent-statement.agent-statement-page.summary" className="kpi-grid kpi-group ast-dashboard-summary" aria-label="유형별 요약">
         {cards.map(([type, key, label, note]) => {
           const bucket = failed ? undefined : summary?.[key]
-          return <KpiCard
+          return <KpiCard guideId="features.agent-statement-page.kpicard-2"
             key={type}
-            guideId={undefined}
+
             label={label}
             value={bucket ? bucket.amount : failed ? '조회 실패' : loading ? '…' : '-'}
             unit={bucket ? '원' : undefined}
@@ -347,7 +347,7 @@ function SummaryCards({
     )
   }
   return (
-    <section data-guide-feature="features.agent-statement.agent-statement-page.summary" className="ast-summary" aria-label="유형별 요약">
+    <section data-guide-feature="features.agent-statement.agent-statement-page.legacy-summary" className="ast-summary" aria-label="유형별 요약">
       {cards.map(([type, key, label, note]) => {
         const bucket = summary?.[key]
         return (

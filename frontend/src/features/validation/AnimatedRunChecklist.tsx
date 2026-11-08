@@ -37,7 +37,7 @@ export function AnimatedRunChecklist({ completed, data, error, retry }: {
         : <span className="vrun-card-note">{error ? '조회 실패' : '확인 대기'}</span>}
     </header>
     <div className="surface-body">
-      {error && <p className="vrun-inline-state is-error" role="alert">{error}<Button variant="secondary" onClick={retry}>다시 시도</Button></p>}
+      {error && <p className="vrun-inline-state is-error" role="alert">{error}<Button data-guide-feature="features.animated-run-checklist.button-1" variant="secondary" onClick={retry}>다시 시도</Button></p>}
       <div className="vrun-checklist">
         {CONDITIONS.map((item, index) => {
           const no = index + 1

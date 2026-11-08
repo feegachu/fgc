@@ -14,11 +14,7 @@ import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
 import { DraftNavigationGuard } from './DraftNavigationGuard'
 import { AgentTopbar } from './AgentTopbar'
-import { HelpComparison } from '../../features/assistant/guide/HelpComparison'
-import type { HelpVersion } from '../../features/assistant/guide/HelpComparison'
-import { Modal } from '../../components/Modal'
-import { Button } from '../../components/Button'
-import { useUnsavedWorkStore } from '../../stores/unsavedWork'
+import type { HelpVersion } from '../../features/assistant/guide/help-version'
 import './kpi-designs.css'
 import './agent-theme.css'
 import './app-theme.css'
@@ -41,13 +37,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
   const revised = user.roleCode !== 'AGENT'
-  const [helpVersion, setHelpVersion] = useState<HelpVersion>('after')
-  const [pendingVersion, setPendingVersion] = useState<HelpVersion | null>(null)
-  const changeVersion = (version: HelpVersion) => {
-    if (version === helpVersion) return
-    if (Object.keys(useUnsavedWorkStore.getState().owners).length) setPendingVersion(version)
-    else setHelpVersion(version)
-  }
+  const helpVersion: HelpVersion = 'after'
   const errorTitle = useErrorTitleStore((state) => state.title)
   const { loggingOut, logout } = useLogout()
   const allowed = current && canOpen(current, user)
@@ -106,7 +96,6 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
           hrefFor={(path) => (month ? withMonth(path, month) : path)}
           onLogout={() => void logout()}
           loggingOut={loggingOut}
-          helpComparison={revised && <HelpComparison version={helpVersion} onChange={changeVersion} label="화면 비교" />}
         />
         <header className="app-header app-header-rail">
           {user.roleCode === 'AGENT' && current?.id === 'AGNT-W01' ? (
@@ -156,13 +145,6 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
         </Suspense>
       )}
       <DraftNavigationGuard />
-      <Modal open={pendingVersion != null} title="화면을 전환할까요?" onClose={() => setPendingVersion(null)}
-        footer={<><Button variant="secondary" onClick={() => setPendingVersion(null)}>계속 작성</Button><Button onClick={() => {
-          if (pendingVersion) setHelpVersion(pendingVersion)
-          setPendingVersion(null)
-        }}>전환</Button></>}>
-        <p>저장하지 않은 입력이 있습니다. 수정 전·후 화면을 전환하면 작성 중인 내용이 초기화됩니다.</p>
-      </Modal>
     </div>
   )
 }

@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useSidebarStore } from '../../stores/sidebar'
 import { canOpen, screens } from '../screens'
@@ -35,14 +34,12 @@ export function Sidebar({
   hrefFor,
   onLogout,
   loggingOut,
-  helpComparison,
 }: {
   user: ShellUser
   current?: ScreenDefinition
   hrefFor: (path: string) => string
   onLogout: () => void
   loggingOut: boolean
-  helpComparison?: ReactNode
 }) {
   const collapsed = useSidebarStore((state) => state.collapsed)
   const openSections = useSidebarStore((state) => state.openSections)
@@ -126,7 +123,6 @@ export function Sidebar({
           </span>
         </button>
       </div>
-      {helpComparison}
       <nav className="sidebar-nav" aria-label="주요 업무 메뉴">
         <ul className="sidebar-nav-list">
           {link('/')}

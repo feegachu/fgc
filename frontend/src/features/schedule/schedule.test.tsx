@@ -15,6 +15,17 @@ import { criteriaFromParams, normalizePage } from './api'
 import type { ScheduleDetail, ScheduleHeader } from './api'
 import { responseLabel } from './labels'
 
+// Legacy action-guide regression fixtures do not expose comparison controls in the app.
+let legacyHelpContext = false
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>()
+  return { ...actual, useOutletContext: () => {
+    const context = actual.useOutletContext<Record<string, unknown>>()
+    return legacyHelpContext ? { ...context, helpVersion: 'before' } : context
+  } }
+})
+beforeEach(() => { legacyHelpContext = false })
+
 const envelope = <T,>(data: T) => ({ data, error: null, requestId: 'schedule-test' })
 const header = (scheduleHeaderId: number, overrides: Partial<ScheduleHeader> = {}): ScheduleHeader => ({
   scheduleHeaderId,
@@ -697,6 +708,7 @@ it('4년 정액 정책은 실제 정액·정책 회차 수를 표시하고 취�
 })
 
 it('regeneration help validates reason and waits for new server version before navigation', async () => {
+  legacyHelpContext = true
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
   const { router, actions } = renderAt('/schedules/11', (url) => {
@@ -708,7 +720,6 @@ it('regeneration help validates reason and waits for new server version before n
     return undefined
   })
   await screen.findByText('한빛생명, 종신보험')
-  await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await screen.findByText('한빛생명, 종신보험')
   await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
   const modal = within(screen.getByRole('dialog', { name: '새 버전 만들기' }))

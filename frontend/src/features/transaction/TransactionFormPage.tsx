@@ -1,6 +1,4 @@
 import { ContractPaymentForm } from './ContractPaymentForm'
-import type { ReactNode } from 'react'
-import { useUnsavedWorkStore } from '../../stores/unsavedWork'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import { isWonAmount } from '../assistant/guards'
 import { usePaymentGuideObservation } from '../assistant/usePaymentGuideObservation'
@@ -8,7 +6,7 @@ import { findGuide } from '../assistant/catalog'
 import { useWorkflowGuide } from '../assistant/workflow-state'
 import { connectPaymentGuideLaunch } from './payment-guide-launch'
 import { nameWithCode } from '../../lib/screenText'
-import { closeSettlementGuide, settlementEntry, subscribeSettlementEntry } from '../assistant/settlement/entry'
+import { settlementEntry, subscribeSettlementEntry } from '../assistant/settlement/entry'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -59,26 +57,8 @@ export default function TransactionFormPage() {
   const { user, month, helpVersion } = useOutletContext<ShellContext>()
   const [params] = useSearchParams()
   const id = params.get('id')
-  const revisedGuide = params.get('guideMode') === 'after'
-  const [mode, setMode] = useState<'before' | 'after'>(() => settlementEntry() && !revisedGuide ? 'before' : 'after')
-  const [pendingMode, setPendingMode] = useState<'before' | 'after' | null>(null)
-  const fullFlow = useSyncExternalStore(subscribeSettlementEntry, settlementEntry)
   const legacyEntry = !!id || params.has('commissionItemId') || params.has('amount')
-  useEffect(() => {
-    if (!fullFlow || revisedGuide || mode === 'before') return
-    const timer = window.setTimeout(() => {
-      if (Object.keys(useUnsavedWorkStore.getState().owners).length) setPendingMode('before')
-      else setMode('before')
-    }, 0)
-    return () => clearTimeout(timer)
-  }, [fullFlow, mode, revisedGuide])
-  const cancelMode = () => { setPendingMode(null); if (fullFlow) closeSettlementGuide() }
-  const actualMode = legacyEntry ? 'before' : fullFlow && revisedGuide ? 'after' : helpVersion ?? mode
-  const comparison = (busy: boolean) => helpVersion ? null : <div role="group" aria-label="지급 등록 방식 비교" className="payment-registration-comparison">{(['before', 'after'] as const).map(value => <Button key={value} variant={actualMode === value ? 'primary' : 'secondary'} aria-pressed={actualMode === value} disabled={busy || legacyEntry || !!fullFlow} onClick={() => {
-    if (value === actualMode) return
-    if (Object.keys(useUnsavedWorkStore.getState().owners).length) setPendingMode(value)
-    else setMode(value)
-  }}>{value === 'before' ? '수정 전' : '수정 후'}</Button>)}</div>
+  const actualMode = legacyEntry ? 'before' : helpVersion ?? 'after'
   const [revision, setRevision] = useState(0)
   const queryClient = useQueryClient()
   const draft = useQuery({
@@ -119,8 +99,8 @@ export default function TransactionFormPage() {
     )
   const returnTo = safeReturnTo(params.get('returnTo'), withMonth('/transactions', activeMonth))
   return <>
-    {actualMode === 'after' ? <ContractPaymentForm key={`${activeMonth}:${params.get('contractId') ?? ''}`} initialContractId={readPaymentEntry(params).contractId} month={activeMonth} canProcess={user.canProcess} returnTo={returnTo} comparison={comparison} /> : <TransactionForm
-      comparison={comparison}
+    {actualMode === 'after' ? <ContractPaymentForm key={`${activeMonth}:${params.get('contractId') ?? ''}`} initialContractId={readPaymentEntry(params).contractId} month={activeMonth} canProcess={user.canProcess} returnTo={returnTo} /> : <TransactionForm
+
       key={`${id ?? 'new'}:${activeMonth}:${id ? revision : params.toString()}`}
       entry={id ? {} : readPaymentEntry(params)}
       returnTo={safeReturnTo(params.get('returnTo'), withMonth('/transactions', activeMonth))}
@@ -131,14 +111,10 @@ export default function TransactionFormPage() {
       role={user.roleCode}
       onReload={reload}
     />}
-    <Modal open={pendingMode !== null} title="등록 방식을 바꿀까요?" onClose={cancelMode} footer={<><Button variant="secondary" onClick={cancelMode}>돌아가기</Button><Button onClick={() => { if (pendingMode) setMode(pendingMode); setPendingMode(null) }}>전환</Button></>}>
-      <p>등록 방식을 바꾸면 현재 화면의 저장하지 않은 입력이 초기화됩니다.</p>
-    </Modal>
   </>
 }
 
 function TransactionForm({
-  comparison,
   entry,
   returnTo,
   initialId,
@@ -148,7 +124,6 @@ function TransactionForm({
   role,
   onReload,
 }: {
-  comparison: (busy: boolean) => ReactNode
   entry: PaymentEntry
   returnTo: string
   initialId: string | null
@@ -609,7 +584,6 @@ function TransactionForm({
           <h1 className="page-title">지급 건 등록, 귀속, 확정</h1>
         </div>
         <div className="page-header-actions">
-          {comparison(busy !== null)}
           <ScreenHelp screenId="TRAN-W02" disabled={fullFlow || helpOpen} triggerRef={help} legacyTrigger={<button data-guide-feature="features.transaction.transaction-form-page.button-2"
             ref={help}
             type="button"

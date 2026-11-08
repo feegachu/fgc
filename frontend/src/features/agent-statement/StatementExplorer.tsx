@@ -52,7 +52,7 @@ export function StatementExplorer({
         <div className="ast-agent-area">
           <div className="ast-agent-cards">
             {visible.map((row) => (
-              <button
+              <button data-guide-feature="features.statement-explorer.button-1"
                 className={`ast-agent-card ${String(row.agentId) === selectedId ? 'is-active' : ''}`}
                 key={row.agentId}
                 aria-pressed={String(row.agentId) === selectedId}

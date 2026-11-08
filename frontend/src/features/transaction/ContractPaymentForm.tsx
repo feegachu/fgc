@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
@@ -92,13 +92,11 @@ export function ContractPaymentForm({
   month,
   canProcess,
   returnTo,
-  comparison,
   initialContractId = '',
 }: {
   month: string
   canProcess: boolean
   returnTo: string
-  comparison: (busy: boolean) => ReactNode
   initialContractId?: string
 }) {
   const editor = useRef<HTMLDivElement>(null)
@@ -429,9 +427,8 @@ export function ContractPaymentForm({
           <h1 className="page-title">지급 계약 건 등록, 귀속, 확정</h1>
         </div>
         <div className="page-header-actions">
-          {comparison(!!busy)}
           <ScreenWalkthrough title="계약별 지급 등록" steps={contractPaymentHelp} />
-          <Link className="button button-secondary" to={returnTo}>
+          <Link data-guide-feature="features.contract-payment-form.link-1" className="button button-secondary" to={returnTo}>
             목록으로
           </Link>
         </div>
@@ -443,7 +440,7 @@ export function ContractPaymentForm({
         defaultRatio={65}
       >
         <div className="transaction-form-column">
-          <section className="surface transaction-form-panel" data-guide-target="payment.batch.scope">
+          <section data-guide-feature="features.contract-payment-form.section-2" className="surface transaction-form-panel" data-guide-target="payment.batch.scope">
             <header className="surface-header transaction-surface-header">
               <h2 className="surface-title">① 지급 계약 건</h2>
               <span className="transaction-panel-meta">{clean ? '저장됨' : '미저장'}</span>
@@ -452,7 +449,7 @@ export function ContractPaymentForm({
               className="surface-body transaction-form-grid contract-payment-fields"
             >
               <Field label="계약" required error={selectedContract && !contractAllowed ? '기준 정산월 이후의 계약입니다. 다른 계약을 선택하세요.' : undefined}>
-                <SearchSelect
+                <SearchSelect data-guide-feature="features.contract-payment-form.searchselect-3"
                   data-guide-target="payment.batch.contract"
                   disabled={scopeLocked}
                   value={contractId}
@@ -468,7 +465,7 @@ export function ContractPaymentForm({
                 />
               </Field>
               <Field label="지급단계" required>
-                <select
+                <select data-guide-feature="features.contract-payment-form.select-4"
                   disabled={scopeLocked}
                   value={stage}
                   onChange={(event) => {
@@ -481,13 +478,13 @@ export function ContractPaymentForm({
                 </select>
               </Field>
               <Field label="원천유형">
-                <input value="GA 수기지급" readOnly />
+                <input data-guide-feature="features.contract-payment-form.input-5" value="GA 수기지급" readOnly />
               </Field>
               <Field label="정산월" required>
-                <input type="month" value={settlementMonth} readOnly />
+                <input data-guide-feature="features.contract-payment-form.input-6" type="month" value={settlementMonth} readOnly />
               </Field>
               <Field label="회차" required>
-                <select
+                <select data-guide-feature="features.contract-payment-form.select-7"
                   disabled={scopeLocked || !installments.length}
                   value={chosen}
                   onChange={(event) => {
@@ -509,7 +506,7 @@ export function ContractPaymentForm({
                 </select>
               </Field>
               <Field label="증빙">
-                <input
+                <input data-guide-feature="features.contract-payment-form.input-8"
                   disabled={editingLocked}
                   value={evidence}
                   maxLength={500}
@@ -529,7 +526,7 @@ export function ContractPaymentForm({
                     : undefined
                 }
               >
-                <input
+                <input data-guide-feature="features.contract-payment-form.input-9"
                   type="date"
                   min={attributionMinimum}
                   max={monthEnd}
@@ -550,7 +547,7 @@ export function ContractPaymentForm({
                     : undefined
                 }
               >
-                <input
+                <input data-guide-feature="features.contract-payment-form.input-10"
                   type="date"
                   min={monthStart}
                   max={monthEnd}
@@ -564,7 +561,7 @@ export function ContractPaymentForm({
               </Field>
               <div className="contract-payment-actions" data-guide-target="payment.batch.actions">
                 <div className="transaction-action-list">
-                  <Button
+                  <Button data-guide-feature="features.contract-payment-form.button-11"
                     data-guide-target="payment.batch.save"
                     variant="secondary"
                     loading={busy === 'save'}
@@ -587,7 +584,7 @@ export function ContractPaymentForm({
                   >
                     임시저장
                   </Button>
-                  <Button
+                  <Button data-guide-feature="features.contract-payment-form.button-12"
                     data-guide-target="payment.batch.precheck"
                     variant="secondary"
                     loading={busy === 'precheck'}
@@ -596,7 +593,7 @@ export function ContractPaymentForm({
                   >
                     사전검증
                   </Button>
-                  <Button
+                  <Button data-guide-feature="features.contract-payment-form.button-13"
                     data-guide-target="payment.batch.confirm"
                     loading={busy === 'confirm'}
                     disabled={!!busy || !canProcess || !allChecked || uncertain}
@@ -605,7 +602,7 @@ export function ContractPaymentForm({
                     확정
                   </Button>
                   {uncertain && Object.keys(saved).length > 0 && (
-                    <Button variant="secondary" loading={busy === 'reload'} onClick={() => void reconcile()}>
+                    <Button data-guide-feature="features.contract-payment-form.button-14" variant="secondary" loading={busy === 'reload'} onClick={() => void reconcile()}>
                       확정 결과 다시 확인
                     </Button>
                   )}
@@ -618,7 +615,7 @@ export function ContractPaymentForm({
                     {error}
                   </p>
                 )}
-                {uncertain && <Link to={returnTo}>지급 목록에서 저장·확정 결과 확인</Link>}
+                {uncertain && <Link data-guide-feature="features.contract-payment-form.link-15" to={returnTo}>지급 목록에서 저장·확정 결과 확인</Link>}
               </div>
             </fieldset>
             {(schedules.isFetching || detail.isFetching) && (
@@ -648,7 +645,7 @@ export function ContractPaymentForm({
               <p className="surface-body">사용 중인 운영 스케줄을 확인해 주세요.</p>
             )}
           </section>
-          <section className="surface transaction-attribution-panel" data-guide-target="payment.batch.lines">
+          <section data-guide-feature="features.contract-payment-form.section-16" className="surface transaction-attribution-panel" data-guide-target="payment.batch.lines">
             <header className="surface-header transaction-surface-header">
               <h2 className="surface-title">② 귀속행, 이 계약의 설계사별 지급 내역</h2>
               <span className="transaction-panel-meta">
@@ -656,7 +653,7 @@ export function ContractPaymentForm({
               </span>
             </header>
             <div className="data-table-viewport">
-              <table className="data-table contract-payment-table">
+              <table data-guide-feature="features.contract-payment-form.table-17" className="data-table contract-payment-table">
                 <caption className="visually-hidden">계약의 지급 귀속행</caption>
                 <colgroup>
                   <col className="batch-col-select" />
@@ -684,7 +681,7 @@ export function ContractPaymentForm({
                     return (
                       <tr key={key} className={String(key) === String(currentResult) ? 'is-selected' : ''}>
                         <td>
-                          <input
+                          <input data-guide-feature="features.contract-payment-form.input-18"
                             type="checkbox"
                             aria-label={`${line.recipientName} ${line.commissionItemName} 선택`}
                             disabled={scopeLocked || !eligible(line)}
@@ -704,7 +701,7 @@ export function ContractPaymentForm({
                           </span>
                         </td>
                         <td>
-                          <SearchSelect
+                          <SearchSelect data-guide-feature="features.contract-payment-form.searchselect-19"
                             disabled={editingLocked || !eligible(line)}
                             aria-label={`${line.recipientName} 수수료 항목 ${key}`}
                             value={edit.item}
@@ -718,7 +715,7 @@ export function ContractPaymentForm({
                           />
                         </td>
                         <td>
-                          <input
+                          <input data-guide-feature="features.contract-payment-form.input-20"
                             data-compare-amount={`actual-${key}`}
                             aria-label={`귀속금액 ${key}`}
                             disabled={editingLocked || !eligible(line)}
@@ -730,7 +727,7 @@ export function ContractPaymentForm({
                           />
                         </td>
                         <td>
-                          <Button variant="ghost" title={checks[key]?.blockers?.map(blocker => blocker.message).filter(Boolean).join(' / ')} onClick={() => setSelectedResult(String(key))}>
+                          <Button data-guide-feature="features.contract-payment-form.button-21" variant="ghost" title={checks[key]?.blockers?.map(blocker => blocker.message).filter(Boolean).join(' / ')} onClick={() => setSelectedResult(String(key))}>
                             {done(key)
                               ? '확정 완료'
                               : checks[key]
@@ -782,7 +779,7 @@ export function ContractPaymentForm({
             confirmedRows={selected.filter((line) => done(line.scheduleLineId!)).length}
             uncertain={uncertain}
           />
-          <section className="surface contract-payment-preview" data-guide-target="payment.batch.expected" aria-labelledby="contract-payment-preview-title">
+          <section data-guide-feature="features.contract-payment-form.section-22" className="surface contract-payment-preview" data-guide-target="payment.batch.expected" aria-labelledby="contract-payment-preview-title">
             <header className="surface-header transaction-surface-header">
               <h2 className="surface-title" id="contract-payment-preview-title">
                 설계사별 예상 스케줄
@@ -793,7 +790,7 @@ export function ContractPaymentForm({
               <ol className="contract-payment-preview-list">
                 {visible.map((line, index) => (
                   <li key={line.scheduleLineId}>
-                    <button
+                    <button data-guide-feature="features.contract-payment-form.button-23"
                       type="button"
                       className="contract-payment-preview-row"
                       disabled={!selected.some((row) => row.scheduleLineId === line.scheduleLineId)}
@@ -834,14 +831,14 @@ export function ContractPaymentForm({
         onClose={() => setConfirmOpen(false)}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setConfirmOpen(false)}>
+            <Button data-guide-feature="features.contract-payment-form.button-24" variant="secondary" onClick={() => setConfirmOpen(false)}>
               돌아가기
             </Button>
-            <Button onClick={() => void confirm()}>확인하고 확정</Button>
+            <Button data-guide-feature="features.contract-payment-form.button-25" onClick={() => void confirm()}>확인하고 확정</Button>
           </>
         }
       >
-        <div className="data-table-viewport"><table className="data-table contract-payment-confirm-table">
+        <div className="data-table-viewport"><table data-guide-feature="features.contract-payment-form.table-26" className="data-table contract-payment-confirm-table">
           <caption className="visually-hidden">확정할 지급 내역</caption>
           <thead><tr><th>설계사</th><th>수수료 항목</th><th>귀속금액</th></tr></thead>
           <tbody>{remaining.map(line => <tr key={line.scheduleLineId}><td>{line.recipientName ?? 'GA'}</td>

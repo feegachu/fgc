@@ -14,6 +14,15 @@ import { useToastStore } from '../../stores/toasts'
 import { criteriaFromParams } from './api'
 import type { Detail, Run } from './api'
 
+// Preserve legacy API/table regression fixtures; guide-revision.spec.ts covers the current UI and guides.
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>()
+  return { ...actual, useOutletContext: () => {
+    const context = actual.useOutletContext<Record<string, unknown>>()
+    return { ...context, helpVersion: 'before' }
+  } }
+})
+
 const run: Run = {
   reconciliationRunId: 41,
   validationRunId: 3,
@@ -753,7 +762,6 @@ it('execution help resets on run selection and waits for the new completed resul
     }
   })
   await screen.findByRole('option', { name: 'LIFE, 테스트생명' })
-  await user.click(screen.getByRole('radio', { name: '수정 전' }))
   await user.click(screen.getByRole('button', { name: '도움말' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
   await user.click(screen.getByRole('button', { name: '다음' }))

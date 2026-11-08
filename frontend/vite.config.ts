@@ -15,6 +15,7 @@ export default defineConfig({
       name: 'development-ui-previews',
       apply: 'serve',
       configureServer(server) {
+        if (process.env.FGC_E2E_PREVIEWS !== 'true') return
         server.middlewares.use(async (req, res, next) => {
           const previews: Record<string, { title: string; entry: string }> = {
             '/policy-preview': { title: '정책 UI 미리보기', entry: 'policyPreview' },

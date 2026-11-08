@@ -209,7 +209,7 @@ export function ClawbackDetail({ detail, revised = false }: { detail: CandidateD
   return (
     <>
       {revised && <div className="claw-detail-tabs" role="tablist" aria-label="환수 검토 근거">
-        {tabs.map(([key, label], index) => <button key={key} type="button" id={`claw-tab-${key}`} role="tab"
+        {tabs.map(([key, label], index) => <button data-guide-feature="features.clawback-detail.button-1" key={key} type="button" id={`claw-tab-${key}`} role="tab"
           aria-selected={activeTab === key} aria-controls={`claw-panel-${key}`} tabIndex={activeTab === key ? 0 : -1}
           onClick={() => setActiveTab(key)} onKeyDown={event => {
             const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length

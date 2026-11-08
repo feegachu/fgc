@@ -14,6 +14,17 @@ import { validateCorrectionLines } from './correctionLines'
 import type { ExceptionCase, ExceptionOptions, ExceptionSearchResult } from './api'
 import { applyActionToCache } from './api'
 
+// Legacy action-guide regression fixtures do not expose comparison controls in the app.
+let legacyHelpContext = false
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>()
+  return { ...actual, useOutletContext: () => {
+    const context = actual.useOutletContext<Record<string, unknown>>()
+    return legacyHelpContext ? { ...context, helpVersion: 'before' } : context
+  } }
+})
+beforeEach(() => { legacyHelpContext = false })
+
 const user = {
   loginId: 'settle01',
   userName: '정산 담당자',
@@ -515,6 +526,7 @@ describe('EXCP-W01 예외함', () => {
   })
 
   it.each([false, true])('원장 정정은 실제 서버 성공 뒤 결과를 표시한다 (도움말=%s)', async (guided) => {
+  legacyHelpContext = true
     vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
     searchResponse = () => search([correctionCase])
@@ -547,7 +559,6 @@ describe('EXCP-W01 예외함', () => {
     const { actions } = renderPage()
     await actions.click(within(await table()).getByRole('button', { name: '12' }))
     // 원장 정정 예외의 처리 폼에는 일반 조치만 나온다.
-    if (guided) await actions.click(screen.getByRole('radio', { name: '수정 전' }))
     const actionSelect = await screen.findByLabelText(/조치/)
     expect(within(actionSelect).queryByRole('option', { name: '해결' })).toBeNull()
     expect(within(actionSelect).getByRole('option', { name: '예외 아님' })).toBeInTheDocument()
@@ -627,6 +638,7 @@ it('양수였던 금액을 지워 두 금액이 모두 0이 되면 요청을 보
 })
 
 it('action help requires a real action sequence and preserves input for a failed retry', async () => {
+  legacyHelpContext = true
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
   let attempts = 0
@@ -637,7 +649,6 @@ it('action help requires a real action sequence and preserves input for a failed
   }
   const { actions } = renderPage()
   await table()
-  await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await actions.click(within(await table()).getByRole('button', { name: '11' }))
   const form = within(await screen.findByRole('form', { name: '예외 처리' }))
   await actions.click(form.getByRole('button', { name: '도움말' }))
@@ -731,12 +742,12 @@ it('does not append a cached action twice or overwrite a newer cached status', (
 })
 
 it.each([[false, 1], [true, 1], [false, 0]] as const)('updates or refreshes a committed action after unmount (help=%s, sequence=%s)', async (guided, sequence) => {
+  legacyHelpContext = true
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
   let finish!: (value: unknown) => void
   postResponse = () => new Promise(resolve => { finish = resolve })
   const { actions, unmount } = renderPage()
   await table()
-  if (guided) await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await actions.click(within(await table()).getByRole('button', { name: '11' }))
   const form = within(await screen.findByRole('form', { name: '예외 처리' }))
   await actions.selectOptions(form.getByLabelText(/조치/), 'START_REVIEW')
@@ -764,12 +775,12 @@ it.each([[false, 1], [true, 1], [false, 0]] as const)('updates or refreshes a co
 })
 
 it('invalidates a completed correction when help is unmounted before acknowledgement', async () => {
+  legacyHelpContext = true
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
   searchResponse = () => search([correctionCase])
   postResponse = () => ({ actionSeq: 2, actionType: 'CORRECT', fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, repostedJournalHeaderId: 72 })
   const { actions, unmount } = renderPage()
   await table()
-  await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await actions.click(within(await table()).getByRole('button', { name: '12' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
   const dialog = within(await screen.findByRole('dialog', { name: '원분개 역분개, 신규 재기표' }))

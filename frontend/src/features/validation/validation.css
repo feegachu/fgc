@@ -558,22 +558,6 @@
   min-width: 0;
 }
 
-/* After preview: presentation timing never changes the server execution state. */
-.vrun-replay-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid #d5e1f2;
-  border-radius: 12px;
-  background: #f4f7fc;
-}
-.vrun-replay-toolbar strong { color: #194d83; font-size: 0.85rem; }
-.vrun-replay-toolbar p { margin: 0.25rem 0 0; color: var(--color-text-secondary); font-size: 0.8rem; }
-.vrun-replay-toolbar button[aria-pressed='true'] { background: #194d83; color: white; border-color: #194d83; }
 .vrun-results-layout,
 .vrun-finalize-sidebar { display: contents; }
 .vrun-detail-page[data-presentation='after'] .vrun-results-layout {

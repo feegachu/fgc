@@ -324,7 +324,7 @@ export function ExceptionPage() {
             </section>
           <Modal open={Boolean(selected)} title={`예외 상세 · ${selected?.contractNo ?? selectedId ?? ''}`}
             className="modal-large exception-detail-modal" onClose={closeDetail} closeOnEscape={!processing}
-            footer={<Button variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button>}>
+            footer={<Button data-guide-feature="features.exception-page.button-1" variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button>}>
             {processing && <p role="status">처리 중입니다. 완료 후 창을 닫을 수 있습니다.</p>}
             <div className="exception-side-panels">
               <section data-guide-feature="features.exception.exception-page.section-3" className="surface">
@@ -363,8 +363,8 @@ export function ExceptionPage() {
             </div>
           </Modal>
           <Modal open={confirmClose} title="작성 중인 내용을 닫을까요?" onClose={() => setConfirmClose(false)}
-            footer={<><Button variant="secondary" onClick={() => setConfirmClose(false)}>계속 작성</Button>
-              <Button onClick={dismissDetail}>입력 버리고 닫기</Button></>}>
+            footer={<><Button data-guide-feature="features.exception-page.button-2" variant="secondary" onClick={() => setConfirmClose(false)}>계속 작성</Button>
+              <Button data-guide-feature="features.exception-page.button-3" onClick={dismissDetail}>입력 버리고 닫기</Button></>}>
             <p>아직 저장하지 않은 처리 내용이 있습니다. 닫으면 작성 중인 내용이 사라집니다.</p>
           </Modal>
         </>

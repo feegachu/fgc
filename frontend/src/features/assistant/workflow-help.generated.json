@@ -719,6 +719,21 @@
         "next": []
       },
       {
+        "stepId": "help.16476970443e5a7d12e36e13a3bc6a08",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract-status-history.button-1",
+        "title": "보험계약 상세, 상세 보기",
+        "instruction": "‘상세 보기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.21c04471a36a26cc3aa3edc3e52bdeb3",
         "screenId": "CONT-W02",
         "targetId": "components.modal.button",
@@ -1802,6 +1817,21 @@
         "next": []
       },
       {
+        "stepId": "help.477c645fd80fee4389911713b69142de",
+        "screenId": "SCHE-W02",
+        "targetId": "features.schedule-detail-page.button-1",
+        "title": "예상 스케줄 상세, 기준정보 / 버전비교",
+        "instruction": "‘기준정보 / 버전비교’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.60ef71c84cfacdbba0be0dc1ba9a425b",
         "screenId": "SCHE-W02",
         "targetId": "schedule.preview.form",
@@ -2136,6 +2166,19 @@
         "next": []
       },
       {
+        "stepId": "help.989c12ca6fc0dac35901d0ca679ac5ec",
+        "screenId": "TRAN-W01",
+        "targetId": "features.transaction-list-page.button-1",
+        "title": "수수료 지급, 예시 지급 건 수정",
+        "instruction": "‘예시 지급 건 수정’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.a21cfffb04e22f10b129e4ae5c325a8a",
         "screenId": "TRAN-W01",
         "targetId": "features.transaction.transaction-list-page.button",
@@ -2242,6 +2285,19 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.e4016af9bdfec5f10b9912f4115e296d",
+        "screenId": "TRAN-W01",
+        "targetId": "features.transaction-list-page.button-2",
+        "title": "수수료 지급, 예시 지급 건 삭제",
+        "instruction": "‘예시 지급 건 삭제’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -7729,6 +7785,36 @@
         "next": []
       },
       {
+        "stepId": "help.223e5809e91d5a3f62575526e56d0c9f",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception-page.button-3",
+        "title": "예외, 입력 버리고 닫기",
+        "instruction": "‘입력 버리고 닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.2b9537ba5e5ad56e60596a997bb2308c",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception-page.button-2",
+        "title": "예외, 계속 작성",
+        "instruction": "‘계속 작성’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.314bd9f56f7d61c664bee80dd0031772",
         "screenId": "EXCP-W01",
         "targetId": "exception.summary.policy_duplicate",
@@ -8045,6 +8131,21 @@
           "SYSTEM_ADMIN",
           "GA_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.896686fc4e4204feab83cce15604fea0",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception-page.button-1",
+        "title": "예외, 닫기",
+        "instruction": "‘닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -8428,6 +8529,19 @@
         "next": []
       },
       {
+        "stepId": "help.706ea142361d2af5097d767abe61099d",
+        "screenId": "VRUN-W01",
+        "targetId": "features.validation-run-list-page.input-1",
+        "title": "월 통합검증, 검증월 (비워두면 전체 월)",
+        "instruction": "‘검증월 (비워두면 전체 월)’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.9fef1fd365ff475a02c33a2233409da8",
         "screenId": "VRUN-W01",
         "targetId": "components.pagination.button-2",
@@ -8634,6 +8748,21 @@
         "next": []
       },
       {
+        "stepId": "help.27aa4d4e21f8d049c64a6d6a8cb0e5d6",
+        "screenId": "VRUN-W02",
+        "targetId": "features.animated-run-checklist.button-1",
+        "title": "월 통합검증 상세, 다시 시도",
+        "instruction": "‘다시 시도’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.3c11c70b7f7815f502c40c1b66878368",
         "screenId": "VRUN-W02",
         "targetId": "features.validation.validation-run-detail-page.link-3",
@@ -8673,6 +8802,21 @@
         "roles": [
           "SYSTEM_ADMIN",
           "GA_ADMIN"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.6114d04d18ebebb1269ceb8632207d7e",
+        "screenId": "VRUN-W02",
+        "targetId": "features.validation.validation-run-detail-page.legacy-checklist-link",
+        "title": "월 통합검증 상세, 미충족 건 바로가기",
+        "instruction": "‘미충족 건 바로가기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -8897,6 +9041,21 @@
         "targetId": "features.validation.validation-run-detail-page.link",
         "title": "월 통합검증 상세, 실행 목록으로",
         "instruction": "‘실행 목록으로’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.e5dc199f92f5ef76de75ba64c27dcfc1",
+        "screenId": "VRUN-W02",
+        "targetId": "features.validation.validation-run-detail-page.legacy-checklist",
+        "title": "월 통합검증 상세, 확정 전 8단계 점검 / ⑤ 확정 조건 (운영정책서 제44조, 8개 전부 통과해야 함)",
+        "instruction": "‘확정 전 8단계 점검 / ⑤ 확정 조건 (운영정책서 제44조, 8개 전부 통과해야 함)’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -10522,6 +10681,21 @@
         "next": []
       },
       {
+        "stepId": "help.223e5809e91d5a3f62575526e56d0c9f",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception-page.button-3",
+        "title": "예외, 입력 버리고 닫기",
+        "instruction": "‘입력 버리고 닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.23c2be7f2736e435e5f48c06c1206ed7",
         "screenId": "CAP-W01",
         "targetId": "components.filter-bar.button",
@@ -10675,6 +10849,21 @@
         "targetId": "features.reconciliation.reconciliation-page.section-4",
         "title": "대사 실행/결과, 실행 요약",
         "instruction": "‘실행 요약’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.2b9537ba5e5ad56e60596a997bb2308c",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception-page.button-2",
+        "title": "예외, 계속 작성",
+        "instruction": "‘계속 작성’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -11716,6 +11905,21 @@
         "next": []
       },
       {
+        "stepId": "help.706ea142361d2af5097d767abe61099d",
+        "screenId": "VRUN-W01",
+        "targetId": "features.validation-run-list-page.input-1",
+        "title": "월 통합검증, 검증월 (비워두면 전체 월)",
+        "instruction": "‘검증월 (비워두면 전체 월)’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.7098d3c40838e1c7d7625708185c7ea6",
         "screenId": "SCHE-W01",
         "targetId": "components.filter-bar.button",
@@ -12190,6 +12394,21 @@
         "next": []
       },
       {
+        "stepId": "help.896686fc4e4204feab83cce15604fea0",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception-page.button-1",
+        "title": "예외, 닫기",
+        "instruction": "‘닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.8a1fd98897efd1b7e3008c9f6231d65f",
         "screenId": "ARB-W01",
         "targetId": "features.arbitrage.arbitrage-page.input-2",
@@ -12366,6 +12585,19 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.989c12ca6fc0dac35901d0ca679ac5ec",
+        "screenId": "TRAN-W01",
+        "targetId": "features.transaction-list-page.button-1",
+        "title": "수수료 지급, 예시 지급 건 수정",
+        "instruction": "‘예시 지급 건 수정’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -13552,6 +13784,19 @@
         "next": []
       },
       {
+        "stepId": "help.e4016af9bdfec5f10b9912f4115e296d",
+        "screenId": "TRAN-W01",
+        "targetId": "features.transaction-list-page.button-2",
+        "title": "수수료 지급, 예시 지급 건 삭제",
+        "instruction": "‘예시 지급 건 삭제’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.e55dbaaade2beedb54c62db17b37287f",
         "screenId": "ARB-W01",
         "targetId": "features.arbitrage.arbitrage-page.section",
@@ -14481,6 +14726,21 @@
         "next": []
       },
       {
+        "stepId": "help.6133d56e8a999264a3471d6ab94be772",
+        "screenId": "CLAW-W01",
+        "targetId": "features.clawback-page.button-3",
+        "title": "환수, 입력 버리고 닫기",
+        "instruction": "‘입력 버리고 닫기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.6410eb7d1cd66538db834a7c5c622437",
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-page.select-6",
@@ -14536,6 +14796,21 @@
           "SYSTEM_ADMIN",
           "GA_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.7951829fcebb5b710b8b1eb9299e39b7",
+        "screenId": "CLAW-W01",
+        "targetId": "features.columns.button-1",
+        "title": "환수, 환수 상세 보기 · 후보",
+        "instruction": "‘환수 상세 보기 · 후보’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -14614,6 +14889,21 @@
         "next": []
       },
       {
+        "stepId": "help.bac19a9195e0b35e68d6543abd3a1240",
+        "screenId": "CLAW-W01",
+        "targetId": "features.clawback-page.button-2",
+        "title": "환수, 계속 작성",
+        "instruction": "‘계속 작성’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.bee2fb86fec01c97509a183b7242f391",
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-calculation.form",
@@ -14648,6 +14938,21 @@
         "targetId": "components.pagination.button-5",
         "title": "환수, 마지막",
         "instruction": "‘마지막’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.c6468e737c82bafe9dd7b0e5efb51330",
+        "screenId": "CLAW-W01",
+        "targetId": "features.clawback-page.button-1",
+        "title": "환수, 닫기",
+        "instruction": "‘닫기’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -14867,6 +15172,19 @@
         "next": []
       },
       {
+        "stepId": "help.0f02171471d23b0116b29a57cfdfa955",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-13",
+        "title": "수수료 지급 등록, 확정",
+        "instruction": "‘확정’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.1081fa298251baf7fd9ade9adaa46c5a",
         "screenId": "TRAN-W02",
         "targetId": "components.search-select.button-2",
@@ -14898,6 +15216,19 @@
         "targetId": "features.transaction.transaction-form-page.link-2",
         "title": "수수료 지급 등록, 목록으로",
         "instruction": "‘목록으로’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.15685e969f18d37e52ae786f4674b95d",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-11",
+        "title": "수수료 지급 등록, 임시저장",
+        "instruction": "‘임시저장’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -14950,6 +15281,32 @@
         "targetId": "features.transaction.attribution-editor.section",
         "title": "수수료 지급 등록, 귀속 내역, 이 돈이 어느 계약 몫인가",
         "instruction": "‘귀속 내역, 이 돈이 어느 계약 몫인가’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.2cea3772ee8a5beee9032078a837193a",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-20",
+        "title": "수수료 지급 등록, 귀속금액",
+        "instruction": "‘귀속금액’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.2f0c2975df8af0291eb5a0d2440bed2e",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-12",
+        "title": "수수료 지급 등록, 사전검증",
+        "instruction": "‘사전검증’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15101,6 +15458,19 @@
         "next": []
       },
       {
+        "stepId": "help.5a4acca15e23e11672bdae043a9faa3d",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.link-15",
+        "title": "수수료 지급 등록, 지급 목록에서 저장·확정 결과 확인",
+        "instruction": "‘지급 목록에서 저장·확정 결과 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.5e96f9985b0703376726cc477873b172",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.attribution-editor.input-5",
@@ -15132,6 +15502,19 @@
         "targetId": "features.transaction.confirmation-panels.button",
         "title": "수수료 지급 등록, 취소",
         "instruction": "‘취소’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.6973fa487c5ed2084aa5fd45762c8b8f",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-5",
+        "title": "수수료 지급 등록, 원천유형",
+        "instruction": "‘원천유형’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15179,11 +15562,37 @@
         "next": []
       },
       {
+        "stepId": "help.720972bb6bfa9db2c66b723865a44ea8",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-6",
+        "title": "수수료 지급 등록, 정산월",
+        "instruction": "‘정산월’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.78cb5c015f0a6fdf9e45a61af1f470d8",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.attribution-editor.select-2",
         "title": "수수료 지급 등록, 귀속 방법",
         "instruction": "‘귀속 방법’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.89845a4869cc52f70b397ba64c1890f1",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.section-22",
+        "title": "수수료 지급 등록, 설계사별 예상 스케줄",
+        "instruction": "‘설계사별 예상 스케줄’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15205,11 +15614,37 @@
         "next": []
       },
       {
+        "stepId": "help.8e92f922aa135b27b7b43da142eb0a7d",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-23",
+        "title": "수수료 지급 등록, 금액 미정 / 원",
+        "instruction": "‘금액 미정 / 원’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.8f85f02715ce47ca3b9fe116d3d986b1",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.cashflow",
         "title": "수수료 지급 등록, 지급 차감",
         "instruction": "‘지급 차감’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.91ef34242e917dd05184a3b887ca559e",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.link-1",
+        "title": "수수료 지급 등록, 목록으로",
+        "instruction": "‘목록으로’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15231,11 +15666,37 @@
         "next": []
       },
       {
+        "stepId": "help.9760bcedd6097adafadfa77e324623fb",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-9",
+        "title": "수수료 지급 등록, 귀속일",
+        "instruction": "‘귀속일’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.97f554ba762f46f60dfee5d844cec2cf",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.stage",
         "title": "수수료 지급 등록, GA→설계사 보험회사→GA",
         "instruction": "‘GA→설계사 보험회사→GA’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.9a2fa8781b688c59dcb796cc4840d133",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-18",
+        "title": "수수료 지급 등록, 선택",
+        "instruction": "‘선택’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15270,6 +15731,32 @@
         "next": []
       },
       {
+        "stepId": "help.b16cfcff86f6984258b4973f76653196",
+        "screenId": "TRAN-W02",
+        "targetId": "features.cap.badges.button",
+        "title": "수수료 지급 등록, 다시 시도",
+        "instruction": "‘다시 시도’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.c2bacd930609208f67b64fc395cf25a8",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-cap-panel.section-1",
+        "title": "수수료 지급 등록, 1,200% 일괄 사전검증 검증 중 / / 행 검증 선택 지급액 -",
+        "instruction": "‘1,200% 일괄 사전검증 검증 중 / / 행 검증 선택 지급액 -’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.c45da0b6c3d36c67bc56350777b50915",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.biz-key",
@@ -15288,6 +15775,19 @@
         "targetId": "features.transaction.transaction-form-page.source-type",
         "title": "수수료 지급 등록, GA 수기지급",
         "instruction": "‘GA 수기지급’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cae5e45ac48084e7347e5e9995ddbd68",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-10",
+        "title": "수수료 지급 등록, 지급 예정일",
+        "instruction": "‘지급 예정일’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15335,6 +15835,19 @@
         "next": []
       },
       {
+        "stepId": "help.d39a2a6b883aebc76b7eae7d840ba4ba",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.select-4",
+        "title": "수수료 지급 등록, 지급단계",
+        "instruction": "‘지급단계’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.d4fcd469a1b53779db268bee637ba671",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.attribution-editor.input-4",
@@ -15374,6 +15887,71 @@
         "next": []
       },
       {
+        "stepId": "help.dd88f940d3d392ee4588fa7321cd2641",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-24",
+        "title": "수수료 지급 등록, 돌아가기",
+        "instruction": "‘돌아가기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.e6db04368c66a1a0c39a0c2cf618f278",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-14",
+        "title": "수수료 지급 등록, 확정 결과 다시 확인",
+        "instruction": "‘확정 결과 다시 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ea54aaa00cd30f6898c551a5554c7623",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.searchselect-3",
+        "title": "수수료 지급 등록, 계약",
+        "instruction": "‘계약’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ec0c219337ba03d79e7ded864f6d9eb7",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.searchselect-19",
+        "title": "수수료 지급 등록, 수수료 항목",
+        "instruction": "‘수수료 항목’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ecdd4189e39099bd1b50696c7c15c0eb",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-8",
+        "title": "수수료 지급 등록, 증빙",
+        "instruction": "‘증빙’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.f3f8b5a47276a372abf9f6160fcc870d",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.confirmation-panels.link-3",
@@ -15387,11 +15965,50 @@
         "next": []
       },
       {
+        "stepId": "help.f45ad75d9f1c3bb05ebc5ae7cab8bcd1",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.select-7",
+        "title": "수수료 지급 등록, 회차",
+        "instruction": "‘회차’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f47cf98fd98bebb7e7d72473304063b9",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-21",
+        "title": "수수료 지급 등록, 확정 완료 / 검증 통과 / 검증 차단 / 임시저장 / 변경됨 / 미저장 / 등록 제외",
+        "instruction": "‘확정 완료 / 검증 통과 / 검증 차단 / 임시저장 / 변경됨 / 미저장 / 등록 제외’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.f679d83d0f655ed1832349a07d9ec0ca",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.amount",
         "title": "수수료 지급 등록, 금액 (원)",
         "instruction": "‘금액 (원)’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.fbef7ac256ce7cf3c77b3383b06897ae",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-25",
+        "title": "수수료 지급 등록, 확인하고 확정",
+        "instruction": "‘확인하고 확정’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15457,6 +16074,19 @@
         "next": []
       },
       {
+        "stepId": "help.0f02171471d23b0116b29a57cfdfa955",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-13",
+        "title": "수수료 지급 등록, 확정",
+        "instruction": "‘확정’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.1081fa298251baf7fd9ade9adaa46c5a",
         "screenId": "TRAN-W02",
         "targetId": "components.search-select.button-2",
@@ -15488,6 +16118,19 @@
         "targetId": "features.transaction.transaction-form-page.link-2",
         "title": "수수료 지급 등록, 목록으로",
         "instruction": "‘목록으로’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.15685e969f18d37e52ae786f4674b95d",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-11",
+        "title": "수수료 지급 등록, 임시저장",
+        "instruction": "‘임시저장’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15540,6 +16183,32 @@
         "targetId": "features.transaction.attribution-editor.section",
         "title": "수수료 지급 등록, 귀속 내역, 이 돈이 어느 계약 몫인가",
         "instruction": "‘귀속 내역, 이 돈이 어느 계약 몫인가’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.2cea3772ee8a5beee9032078a837193a",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-20",
+        "title": "수수료 지급 등록, 귀속금액",
+        "instruction": "‘귀속금액’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.2f0c2975df8af0291eb5a0d2440bed2e",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-12",
+        "title": "수수료 지급 등록, 사전검증",
+        "instruction": "‘사전검증’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15691,6 +16360,19 @@
         "next": []
       },
       {
+        "stepId": "help.5a4acca15e23e11672bdae043a9faa3d",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.link-15",
+        "title": "수수료 지급 등록, 지급 목록에서 저장·확정 결과 확인",
+        "instruction": "‘지급 목록에서 저장·확정 결과 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.5e96f9985b0703376726cc477873b172",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.attribution-editor.input-5",
@@ -15722,6 +16404,19 @@
         "targetId": "features.transaction.confirmation-panels.button",
         "title": "수수료 지급 등록, 취소",
         "instruction": "‘취소’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.6973fa487c5ed2084aa5fd45762c8b8f",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-5",
+        "title": "수수료 지급 등록, 원천유형",
+        "instruction": "‘원천유형’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15769,11 +16464,37 @@
         "next": []
       },
       {
+        "stepId": "help.720972bb6bfa9db2c66b723865a44ea8",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-6",
+        "title": "수수료 지급 등록, 정산월",
+        "instruction": "‘정산월’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.78cb5c015f0a6fdf9e45a61af1f470d8",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.attribution-editor.select-2",
         "title": "수수료 지급 등록, 귀속 방법",
         "instruction": "‘귀속 방법’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.89845a4869cc52f70b397ba64c1890f1",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.section-22",
+        "title": "수수료 지급 등록, 설계사별 예상 스케줄",
+        "instruction": "‘설계사별 예상 스케줄’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15795,11 +16516,37 @@
         "next": []
       },
       {
+        "stepId": "help.8e92f922aa135b27b7b43da142eb0a7d",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-23",
+        "title": "수수료 지급 등록, 금액 미정 / 원",
+        "instruction": "‘금액 미정 / 원’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.8f85f02715ce47ca3b9fe116d3d986b1",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.cashflow",
         "title": "수수료 지급 등록, 지급 차감",
         "instruction": "‘지급 차감’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.91ef34242e917dd05184a3b887ca559e",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.link-1",
+        "title": "수수료 지급 등록, 목록으로",
+        "instruction": "‘목록으로’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15821,11 +16568,37 @@
         "next": []
       },
       {
+        "stepId": "help.9760bcedd6097adafadfa77e324623fb",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-9",
+        "title": "수수료 지급 등록, 귀속일",
+        "instruction": "‘귀속일’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.97f554ba762f46f60dfee5d844cec2cf",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.stage",
         "title": "수수료 지급 등록, GA→설계사 보험회사→GA",
         "instruction": "‘GA→설계사 보험회사→GA’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.9a2fa8781b688c59dcb796cc4840d133",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-18",
+        "title": "수수료 지급 등록, 선택",
+        "instruction": "‘선택’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15860,6 +16633,32 @@
         "next": []
       },
       {
+        "stepId": "help.b16cfcff86f6984258b4973f76653196",
+        "screenId": "TRAN-W02",
+        "targetId": "features.cap.badges.button",
+        "title": "수수료 지급 등록, 다시 시도",
+        "instruction": "‘다시 시도’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.c2bacd930609208f67b64fc395cf25a8",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-cap-panel.section-1",
+        "title": "수수료 지급 등록, 1,200% 일괄 사전검증 검증 중 / / 행 검증 선택 지급액 -",
+        "instruction": "‘1,200% 일괄 사전검증 검증 중 / / 행 검증 선택 지급액 -’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.c45da0b6c3d36c67bc56350777b50915",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.biz-key",
@@ -15878,6 +16677,19 @@
         "targetId": "features.transaction.transaction-form-page.source-type",
         "title": "수수료 지급 등록, GA 수기지급",
         "instruction": "‘GA 수기지급’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cae5e45ac48084e7347e5e9995ddbd68",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-10",
+        "title": "수수료 지급 등록, 지급 예정일",
+        "instruction": "‘지급 예정일’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15925,6 +16737,19 @@
         "next": []
       },
       {
+        "stepId": "help.d39a2a6b883aebc76b7eae7d840ba4ba",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.select-4",
+        "title": "수수료 지급 등록, 지급단계",
+        "instruction": "‘지급단계’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.d4fcd469a1b53779db268bee637ba671",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.attribution-editor.input-4",
@@ -15964,6 +16789,71 @@
         "next": []
       },
       {
+        "stepId": "help.dd88f940d3d392ee4588fa7321cd2641",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-24",
+        "title": "수수료 지급 등록, 돌아가기",
+        "instruction": "‘돌아가기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.e6db04368c66a1a0c39a0c2cf618f278",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-14",
+        "title": "수수료 지급 등록, 확정 결과 다시 확인",
+        "instruction": "‘확정 결과 다시 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ea54aaa00cd30f6898c551a5554c7623",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.searchselect-3",
+        "title": "수수료 지급 등록, 계약",
+        "instruction": "‘계약’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ec0c219337ba03d79e7ded864f6d9eb7",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.searchselect-19",
+        "title": "수수료 지급 등록, 수수료 항목",
+        "instruction": "‘수수료 항목’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ecdd4189e39099bd1b50696c7c15c0eb",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-8",
+        "title": "수수료 지급 등록, 증빙",
+        "instruction": "‘증빙’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.f3f8b5a47276a372abf9f6160fcc870d",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.confirmation-panels.link-3",
@@ -15977,11 +16867,50 @@
         "next": []
       },
       {
+        "stepId": "help.f45ad75d9f1c3bb05ebc5ae7cab8bcd1",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.select-7",
+        "title": "수수료 지급 등록, 회차",
+        "instruction": "‘회차’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f47cf98fd98bebb7e7d72473304063b9",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-21",
+        "title": "수수료 지급 등록, 확정 완료 / 검증 통과 / 검증 차단 / 임시저장 / 변경됨 / 미저장 / 등록 제외",
+        "instruction": "‘확정 완료 / 검증 통과 / 검증 차단 / 임시저장 / 변경됨 / 미저장 / 등록 제외’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.f679d83d0f655ed1832349a07d9ec0ca",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.amount",
         "title": "수수료 지급 등록, 금액 (원)",
         "instruction": "‘금액 (원)’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.fbef7ac256ce7cf3c77b3383b06897ae",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-25",
+        "title": "수수료 지급 등록, 확인하고 확정",
+        "instruction": "‘확인하고 확정’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -16047,6 +16976,19 @@
         "next": []
       },
       {
+        "stepId": "help.0f02171471d23b0116b29a57cfdfa955",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-13",
+        "title": "수수료 지급 등록, 확정",
+        "instruction": "‘확정’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.1081fa298251baf7fd9ade9adaa46c5a",
         "screenId": "TRAN-W02",
         "targetId": "components.search-select.button-2",
@@ -16078,6 +17020,19 @@
         "targetId": "features.transaction.transaction-form-page.link-2",
         "title": "수수료 지급 등록, 목록으로",
         "instruction": "‘목록으로’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.15685e969f18d37e52ae786f4674b95d",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-11",
+        "title": "수수료 지급 등록, 임시저장",
+        "instruction": "‘임시저장’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -16130,6 +17085,32 @@
         "targetId": "features.transaction.attribution-editor.section",
         "title": "수수료 지급 등록, 귀속 내역, 이 돈이 어느 계약 몫인가",
         "instruction": "‘귀속 내역, 이 돈이 어느 계약 몫인가’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.2cea3772ee8a5beee9032078a837193a",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-20",
+        "title": "수수료 지급 등록, 귀속금액",
+        "instruction": "‘귀속금액’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.2f0c2975df8af0291eb5a0d2440bed2e",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-12",
+        "title": "수수료 지급 등록, 사전검증",
+        "instruction": "‘사전검증’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -16281,6 +17262,19 @@
         "next": []
       },
       {
+        "stepId": "help.5a4acca15e23e11672bdae043a9faa3d",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.link-15",
+        "title": "수수료 지급 등록, 지급 목록에서 저장·확정 결과 확인",
+        "instruction": "‘지급 목록에서 저장·확정 결과 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.5e96f9985b0703376726cc477873b172",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.attribution-editor.input-5",
@@ -16312,6 +17306,19 @@
         "targetId": "features.transaction.confirmation-panels.button",
         "title": "수수료 지급 등록, 취소",
         "instruction": "‘취소’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.6973fa487c5ed2084aa5fd45762c8b8f",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-5",
+        "title": "수수료 지급 등록, 원천유형",
+        "instruction": "‘원천유형’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -16359,11 +17366,37 @@
         "next": []
       },
       {
+        "stepId": "help.720972bb6bfa9db2c66b723865a44ea8",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-6",
+        "title": "수수료 지급 등록, 정산월",
+        "instruction": "‘정산월’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.78cb5c015f0a6fdf9e45a61af1f470d8",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.attribution-editor.select-2",
         "title": "수수료 지급 등록, 귀속 방법",
         "instruction": "‘귀속 방법’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.89845a4869cc52f70b397ba64c1890f1",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.section-22",
+        "title": "수수료 지급 등록, 설계사별 예상 스케줄",
+        "instruction": "‘설계사별 예상 스케줄’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -16385,11 +17418,37 @@
         "next": []
       },
       {
+        "stepId": "help.8e92f922aa135b27b7b43da142eb0a7d",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-23",
+        "title": "수수료 지급 등록, 금액 미정 / 원",
+        "instruction": "‘금액 미정 / 원’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.8f85f02715ce47ca3b9fe116d3d986b1",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.cashflow",
         "title": "수수료 지급 등록, 지급 차감",
         "instruction": "‘지급 차감’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.91ef34242e917dd05184a3b887ca559e",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.link-1",
+        "title": "수수료 지급 등록, 목록으로",
+        "instruction": "‘목록으로’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -16411,11 +17470,37 @@
         "next": []
       },
       {
+        "stepId": "help.9760bcedd6097adafadfa77e324623fb",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-9",
+        "title": "수수료 지급 등록, 귀속일",
+        "instruction": "‘귀속일’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.97f554ba762f46f60dfee5d844cec2cf",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.stage",
         "title": "수수료 지급 등록, GA→설계사 보험회사→GA",
         "instruction": "‘GA→설계사 보험회사→GA’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.9a2fa8781b688c59dcb796cc4840d133",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-18",
+        "title": "수수료 지급 등록, 선택",
+        "instruction": "‘선택’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -16450,6 +17535,32 @@
         "next": []
       },
       {
+        "stepId": "help.b16cfcff86f6984258b4973f76653196",
+        "screenId": "TRAN-W02",
+        "targetId": "features.cap.badges.button",
+        "title": "수수료 지급 등록, 다시 시도",
+        "instruction": "‘다시 시도’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.c2bacd930609208f67b64fc395cf25a8",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-cap-panel.section-1",
+        "title": "수수료 지급 등록, 1,200% 일괄 사전검증 검증 중 / / 행 검증 선택 지급액 -",
+        "instruction": "‘1,200% 일괄 사전검증 검증 중 / / 행 검증 선택 지급액 -’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.c45da0b6c3d36c67bc56350777b50915",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.biz-key",
@@ -16468,6 +17579,19 @@
         "targetId": "features.transaction.transaction-form-page.source-type",
         "title": "수수료 지급 등록, GA 수기지급",
         "instruction": "‘GA 수기지급’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cae5e45ac48084e7347e5e9995ddbd68",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-10",
+        "title": "수수료 지급 등록, 지급 예정일",
+        "instruction": "‘지급 예정일’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -16515,6 +17639,19 @@
         "next": []
       },
       {
+        "stepId": "help.d39a2a6b883aebc76b7eae7d840ba4ba",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.select-4",
+        "title": "수수료 지급 등록, 지급단계",
+        "instruction": "‘지급단계’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.d4fcd469a1b53779db268bee637ba671",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.attribution-editor.input-4",
@@ -16554,6 +17691,71 @@
         "next": []
       },
       {
+        "stepId": "help.dd88f940d3d392ee4588fa7321cd2641",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-24",
+        "title": "수수료 지급 등록, 돌아가기",
+        "instruction": "‘돌아가기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.e6db04368c66a1a0c39a0c2cf618f278",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-14",
+        "title": "수수료 지급 등록, 확정 결과 다시 확인",
+        "instruction": "‘확정 결과 다시 확인’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ea54aaa00cd30f6898c551a5554c7623",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.searchselect-3",
+        "title": "수수료 지급 등록, 계약",
+        "instruction": "‘계약’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ec0c219337ba03d79e7ded864f6d9eb7",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.searchselect-19",
+        "title": "수수료 지급 등록, 수수료 항목",
+        "instruction": "‘수수료 항목’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ecdd4189e39099bd1b50696c7c15c0eb",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.input-8",
+        "title": "수수료 지급 등록, 증빙",
+        "instruction": "‘증빙’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.f3f8b5a47276a372abf9f6160fcc870d",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.confirmation-panels.link-3",
@@ -16567,11 +17769,50 @@
         "next": []
       },
       {
+        "stepId": "help.f45ad75d9f1c3bb05ebc5ae7cab8bcd1",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.select-7",
+        "title": "수수료 지급 등록, 회차",
+        "instruction": "‘회차’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f47cf98fd98bebb7e7d72473304063b9",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-21",
+        "title": "수수료 지급 등록, 확정 완료 / 검증 통과 / 검증 차단 / 임시저장 / 변경됨 / 미저장 / 등록 제외",
+        "instruction": "‘확정 완료 / 검증 통과 / 검증 차단 / 임시저장 / 변경됨 / 미저장 / 등록 제외’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.f679d83d0f655ed1832349a07d9ec0ca",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.amount",
         "title": "수수료 지급 등록, 금액 (원)",
         "instruction": "‘금액 (원)’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.fbef7ac256ce7cf3c77b3383b06897ae",
+        "screenId": "TRAN-W02",
+        "targetId": "features.contract-payment-form.button-25",
+        "title": "수수료 지급 등록, 확인하고 확정",
+        "instruction": "‘확인하고 확정’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",

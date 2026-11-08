@@ -271,7 +271,7 @@ export default function ClawbackPage() {
       <Modal open={selected != null} title={`환수 상세 · ${selected?.contractNo ?? '계약 확인'}`}
         className="modal-large claw-detail-modal" onClose={closeDetail} closeOnEscape={!processing}
         footer={<div className="claw-footer-actions">{revised && <div ref={setCalculationHost} />}
-          <Button variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button></div>}>
+          <Button data-guide-feature="features.clawback-page.button-1" variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button></div>}>
         <section data-guide-feature="features.clawback.clawback-page.section-2" className="claw-detail-panel" aria-labelledby="claw-detail-title">
           <header className="surface-header claw-panel-header">
             <h3 className="surface-title" id="claw-detail-title">후보 근거 · 환수 계산</h3>
@@ -307,8 +307,8 @@ export default function ClawbackPage() {
         </section>
       </Modal>
       <Modal open={confirmClose} title="작성 중인 내용을 닫을까요?" onClose={() => setConfirmClose(false)}
-        footer={<><Button variant="secondary" onClick={() => setConfirmClose(false)}>계속 작성</Button>
-          <Button onClick={() => { setConfirmClose(false); setSelection(null) }}>입력 버리고 닫기</Button></>}>
+        footer={<><Button data-guide-feature="features.clawback-page.button-2" variant="secondary" onClick={() => setConfirmClose(false)}>계속 작성</Button>
+          <Button data-guide-feature="features.clawback-page.button-3" onClick={() => { setConfirmClose(false); setSelection(null) }}>입력 버리고 닫기</Button></>}>
         <p>입력한 계산 사유가 저장되지 않았습니다. 창을 닫으면 작성 중인 내용이 사라집니다.</p>
       </Modal>
     </div>

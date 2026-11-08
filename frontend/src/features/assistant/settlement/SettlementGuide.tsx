@@ -15,7 +15,7 @@ import { decide, STEPS, handoffFor, replacePayment as replacementSelection } fro
 import type { Selection, Evidence, Decision } from './state'
 import type { ContractPage } from '../../contract/api'
 import { readPayment } from '../../transaction/form-api'
-import type { HelpVersion } from '../guide/HelpComparison'
+import type { HelpVersion } from '../guide/help-version'
 import { guideGet, readEvidence } from './api'
 import { destinations, settlementCatalog, titles, FLOW_VERSION } from './catalog'
 import './settlement.css'

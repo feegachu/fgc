@@ -3,12 +3,7 @@ import type { Locator, Page } from '@playwright/test'
 import { screenWalkthroughs } from '../src/features/assistant/guide/screen-walkthroughs'
 
 export async function chooseDetailedHelp(page: Page) {
-  const after = page.getByRole('radio', { name: '수정 후', exact: true })
-  if (!await after.isChecked()) {
-    await page.getByRole('radio', { name: '수정 전', exact: true }).focus()
-    await page.keyboard.press('ArrowRight')
-  }
-  await expect(after).toBeChecked()
+  await expect(page.getByRole('button', { name: '도움말', exact: true })).toBeVisible()
 }
 
 export async function readDetailedHelp(page: Page, trigger: Locator, minSteps: number) {

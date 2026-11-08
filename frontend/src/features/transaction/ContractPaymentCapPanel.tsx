@@ -21,7 +21,7 @@ export function ContractPaymentCapPanel({ rows, pending }: { rows: Row[]; pendin
   const common = !pending && checked === rows.length && previews.length === rows.length
     && first && previews.every(p => basis(p) === basis(first)) ? first : undefined
   const total = rows.reduce((sum, row) => sum + row.amount, 0)
-  return <section className="surface transaction-cap-panel contract-batch-cap" id="cap-panel" aria-labelledby="batch-cap-title">
+  return <section data-guide-feature="features.contract-payment-cap-panel.section-1" className="surface transaction-cap-panel contract-batch-cap" id="cap-panel" aria-labelledby="batch-cap-title">
     <header className="surface-header transaction-surface-header">
       <h2 className="surface-title" id="batch-cap-title">1,200% 일괄 사전검증</h2>
       <span className="transaction-panel-meta">{pending ? '검증 중' : `${checked}/${rows.length}행 검증`}</span>
@@ -42,7 +42,7 @@ export function ContractPaymentCapPanel({ rows, pending }: { rows: Row[]; pendin
         </div>
       </>}
       {rows.length ? <div className="contract-batch-cap-table">
-        <table>
+        <table data-guide-feature="features.contract-payment-cap-panel.table-2">
           <thead><tr><th>설계사 / 수수료 항목</th><th>지급액</th><th>산입액 / 판정</th></tr></thead>
           <tbody>{rows.map(row => <tr key={row.id}>
             <td><strong>{row.name}</strong><span>{row.item}</span></td>

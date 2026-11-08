@@ -178,13 +178,9 @@ html:has(.app-shell.app-theme) body {
   background: var(--color-action-subtle);
 }
 
-/* Compact tabs keep the visible mouse/keyboard highlight and close controls. */
+/* Use the shared fixed tab width, keeping compact height and close controls. */
 :root .workspace-tab {
-  width: auto;
-  min-width: 6.5rem;
-  max-width: 16rem;
   height: var(--control-height-sm);
-  flex: 0 0 auto;
   border: 0;
   border-radius: 6px;
   background: transparent;

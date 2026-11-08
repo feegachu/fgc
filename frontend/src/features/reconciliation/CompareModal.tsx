@@ -65,7 +65,7 @@ function CompareContent({ detail, month, revised }: { detail: Detail; month: str
   return (
     <>
       {revised && <div className="reco-detail-tabs" role="tablist" aria-label="대사 비교 상세 항목">
-        {tabs.map((label, index) => <button type="button" key={label} role="tab" id={`reco-tab-${index}`} aria-selected={tab === index}
+        {tabs.map((label, index) => <button data-guide-feature="features.compare-modal.button-1" type="button" key={label} role="tab" id={`reco-tab-${index}`} aria-selected={tab === index}
           aria-controls={`reco-panel-${index}`} tabIndex={tab === index ? 0 : -1} onClick={() => setTab(index)} onKeyDown={event => {
             const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : null
             if (next != null) { event.preventDefault(); setTab(next); document.getElementById(`reco-tab-${next}`)?.focus() }

@@ -133,7 +133,7 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
       id: 'payment.openRegistration', selector: '[data-guide-feature="features.transaction.transaction-list-page.context-link-2"]',
       title: '수수료 지급 등록으로 이어가기', concise: true,
       instruction: '신규 등록을 눌러 계약별 지급 건을 작성하세요.',
-      interaction: '수정 후 등록 화면에서 안내를 이어갑니다.',
+      interaction: '계약별 지급 등록 화면에서 안내를 이어갑니다.',
       destination: 'payment-form', presentation: { side: 'left' },
     }]
   }

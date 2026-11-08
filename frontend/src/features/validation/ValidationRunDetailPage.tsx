@@ -141,24 +141,9 @@ function DetailBody({
   const revised = helpVersion !== 'before'
   const awaitingAttempt = executed && previousAttemptId !== null && !hasNewAttempt(progress.data, previousAttemptId)
   const presentation = useRunPresentation(status, currentStep, attemptWaitGeneration, revised, awaitingAttempt)
-  const [replay, setReplay] = useState<{ detail: ValidationRunDetail; status: string; step: number; loop: boolean } | null>(null)
-  const [replayGeneration, setReplayGeneration] = useState(0)
-  const canReplay = revised && !awaitingAttempt && ['COMPLETED', 'FINALIZED', 'FAILED'].includes(status ?? '') && (header.currentStep ?? 0) > 0
-  const replaying = canReplay && replay !== null
-  const replayPresentation = useRunPresentation(replay?.status, replay?.step ?? 0, replayGeneration, replaying, false)
-  const displayed = replaying ? replayPresentation : presentation
-  const resultDetail = replaying ? replay.detail : detail
+  const displayed = presentation
+  const resultDetail = detail
   const resultStep = Math.min(displayed.completed, resultDetail.header?.currentStep ?? 0)
-  const startReplay = (loop: boolean) => {
-    if (!canReplay || !status) return
-    setReplay({ detail, status, step: currentStep, loop })
-    setReplayGeneration(value => value + 1)
-  }
-  useEffect(() => {
-    if (!replaying || !replay.loop || replayPresentation.catchingUp) return
-    const timer = window.setTimeout(() => setReplayGeneration(value => value + 1), 3000)
-    return () => window.clearTimeout(timer)
-  }, [replaying, replay, replayPresentation.catchingUp, replayGeneration])
 
   // Results are fetched at server milestones, independently of the slower visual playback.
   useEffect(() => {
@@ -227,9 +212,7 @@ function DetailBody({
     onError: (error) => { executionGuide.fail(errorText(error)); toast(errorText(error), 'error') },
   })
 
-  const progressToastActive = revised && (replaying
-    ? displayed.catchingUp
-    : execute.isPending || awaitingAttempt || status === 'RUNNING' || displayed.catchingUp)
+  const progressToastActive = revised && (execute.isPending || awaitingAttempt || status === 'RUNNING' || displayed.catchingUp)
   const summariesLoaded = [resultDetail.capSummary?.violationCount, resultDetail.capSummary?.warningCount,
     resultDetail.arbitrageSummary?.candidateCount, resultDetail.ledgerSummary?.imbalanceCount,
     resultDetail.reconciliationSummary?.mismatchCount, resultDetail.exceptionSummary?.openWorkItemCount, resultDetail.exceptionSummary?.detectedCount, resultDetail.exceptionSummary?.newCount,
@@ -239,8 +222,7 @@ function DetailBody({
       : status === 'FAILED' ? failureText(failureMessage, currentStep) : ''
   const guideState = guideError ? 'error' : progressToastActive || executed && status === 'CREATED' ? 'running'
     : ['COMPLETED', 'FINALIZED'].includes(status ?? '') && resultStep >= 8 && summariesLoaded ? 'ready' : 'waiting'
-  const progressToastTitle = replaying ? '저장된 결과 화면 재생 중'
-    : execute.isPending || awaitingAttempt ? '월 통합검증 시작 중'
+  const progressToastTitle = execute.isPending || awaitingAttempt ? '월 통합검증 시작 중'
       : status === 'RUNNING' ? '월 통합검증 실행 중' : '검증 결과 표시 중'
   const activeStepName = STEP_NAMES.find((_name, index) => displayed.state(index + 1) === 'running')
   useRunProgressToast(progressToastActive,
@@ -360,20 +342,6 @@ function DetailBody({
           {!revised && executionActions}
         </header>
         <div className="surface-body">
-          {revised && <div className="vrun-replay-toolbar">
-            <div>
-              <strong>{replaying ? '저장된 결과 화면 재생 중' : '화면 미리보기'}</strong>
-              <p>{canReplay ? '저장된 결과로 애니메이션만 재생합니다. 검증 실행·데이터 저장은 하지 않습니다.' : '검증 결과가 있는 실행을 선택하면 다시 실행하지 않고 화면을 반복해서 볼 수 있습니다.'}</p>
-            </div>
-            <div className="page-header-actions">
-              <Button variant="secondary" disabled={!canReplay} onClick={() => startReplay(replay?.loop ?? false)}>화면 다시 재생</Button>
-              <Button variant="secondary" disabled={!canReplay} aria-pressed={replaying && replay.loop} onClick={() => {
-                if (replaying) setReplay({ ...replay, loop: !replay.loop })
-                else startReplay(true)
-              }}>{replaying && replay.loop ? '반복 재생 켜짐' : '반복 재생'}</Button>
-              {replaying && <Button variant="secondary" onClick={() => setReplay(null)}>재생 종료</Button>}
-            </div>
-          </div>}
           {/* 숨겨져도 [실행]의 aria-describedby로 읽히므로 숨기는 상태에는 글자를 두지 않는다. */}
           <p
             className="vrun-action-note"
@@ -397,7 +365,7 @@ function DetailBody({
                           ? '계약별 실행은 실패 지점부터 재시작할 수 없습니다. 새 실행을 만드세요.'
                           : ''}
           </p>
-          {!replaying && header.runType !== 'MANUAL_CONTRACT' && <ValidationRestartPanel key={id} id={id} month={header.validationMonth ?? ""} runNo={header.runNo ?? 0} status={status ?? 'CREATED'} waiting={!progress.isSuccess || !!(executed && !finished)} canProcess={canProcess} onAccepted={() => {
+          {header.runType !== 'MANUAL_CONTRACT' && <ValidationRestartPanel key={id} id={id} month={header.validationMonth ?? ""} runNo={header.runNo ?? 0} status={status ?? 'CREATED'} waiting={!progress.isSuccess || !!(executed && !finished)} canProcess={canProcess} onAccepted={() => {
             announced.current = false
             setPreviousAttemptId(progress.data?.attemptId ?? 0)
             setExecuted(true)
@@ -405,12 +373,12 @@ function DetailBody({
             toast('재시작 요청을 접수했습니다. 실제 진행 상태를 확인합니다.', 'info')
           }} />}
           <p className="vrun-progress-line">
-            <span>{guidePreview ? '진행 표시 미리보기' : replaying ? (displayed.catchingUp ? '화면 재생' : replay.loop ? '3초 후 다시 재생' : '화면 재생 완료') : revised && presentation.catchingUp && status !== 'RUNNING' ? '완료된 단계 표시 중' : '진행률'}</span>
+            <span>{guidePreview ? '진행 표시 미리보기' : revised && presentation.catchingUp && status !== 'RUNNING' ? '완료된 단계 표시 중' : '진행률'}</span>
             <span className="vrun-progress-value" role="status" aria-live="polite">
               {progressText(revised ? progressDisplay.completed : currentStep)}
             </span>
           </p>
-          <ol key={guidePreview ? `guide-${guideGeneration}` : replaying ? `replay-${replayGeneration}` : 'live'} className="vrun-stepper" aria-label={replaying ? '저장된 검증 결과 재생' : '월 통합검증 10단계 진행 상태'}>
+          <ol key={guidePreview ? `guide-${guideGeneration}` : 'live'} className="vrun-stepper" aria-label="월 통합검증 10단계 진행 상태">
             {STEP_NAMES.map((name, index) => {
               const state = revised ? progressDisplay.state(index + 1) : stepState(index + 1, status, currentStep)
               return (
@@ -440,14 +408,14 @@ function DetailBody({
 
       <div className="vrun-results-layout" data-guide-target="validation.results" data-guide-validation-state={guideState} data-guide-validation-error={guideError} data-guide-completed={guideState === 'ready'}>
       <div className="vrun-mid-grid">
-        <TargetSection key={replaying ? `replay-targets-${replayGeneration}` : `targets-${attemptWaitGeneration}`} detail={resultDetail} revised={revised} ready={!revised || resultStep >= 2} />
+        <TargetSection key={`targets-${attemptWaitGeneration}`} detail={resultDetail} revised={revised} ready={!revised || resultStep >= 2} />
         <SummarySection detail={resultDetail} status={status} completed={revised ? resultStep : undefined} ready={guideState === 'ready'} />
       </div>
 
       <ExceptionSection detail={resultDetail} openLink={link} completed={revised ? resultStep : undefined} />
 
       <div className="vrun-finalize-sidebar">
-      <div data-guide-target="validation.checklist"><ChecklistSection status={status} checklist={checklist} revised={revised} completed={resultStep} generation={`${attemptWaitGeneration}-${replaying ? replayGeneration : 'live'}`} /></div>
+      <div data-guide-target="validation.checklist"><ChecklistSection status={status} checklist={checklist} revised={revised} completed={resultStep} generation={`${attemptWaitGeneration}-live`} /></div>
 
       <FinalizeSection
         revised={revised}
@@ -455,7 +423,6 @@ function DetailBody({
         id={id}
         status={status}
         canFinalize={canFinalize}
-        replaying={replaying}
         runType={header.runType}
         checklist={checklist.isError || checklist.isFetching ? undefined : checklist.data}
         validationMonth={formatMonth(header.validationMonth)}
@@ -721,7 +688,7 @@ function ChecklistSection({
                   {condition.passed ? '통과' : `미충족 ${condition.count}건`}
                 </StatusBadge>}
                 {to && (
-                  <Link data-guide-feature="features.validation.validation-run-detail-page.link-3" className={revised ? 'vrun-text-link' : undefined} to={to} aria-label={`${condition.label} 미충족 건 바로가기`}>
+                  <Link data-guide-feature="features.validation.validation-run-detail-page.legacy-checklist-link" className={revised ? 'vrun-text-link' : undefined} to={to} aria-label={`${condition.label} 미충족 건 바로가기`}>
                     바로가기
                   </Link>
                 )}
@@ -739,7 +706,7 @@ function ChecklistSection({
     )
   }
   return (
-    <section data-guide-feature="features.validation.validation-run-detail-page.section-7" className="surface" aria-labelledby="vrun-checklist-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.legacy-checklist" className="surface" aria-labelledby="vrun-checklist-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-checklist-title">
           {revised ? '확정 전 8단계 점검' : '⑤ 확정 조건 (운영정책서 제44조, 8개 전부 통과해야 함)'}
@@ -764,7 +731,6 @@ function newKey(id: string) {
 
 function FinalizeSection({
   revised,
-  replaying,
   finalizeGuide,
   runType,
   id,
@@ -777,7 +743,6 @@ function FinalizeSection({
   onFailed,
 }: {
   revised: boolean
-  replaying: boolean
   finalizeGuide: SaveGuide
   id: string
   runType?: string
@@ -795,7 +760,7 @@ function FinalizeSection({
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const supportedType = runType === 'MONTHLY' || runType === 'PRE_CONFIRM'
-  const finalizable = !replaying && supportedType && canFinalize && status === 'COMPLETED' && checklist?.passed === true
+  const finalizable = supportedType && canFinalize && status === 'COMPLETED' && checklist?.passed === true
   useEffect(() => { finalizeGuide.update(id, finalizable) }, [finalizeGuide, id, finalizable])
   // 멱등키는 성공하거나 FGC-VRUN-006(다른 실행에 귀속된 키)을 받을 때까지 같은 값으로 재시도한다.
   const key = useRef<string | null>(null)
@@ -825,8 +790,7 @@ function FinalizeSection({
   const passed = checklist?.passed === true
   const enabled = finalizable && !mutation.isPending
   let reason = ''
-  if (replaying) reason = '화면 재생 중에는 확정할 수 없습니다. 재생을 종료해 주세요.'
-  else if (mutation.isPending) reason = '확정 요청을 처리하고 있습니다. 잠시 기다려 주세요.'
+  if (mutation.isPending) reason = '확정 요청을 처리하고 있습니다. 잠시 기다려 주세요.'
   else if (!canFinalize) reason = '확정은 GA관리자와 시스템관리자만 할 수 있습니다.'
   else if (status === 'FINALIZED') reason = '이미 확정된 실행입니다. 결과를 바꾸려면 새 실행을 만드세요.'
   else if (!supportedType) reason = '월 전체를 계산한 월간·확정 전 실행만 최종 확정할 수 있습니다.'
@@ -880,7 +844,7 @@ function FinalizeSection({
         {!enabled && <div id="finalize-disabled-tooltip" role="tooltip" className="vrun-finalize-tooltip" hidden={!showDisabledReason}>
           <strong>확정할 수 없는 이유</strong>
           <p>{reason}</p>
-          {status === 'COMPLETED' && !replaying && blockedConditions.length > 0 && <ul>
+          {status === 'COMPLETED' && blockedConditions.length > 0 && <ul>
             {blockedConditions.map(condition => <li key={condition.no}>{condition.label} · 미충족 {condition.count}건</li>)}
           </ul>}
         </div>}

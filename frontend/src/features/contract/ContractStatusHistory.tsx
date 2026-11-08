@@ -413,7 +413,7 @@ export function ContractStatusHistory({ id, compact = false }: { id: string; com
             {ordered.map((event, index) => <li className="contract-history-event" key={event.eventId ?? index}>
               <div className="contract-history-node-heading">
                 <strong>{responseLabel(contractStatusLabels, event.newStatus, event.newStatusLabel)}</strong>
-                {event.eventId != null && <Button variant="secondary" onClick={() => setSelection({ eventId: event.eventId!, open: true })}>상세 보기</Button>}
+                {event.eventId != null && <Button data-guide-feature="features.contract-status-history.button-1" variant="secondary" onClick={() => setSelection({ eventId: event.eventId!, open: true })}>상세 보기</Button>}
               </div>
               <time dateTime={event.effectiveAt}>{dateTime(event.effectiveAt)}</time>
               <span>{reasonText(event)}</span>

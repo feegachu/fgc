@@ -10,7 +10,7 @@ import { GuideTargets } from './targets'
 import { FilterBar } from '../../../components/FilterBar'
 import definitions from './screen-help.json'
 import guideMascot from '../assets/pico-guide.png'
-// The original walkthrough remains available through the sidebar's before mode.
+// Isolated regression coverage for the original action-guide runtime.
 vi.mock('react-router', async (importOriginal) => ({
   ...await importOriginal<typeof import('react-router')>(),
   useOutletContext: () => ({ helpVersion: 'before' }),

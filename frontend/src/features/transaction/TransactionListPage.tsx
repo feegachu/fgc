@@ -223,8 +223,8 @@ export default function TransactionListPage() {
       align: 'center',
       render: (row) =>
         row.commissionTransactionId === -1 ? <div className="transaction-row-actions transaction-guide-actions">
-          <Button variant="ghost" aria-label="예시 지급 건 수정" onClick={() => toast('수정 기능을 설명하는 예시 행입니다.', 'info')}>수정</Button>
-          <Button variant="ghost" aria-label="예시 지급 건 삭제" onClick={() => toast('삭제 기능을 설명하는 예시 행입니다.', 'info')}>삭제</Button>
+          <Button data-guide-feature="features.transaction-list-page.button-1" variant="ghost" aria-label="예시 지급 건 수정" onClick={() => toast('수정 기능을 설명하는 예시 행입니다.', 'info')}>수정</Button>
+          <Button data-guide-feature="features.transaction-list-page.button-2" variant="ghost" aria-label="예시 지급 건 삭제" onClick={() => toast('삭제 기능을 설명하는 예시 행입니다.', 'info')}>삭제</Button>
         </div> : row.status !== 'DRAFT' ? (
           '-'
         ) : user.canProcess ? (

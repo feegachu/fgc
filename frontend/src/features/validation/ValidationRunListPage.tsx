@@ -321,7 +321,7 @@ function StatusFilter({ validationMonth, status, onSearch }: { validationMonth: 
     <FilterBar className="vrun-filter-bar" embedded onSubmit={() => onSearch(draftMonth, draft)}>
       <div className="filter-field vrun-filter-status">
         <label className="filter-field-label" htmlFor="f-validation-month">검증월</label>
-        <input className="field-control" id="f-validation-month" type="month" value={draftMonth}
+        <input data-guide-feature="features.validation-run-list-page.input-1" className="field-control" id="f-validation-month" type="month" value={draftMonth}
           aria-label="검증월 (비워두면 전체 월)"
           onChange={(event) => setDraftMonth(event.target.value)} />
       </div>

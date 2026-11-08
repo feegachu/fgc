@@ -68,7 +68,7 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
             className={`workspace-tab ${tab.id === activeId ? 'is-active' : ''} ${tab.modified ? 'is-modified' : ''}`}
             key={tab.id}
           >
-            <Link data-guide-feature="app.shell.workspace-tabs.link" className="workspace-tab-link" to={tab.href} aria-current={tab.id === activeId ? 'page' : undefined}>
+            <Link data-guide-feature="app.shell.workspace-tabs.link" className="workspace-tab-link" title={tab.title} to={tab.href} aria-current={tab.id === activeId ? 'page' : undefined}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 {tab.icon}
               </span>

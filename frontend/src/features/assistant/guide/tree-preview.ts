@@ -41,7 +41,7 @@ export function previewTree(kind: 'reconciliation' | 'ledger') {
       if (index >= tasks.length) return
       tasks[index++]()
     }
-    pulse()
+    if (kind === 'ledger') pulse()
     timer = window.setTimeout(tick, kind === 'reconciliation' ? 3000 : 2200)
   }
   // Manual interaction takes over immediately; never fight a user's tree selection.
