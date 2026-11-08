@@ -665,7 +665,7 @@ it('the detail help waits for the real finalization result before completing', a
   await waitFor(() => expect(next()).toBeEnabled())
   await actions.click(next())
   expect(await screen.findByText('확정 완료')).toBeVisible()
-}, 10000)
+})
 
 it('invalidates a created run even if its page unmounts before the response', async () => {
   handlers['GET /api/v1/validation-runs'] = () => listPage([])
