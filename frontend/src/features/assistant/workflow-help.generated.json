@@ -14748,21 +14748,6 @@
         "next": []
       },
       {
-        "stepId": "help.e580edcc620b863f3ce5643a1763fe36",
-        "screenId": "CLAW-W01",
-        "targetId": "clawback.pdf-viewer.download",
-        "title": "환수, 다운로드",
-        "instruction": "‘다운로드’ 위치입니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "SYSTEM_ADMIN",
-          "GA_ADMIN",
-          "SETTLEMENT",
-          "COMPLIANCE"
-        ],
-        "next": []
-      },
-      {
         "stepId": "help.eacb41ca20ec244dc62908f709278aa6",
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-page.select-4",

@@ -828,7 +828,6 @@
     "ledger.kpi.balance": "INTERNAL_READ",
     "ledger.kpi.credit": "INTERNAL_READ",
     "ledger.kpi.debit": "INTERNAL_READ",
-    "clawback.pdf-viewer.download": "INTERNAL_READ",
     "clawback.pdf-viewer.open": "INTERNAL_READ",
     "clawback.pdf-viewer.refresh": "INTERNAL_READ"
   }

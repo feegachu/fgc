@@ -165,7 +165,7 @@ async function installApi(
   return { writes, documents }
 }
 
-test('계산 결과에서 문서를 열고 명시적으로 다운로드하며 같은 계산의 PDF를 재사용한다', async ({ page }, info) => {
+test('계산 결과에서 기본 PDF 뷰어를 열고 같은 계산의 문서를 재사용한다', async ({ page }, info) => {
   const { writes, documents } = await installApi(page, { loseResponse: true })
   await page.goto('/clawbacks?month=2026-07&contractNo=CLW-727')
   await page.getByLabel('계약번호', { exact: true }).fill('아직 조회하지 않은 입력')
@@ -183,9 +183,8 @@ test('계산 결과에서 문서를 열고 명시적으로 다운로드하며 �
   expect(downloads).toBe(0)
   expect(writes[0]).toEqual(writes[1])
   expect(writes[0].body).toEqual({ calculationVersion: 2, expectedSourceVersion: 'claw-v1-ui727' })
-  const downloaded = page.waitForEvent('download')
-  await viewer.getByRole('link', { name: '다운로드' }).click()
-  expect((await downloaded).suggestedFilename()).toBe('CLN-7-v1.pdf')
+  await expect(viewer.getByRole('link', { name: '다운로드' })).toHaveCount(0)
+  await expect(viewer.getByText('CLN-7-v1.pdf', { exact: true })).toHaveCount(0)
   await expect.poll(() => page.frames().some(frame => frame.url().startsWith('chrome-extension:'))).toBe(true)
   const pdfFrame = page.frames().find(frame => frame.url().startsWith('chrome-extension:'))!
   await expect(pdfFrame.locator('viewer-toolbar')).toBeVisible()

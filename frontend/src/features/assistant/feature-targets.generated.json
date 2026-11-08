@@ -110,11 +110,6 @@
     "element": "section"
   },
   {
-    "id": "clawback.pdf-viewer.download",
-    "file": "components/PdfViewer.tsx",
-    "element": "a"
-  },
-  {
     "id": "clawback.pdf-viewer.open",
     "file": "features/clawback/ClawbackDocuments.tsx",
     "element": "Button"

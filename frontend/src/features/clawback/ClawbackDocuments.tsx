@@ -136,7 +136,10 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false 
       <DisabledButtonHint disabled={disabled} reason={reason}>
         <Button data-guide-feature="clawback.pdf-viewer.open" variant="secondary" loading={issuing || !!downloading} disabled={disabled}
           onClick={event => { viewerTrigger.current = event.currentTarget; void (canIssue ? generate() : existing && download(existing)) }}>
-          <span className="material-symbols-rounded" aria-hidden="true">picture_as_pdf</span>PDF 출력하기
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" style={{ flexShrink: 0 }}>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6" />
+            <path d="M6.5 17v-5H8a1.25 1.25 0 0 1 0 2.5H6.5M11 12v5h1a2 2 0 0 0 2-2v-1a2 2 0 0 0-2-2zM16.5 17v-5H19m-2.5 2.5h2" />
+          </svg>PDF 출력하기
         </Button>
       </DisabledButtonHint>
       {(issue.error || downloadError || history.error) && <div className="claw-pdf-error" role="alert">
