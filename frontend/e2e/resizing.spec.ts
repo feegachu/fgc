@@ -344,7 +344,8 @@ test('컬럼 확대·축소·가로 스크롤·저장 후에도 행 선택이 �
 
 test('모바일 예외 목록은 표 스크롤을 유지하고 상세 모달이 화면 안에 들어온다', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  // The tab strip recalculates its slot width in ResizeObserver after the viewport change.
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   const table = page.getByRole('table', { name: '예외 목록' })
   expect(await table.locator('..').evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true)
   await table.getByRole('button', { name: '11', exact: true }).click()

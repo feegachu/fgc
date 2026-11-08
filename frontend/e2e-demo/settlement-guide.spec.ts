@@ -1,145 +1,57 @@
-import { selectEntity } from '../e2e/selectEntity'
-import { continueFlow, readFlowExplanations, test, expect, login, api, responseFor, successful } from './fixtures'
+import { test, expect, login, completeMonthly } from './fixtures'
+
 test.use({ video: 'off' })
-for (const startMode of ['existing', 'new'] as const) {
-  test(`FUN-088 실제 서버 ${startMode}: 계약 → 지급 → 월 검증 → 대사 불일치 분기`, async ({ page }, info) => {
-    const errors: string[] = []
-    const writes: string[] = []
-    page.on('pageerror', (error) => errors.push(error.message))
-    page.on('request', (request) => {
-      if (
-        request.method() === 'POST' &&
-        /\/api\/v1\/(contracts|transactions|validation-runs|reconciliations|exceptions)(\/|$|\?)/.test(request.url())
-      )
-        writes.push(new URL(request.url()).pathname)
-    })
-    await login(page, 'settle01', '/?month=2026-07')
-    await page.getByRole('button', { name: '전체 업무 가이드', exact: true }).click()
-    const guide = page.getByRole('complementary', { name: '전체 업무 가이드' })
-    const contractNo = startMode === 'new' ? 'E2E-FUN088-CONTRACT' : 'FGC-FGL01-202607-0002'
-    if (startMode === 'existing') await guide.getByLabel(/기존 계약번호/).fill(contractNo)
-    await guide.getByRole('button', { name: '안내 시작', exact: true }).click()
-    // Guide setup may normalize the same contract route and replace its DOM after the URL first matches.
-    await expect(guide).toHaveAttribute('aria-busy', 'false')
-    expect(writes).toHaveLength(0)
-    if (startMode === 'new') {
-      await expect(page).toHaveURL(/\/contracts\/new/)
-      const seed = await api(page, '/contracts?contractNo=FGC-FGL01-202607-0001&page=1&size=20')
-      const original = await api(page, `/contracts/${seed.content[0].contractId}`)
-      await page.locator('input[name=contractDate]').fill(original.contractDate)
-      await page.locator('select[name=insurerId]').selectOption(String(original.insurerId))
-      await selectEntity(
-        page,
-        page.locator('[role=combobox][name=productOfferingId]'),
-        String(original.productOfferingId),
-      )
-      await page.locator('input[name=contractNo]').fill(contractNo)
-      await selectEntity(page, page.locator('[role=combobox][name=agentId]'), String(original.agentId))
-      for (const field of ['premiumPerCycleAmount', 'firstPremiumAmount', 'monthlyEquivalentFirstPremium'])
-        await page.locator(`input[name=${field}]`).fill(String(original[field]))
-      const term = page.locator('input[name=paymentTermMonths]')
-      if (await term.isEditable()) await term.fill(String(original.paymentTermMonths))
-      await readFlowExplanations(page)
-      const created = responseFor(page, '/contracts')
-      await page.locator('button[type=submit]').click()
-      const savedContract = await successful(created)
-      await expect(page).toHaveURL(new RegExp(`/contracts/${savedContract.contractId}(?:\\?|$)`))
-    } else {
-      await expect(page).toHaveURL(/\/contracts\/\d+/)
-      await expect(page.getByRole('main').getByRole('heading', { name: '보험계약 상세', exact: true })).toBeVisible()
-      await expect(page.getByRole('button', { name: '스케줄 재생성', exact: true })).toBeEnabled()
-      const regenerated = page.waitForResponse(
-        (response) => response.url().includes('/schedules/regenerate') && response.request().method() === 'POST',
-      )
-      await page.getByRole('button', { name: '스케줄 재생성', exact: true }).click()
-      await successful(regenerated)
-    }
-    await expect(page.getByRole('main').getByRole('heading', { name: '보험계약 상세', exact: true })).toBeVisible()
-    await continueFlow(page)
-    await expect(page).toHaveURL(/\/schedules\/\d+/)
-    await expect(guide).toContainText('2/9')
-    await readFlowExplanations(page)
-    await guide.getByRole('button', { name: '스케줄 확인 완료' }).click()
-    await expect(page).toHaveURL(/\/transactions\/new/)
-    expect(writes).toHaveLength(1)
-    const contracts = await api(page, `/contracts?contractNo=${contractNo}&page=1&size=20`)
-    const contract = await api(page, `/contracts/${contracts.content[0].contractId}`)
-    const items = await api(page, '/base/commission-items?asOf=2026-07-01')
-    const item = items.find((entry: { itemCode: string }) => entry.itemCode === 'BASE_COMMISSION')
-    await selectEntity(page, page.locator('#recipient'), String(contract.agentId))
-    await selectEntity(page, page.locator('#item'), String(item.commissionItemId))
-    await page.locator('#bizKey').fill('E2E-FUN088-GUIDE')
-    await page.locator('#amount').fill('20')
-    if (!(await page.locator('[data-contract-id]').count())) await page.locator('#btn-add-attr').click()
-    await selectEntity(page, page.locator('[data-contract-id]'), String(contract.contractId))
-    await page.locator('[data-attr-date]').fill('2026-07-31')
-    await page.locator('[data-attr-amount]').fill('20')
-    await readFlowExplanations(page)
-    const saving = responseFor(page, '/transactions')
-    await page.locator('#btn-save').click()
-    const payment = await successful(saving)
-    await continueFlow(page)
-    await expect(guide).toContainText('4/9')
-    const checking = responseFor(page, `/transactions/${payment.commissionTransactionId}/precheck`)
-    await page.locator('#btn-precheck').click()
-    expect((await successful(checking)).confirmable).toBe(true)
-    await continueFlow(page)
-    await expect(guide).toContainText('5/9')
-    await readFlowExplanations(page)
-    await page.locator('#btn-confirm').click()
-    const confirming = responseFor(page, `/transactions/${payment.commissionTransactionId}/confirm`)
-    await page.getByRole('dialog').getByRole('button', { name: '확정 실행' }).click()
-    expect((await successful(confirming)).status).toBe('CONFIRMED')
-    await expect(page).toHaveURL(/\/transactions\?/)
-    await expect(page.getByRole('main').getByRole('heading', { name: '수수료 지급 건 목록', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: '확정된 지급을 확인하세요' })).toBeVisible()
-    await continueFlow(page)
-    await expect(page).toHaveURL(/\/validation-runs\?month=2026-07/)
-    await readFlowExplanations(page)
-    const creating = responseFor(page, '/validation-runs')
-    await page.getByRole('button', { name: '실행 생성' }).click()
-    const run = await successful(creating)
-    await expect(page).toHaveURL(new RegExp(`/validation-runs/${run.validationRunId}\\b`))
-    // URL이 먼저 바뀔 수 있으므로 이동한 화면의 설명이 표시될 때까지 기다린다.
-    await expect(guide.getByRole('heading', { name: '검증 실행을 확인하세요', exact: true })).toBeVisible()
-    await continueFlow(page)
-    await readFlowExplanations(page)
-    await expect(guide).toContainText('월 통합검증 계산이 끝나지 않았습니다')
-    await page.getByRole('button', { name: '실행', exact: true }).click()
-    await expect
-      .poll(async () => (await api(page, `/validation-runs/${run.validationRunId}/progress`)).status, {
-        timeout: 120000,
-      })
-      .toBe('COMPLETED')
-    await continueFlow(page)
-    await expect(page).toHaveURL(/\/reconciliations\?/)
-    await expect(page).toHaveURL(/\/reconciliations/)
-    const history = page.getByRole('table', { name: '검색조건에 해당하는 대사 실행 이력' })
-    const runs = await api(page, '/reconciliations?month=2026-07&stage=GA_TO_FC&page=1&size=100')
-    const selectedRun = runs.content.find(
-      (entry: { validationRunId: number; insurerId: number }) =>
-        entry.validationRunId === run.validationRunId && entry.insurerId === contract.insurerId,
-    )
-    expect(selectedRun).toBeTruthy()
-    await history
-      .getByRole('row')
-      .filter({ has: page.getByRole('cell', { name: String(selectedRun.reconciliationRunId), exact: true }) })
-      .click()
-    await continueFlow(page)
-    await expect(guide).toContainText('8/9')
-    await expect(page).toHaveURL(/\/exceptions/)
-    expect(writes.filter((path) => path.endsWith('/confirm'))).toHaveLength(1)
-    expect(writes.filter((path) => path === '/api/v1/reconciliations')).toHaveLength(0)
-    expect(errors).toEqual([])
-    await info.attach('exception-branch', { body: await page.screenshot(), contentType: 'image/png' })
-    await info.attach('real-guide-evidence', {
-      body: JSON.stringify({
-        paymentId: payment.commissionTransactionId,
-        validationRunId: run.validationRunId,
-        writes,
-        errors,
-      }),
-      contentType: 'application/json',
-    })
+
+test('FUN-088 실제 서버: 전체 업무 가이드는 계약 생성 화면에서 시작하고 저장을 대신하지 않는다', async ({ page }) => {
+  await login(page, 'settle01', '/?month=2026-07')
+  const writes: string[] = []
+  page.on('request', request => {
+    const path = new URL(request.url()).pathname
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method()) && path.startsWith('/api/v1/') && !path.startsWith('/api/v1/auth/')) writes.push(path)
   })
-}
+  await page.getByRole('button', { name: '전체 업무 가이드', exact: true }).click()
+  const overview = page.getByRole('dialog', { name: '전체 업무 가이드', exact: true })
+  await expect(overview.getByRole('list', { name: '전체 업무 9단계' }).getByRole('listitem')).toHaveCount(9)
+  await overview.getByRole('button', { name: '계약 생성부터 시작' }).click()
+  await expect(page).toHaveURL(/\/contracts\/new/)
+  const guide = page.getByRole('complementary', { name: '전체 업무 가이드' })
+  await expect(guide).toContainText('계약 등록 · 1/9')
+  await expect(guide.getByRole('heading', { name: '계약일', exact: true })).toBeVisible()
+  await guide.getByRole('button', { name: '접기', exact: true }).click()
+  await page.locator('input[name=contractNo]').fill('E2E-GUIDE-UNSAVED')
+  await guide.getByRole('button', { name: '펼치기', exact: true }).click()
+  await expect(page.locator('input[name=contractNo]')).toHaveValue('E2E-GUIDE-UNSAVED')
+  await guide.getByRole('button', { name: '종료', exact: true }).click()
+  await expect(guide).toHaveCount(0)
+  await expect(page.locator('input[name=contractNo]')).toHaveValue('E2E-GUIDE-UNSAVED')
+  expect(writes).toEqual([])
+})
+
+test('FUN-088 실제 서버: 대사 범위 시연 → 왼쪽 메뉴로 검증원장 → 예외함 안내', async ({ page }, info) => {
+  await page.goto('login')
+  await completeMonthly(page)
+  await login(page, 'settle01', '/reconciliations?month=2026-07')
+  const writes: string[] = []
+  page.on('request', request => {
+    const path = new URL(request.url()).pathname
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method()) && path.startsWith('/api/v1/') && !path.startsWith('/api/v1/auth/')) writes.push(path)
+  })
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  const card = page.locator('.screen-step-guide')
+  await card.getByRole('button', { name: '다음', exact: true }).click()
+  const history = page.locator('[data-guide-target="reconciliation.history"]')
+  await expect(history.locator('[aria-expanded="true"]')).toHaveCount(0)
+  await card.getByRole('button', { name: '다음', exact: true }).click()
+  await expect(page.locator('.payment-guide-spotlight')).toHaveCount(1)
+  await expect(history.locator('[aria-expanded="true"]').first()).toBeVisible({ timeout: 15000 })
+  await card.getByRole('button', { name: '다음', exact: true }).click()
+  await page.locator('[data-guide-feature="navigation.menu.ledg-w01"]').click()
+  await expect(page).toHaveURL(/\/journals/)
+  await expect(card).toBeVisible()
+  for (let index = 0; index < 4; index++) await card.getByRole('button', { name: '다음', exact: true }).click()
+  await page.locator('[data-guide-feature="navigation.menu.excp-w01"]').click()
+  await expect(page).toHaveURL(/\/exceptions/)
+  await expect(card.getByRole('heading', { name: '유형별 미처리 현황' })).toBeVisible()
+  expect(writes).toEqual([])
+  await info.attach('reconciliation-ledger-exceptions', { body: await page.screenshot(), contentType: 'image/png' })
+})

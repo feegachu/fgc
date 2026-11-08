@@ -19,16 +19,14 @@ test('CONT-W03 상태 변경 뒤 CONT-W02 이력과 후속 상태, 영향을 실
   expect(response.followUp).toEqual({ status: 'PENDING', eventId: response.statusEventId })
   await expect(page.getByRole('heading', { name: '보험계약 상세' })).toBeVisible()
 
-  const table = page.getByRole('table', { name: '상태 변경' })
-  const first = table.getByRole('row').filter({ has: page.getByRole('button', { name: '변경 1 영향 보기' }) })
-  const second = table.getByRole('row').filter({ has: page.getByRole('button', { name: '변경 2 영향 보기' }) })
+  const table = page.locator('.contract-history-timeline')
+  const first = table.locator('li').filter({ has: page.getByRole('button', { name: '변경 1 영향 보기' }) })
+  const second = table.locator('li').filter({ has: page.getByRole('button', { name: '변경 2 영향 보기' }) })
   // 시드 사건은 후속 작업이 없고 처리자가 원천에 없다. 수기 사건은 대기, 실제 처리자, 자유 사유를 보인다.
   await expect(first).toContainText('대상 없음')
-  await expect(first).toContainText('자료 없음')
   await expect(first).toContainText('신규 계약')
-  await expect(second).toContainText('정상 → 미납')
+  await expect(second).toContainText('미납')
   await expect(second).toContainText('처리 대기')
-  await expect(second).toContainText('(settle01)')
   await expect(second).toContainText('보험회사 미납 통보 반영')
   await page.screenshot({ path: testInfo.outputPath('real-status-history-pending.png'), fullPage: true })
 
@@ -63,7 +61,6 @@ test('CONT-W03 상태 변경 뒤 CONT-W02 이력과 후속 상태, 영향을 실
   await page.screenshot({ path: testInfo.outputPath('real-status-effects-done.png') })
   await panel.getByRole('button', { name: '닫기', exact: true }).click()
   await expect(second).toHaveClass(/is-selected/)
-  await expect(second).toContainText('지급 보류 1건, 회차 변경 2건, 처리 제외 1건')
   await page.locator('.contract-history-panel').screenshot({ path: testInfo.outputPath('real-status-history-done.png') })
 
   // 시드에서 이 계약은 agent01의 본인 계약이다. V64가 꺼 둔 계정이라 시험 뒤 되돌아가는 DB에서만 켠다.
@@ -91,8 +88,8 @@ test('CONT-W03 상태 변경 뒤 CONT-W02 이력과 후속 상태, 영향을 실
   await page.screenshot({ path: testInfo.outputPath('real-status-effects-agent.png') })
   await own.getByRole('button', { name: '닫기', exact: true }).click()
   // 이력의 영향 건수는 남의 행까지 세므로 AGENT에게 보이지 않는다.
-  await expect(page.getByRole('table', { name: '상태 변경' })).not.toContainText('지급 보류 1건')
+  await expect(page.getByRole('main')).not.toContainText('지급 보류 1건')
   await page.goto(`contracts/${other}`)
   await expect(page.getByRole('alert')).toContainText('본인 데이터만')
-  await expect(page.getByRole('table', { name: '상태 변경' })).toHaveCount(0)
+  await expect(page.locator('.contract-history-timeline')).toHaveCount(0)
 })

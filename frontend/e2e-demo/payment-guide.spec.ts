@@ -16,7 +16,7 @@ for (const multi of [false, true]) {
       if (path.startsWith('/api/v1/transactions'))
         requests.push({ path, method: response.request().method(), status: response.status() })
     })
-    await login(page, 'settle01', '/transactions/new?month=2026-07')
+    await login(page, 'settle01', '/transactions/new?amount=0&month=2026-07')
     const contracts = await api(page, '/contracts?contractNo=FGC-FGL01-202607-0002&page=1&size=20')
     expect(contracts.content).toHaveLength(1)
     const contract = await api(page, `/contracts/${contracts.content[0].contractId}`)

@@ -48,7 +48,8 @@ class CommissionPaymentBatchIntegrationTest {
         var before = counts();
         var valid = request("-1", 1L, PaymentStage.GA_TO_FC, LocalDate.of(2026,7,1), itemId(), 1);
         var invalid = request("-2", 1L, PaymentStage.GA_TO_FC, LocalDate.of(2026,7,1), Long.MAX_VALUE, 1);
-        assertThatThrownBy(() -> service.create(new CommissionPaymentBatchRequest(List.of(valid, invalid))))
+        var batch = new CommissionPaymentBatchRequest(List.of(valid, invalid));
+        assertThatThrownBy(() -> service.create(batch))
                 .isInstanceOf(FgcBusinessException.class);
         assertThat(counts()).isEqualTo(before);
     }
@@ -56,7 +57,8 @@ class CommissionPaymentBatchIntegrationTest {
     @Test void duplicateInOneBatchRollsBackEverything() {
         var before = counts();
         var request = request("-same", 1L, PaymentStage.GA_TO_FC, LocalDate.of(2026,7,1), itemId(), 1);
-        assertThatThrownBy(() -> service.create(new CommissionPaymentBatchRequest(List.of(request, request))))
+        var batch = new CommissionPaymentBatchRequest(List.of(request, request));
+        assertThatThrownBy(() -> service.create(batch))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class)
                 .satisfies(error -> assertThat(new ConstraintErrorCodeResolver().resolve(error)).contains(FgcErrorCode.TRAN_001));
         assertThat(counts()).isEqualTo(before);
@@ -80,7 +82,8 @@ class CommissionPaymentBatchIntegrationTest {
             request("-month",1L,PaymentStage.GA_TO_FC,LocalDate.of(2026,8,1),itemId(),1),
             request("-attrs",1L,PaymentStage.GA_TO_FC,LocalDate.of(2026,7,1),itemId(),2));
         for (var invalid : invalids) {
-            assertThatThrownBy(() -> service.create(new CommissionPaymentBatchRequest(List.of(first, invalid))))
+            var batch = new CommissionPaymentBatchRequest(List.of(first, invalid));
+            assertThatThrownBy(() -> service.create(batch))
                 .isInstanceOf(FgcBusinessException.class).extracting("errorCode").isEqualTo(FgcErrorCode.COMMON_002);
             assertThat(counts()).isEqualTo(before);
         }

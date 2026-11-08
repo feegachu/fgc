@@ -74,7 +74,7 @@ public class JournalExplorerRepository {
                 .addValue("from", filter.from()).addValue("to", filter.to()).addValue("type", filter.type())
                 .addValue("status", filter.status()).addValue("account", blank(filter.account()))
                 .addValue("contractNo", blank(filter.contractNo()) == null ? null : "%" + escape(filter.contractNo().trim()) + "%")
-                .addValue("limit", size).addValue("offset", ((long) contractPage - 1L) * size);
+                .addValue("limit", size).addValue("offset", (contractPage - 1L) * size);
         long contractCount = count(SCOPE + "SELECT count(DISTINCT COALESCE(linked_contract_id,0)) FROM scoped", parameters);
         List<Contract> contracts = jdbc.query(SCOPE + """
             SELECT COALESCE(linked_contract_id,0) AS contract_id, COALESCE(contract_no,'공통·미연결') AS contract_no,
@@ -85,7 +85,7 @@ public class JournalExplorerRepository {
             """, parameters, (rs, row) -> new Contract(rs.getLong("contract_id"), rs.getString("contract_no"),
                 rs.getLong("journal_count"), rs.getBigDecimal(DEBIT_TOTAL), rs.getBigDecimal(CREDIT_TOTAL),rs.getString("agent_name"),rs.getString("insurer_name")));
         Long selected = selectedContract(all, contractId, contracts);
-        parameters.addValue("selected", selected).addValue("journalId", journalId).addValue("offset", ((long) page - 1L) * size);
+        parameters.addValue("selected", selected).addValue("journalId", journalId).addValue("offset", (page - 1L) * size);
         long journalCount = count(SELECTED_SCOPE + "SELECT count(*) FROM entries", parameters);
         Totals totals = jdbc.queryForObject(SELECTED_SCOPE + """
             SELECT count(*) AS journal_count, COALESCE(sum(debit_total),0) AS debit_total, COALESCE(sum(credit_total),0) AS credit_total,

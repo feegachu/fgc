@@ -189,11 +189,13 @@ public class ClawbackNoticePdfRenderer {
         s.text(0,y,s.w,"※ 환수 기준 회차는 경과월 + 1이며 지급회차와 구분합니다. 13회 이상에 여러 구간이 있으면 ‘구간별’로 표시합니다.\n※ - 는 저장된 정책 구간이 없다는 뜻입니다. 과거 계산판에 환수율표가 없으면 실제 적용한 환수율만 표시합니다.\n※ "+known(n.rounding())+" / 계산일시: "+(n.calculatedAt()==null?"-":n.calculatedAt().atZoneSameInstant(SEOUL).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))),s.f.sans(),7.5f,0);
     }
 
+    private static BigDecimal itemAmount(Item item) { return item == null ? BigDecimal.ZERO : item.amount(); }
+
     private float formulaRows(Sheet s, Notice n, List<Item> items, float y, float[] cols) throws IOException {
         for(int pair=0;pair<Math.max(1,items.size());pair+=2){
             Item a=items.isEmpty()?null:items.get(pair);
             Item b=pair+1<items.size()?items.get(pair+1):null;
-            String[] cells={n.contractNo()+"\n"+n.productName(),period(n),formula(n,a),formula(n,b),money((a==null?BigDecimal.ZERO:a.amount()).add(b==null?BigDecimal.ZERO:b.amount()))};
+            String[] cells={n.contractNo()+"\n"+n.productName(),period(n),formula(n,a),formula(n,b),money(itemAmount(a).add(itemAmount(b)))};
             float x=0;for(int i=0;i<5;i++){s.cell(new Box(x,y,cols[i],38),cells[i],new CellStyle(s.f.serif(),i==4?11f:9f,i==4?2:1,false,.5f));x+=cols[i];}y+=38;
         }
         return y;
@@ -286,12 +288,13 @@ public class ClawbackNoticePdfRenderer {
     }
     private record Box(float x, float top, float width, float height) { }
     private record CellStyle(PDType0Font font, float size, int align, boolean gray, float border) { }
-    private static float alignedOffset(int align, float space, float padding) {
-        if (align == 2) return space - padding;
-        if (align == 1) return space / 2;
-        return padding;
-    }
     private static final class Sheet implements AutoCloseable {
+        private static float alignedOffset(int align, float space, float padding) {
+            if (align == 2) return space - padding;
+            if (align == 1) return space / 2;
+            return padding;
+        }
+
         final Fonts f;
         final float w;
         final float h;

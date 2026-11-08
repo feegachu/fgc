@@ -119,7 +119,7 @@ test('쪽 제목은 왼쪽 끝에, 도움말은 오른쪽 끝에 있고 격자�
 
   // VRUN-W01은 도움말이 쪽 머리가 아니라 새 실행 만들기 머리에 있다.
   await page.goto(`validation-runs?month=${month}`)
-  await expect.poll(() => headerLayout(page, '.surface-header', '.surface-title')).toEqual(atEdges)
+  await expect.poll(() => headerLayout(page, '.page-header', '.page-title')).toEqual(atEdges)
 
   // EXCP-W01은 처리 양식 안에 있다. 칸을 채우지 않고 오른쪽에 붙는다.
   await page.goto(`exceptions?month=${month}`)
@@ -149,9 +149,11 @@ test('1440폭에서 읽어야 할 열이 가로 스크롤 뒤로 가지 않고 �
   const content = page.getByRole('columnheader', { name: /^내용/ })
   expect((await content.boundingBox())!.width, '내용 열이 한 줄에 몇 글자는 읽히는 폭').toBeGreaterThan(160)
 
+  await page.getByRole('dialog', { name: /예외 상세/ }).getByRole('button', { name: '닫기', exact: true }).first().click()
   // 끝까지 내리면 표의 마지막 행까지 업무 비서에 가려지지 않는다.
   await expect.poll(() => coveredAtScrollEnd(page), { message: 'EXCP-W01' }).toEqual([])
-  await page.goto(`reconciliations?month=${month}`)
+  await page.goto(`reconciliations?month=${month}&historyView=table`)
+  await page.getByRole('button', { name: '표 보기', exact: true }).click()
   await expect(page.getByRole('table', { name: '검색조건에 해당하는 대사 실행 이력' }).locator('tbody tr').first()).toBeVisible()
   await expect.poll(() => coveredAtScrollEnd(page), { message: 'RECO-W01' }).toEqual([])
   await page.goto(`validation-runs/${run}?month=${month}`)

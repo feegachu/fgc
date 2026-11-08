@@ -4,7 +4,7 @@ test.use({video:'off'})
 const counts=()=>sql("SELECT json_build_array((SELECT count(*) FROM fgc.commission_transaction),(SELECT count(*) FROM fgc.transaction_attribution),(SELECT count(*) FROM fgc.cap_check),(SELECT count(*) FROM fgc.journal_header),(SELECT count(*) FROM fgc.exception_case),(SELECT count(*) FROM fgc.audit_log))")
 test('#733 실제 서버: 가상 귀속·신규 후보 무저장 계산',async({page},info)=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message))
-  await login(page,'settle01','/transactions/new?month=2026-07')
+  await login(page,'settle01','/transactions/new?amount=0&month=2026-07')
   const contracts=await api(page,'/contracts?contractNo=FGC-FGL01-202607-0002&page=1&size=20')
   const contract=await api(page,`/contracts/${contracts.content[0].contractId}`)
   const items=await api(page,'/base/commission-items?asOf=2026-07-01')

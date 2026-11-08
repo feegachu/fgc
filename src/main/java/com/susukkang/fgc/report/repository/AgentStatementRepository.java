@@ -39,13 +39,14 @@ public class AgentStatementRepository {
     public static final Set<String> ENTRY_TYPES = Set.of(PAYMENT, HELD, ADJUSTMENT, CLAWBACK);
 
     private static final String ENTRY_TYPE = "e.entry_type";
+    private static final String CONTRACT_NO = "contractNo";
     private static final String AGENT_ID = "agentId";
     private static final String ENTRY_TYPE_PARAM = "entryType";
 
     private static final Map<String, String> SORTABLE = Map.of(
             "basisDate", "e.basis_date",
             "entryType", ENTRY_TYPE,
-            "contractNo", "ic.contract_no",
+            CONTRACT_NO, "ic.contract_no",
             "commissionItemCode", "ci.item_code",
             "installmentNo", "e.installment_no",
             "statusCode", "e.status_code",
@@ -210,6 +211,9 @@ public class AgentStatementRepository {
     private final EntityManager entityManager;
 
     /** 한 요청으로 전체 설계사를 조회하며, 개별 명세와 동일한 CTE/귀속 범위를 재사용한다. */
+    // OVERVIEW_SQL is assembled once from repository-owned SQL and fixed scope fragments.
+    // No request value is interpolated: every filter below is a bound query parameter.
+    @SuppressWarnings("java:S2077")
     public List<StatementAgentOverview> overview(Filter filter) {
         Map<Long, StatementAgentOverview.OrganizationNode> organizations = new HashMap<>();
         entityManager.createNativeQuery("SELECT organization_id,parent_id,organization_name,organization_type FROM fgc.organization")
@@ -219,13 +223,11 @@ public class AgentStatementRepository {
                     organizations.put(id, new StatementAgentOverview.OrganizationNode(id,
                             row[1] == null ? null : ((Number) row[1]).longValue(), (String) row[2], (String) row[3]));
                 });
-        Map<String, Object> params = new HashMap<>();
-        params.put("month", filter.month());
-        params.put("contractNo", filter.contractNo());
-        params.put("commissionItemId", filter.commissionItemId());
-        params.put("entryType", filter.entryType());
         NativeQuery<?> query = (NativeQuery<?>) entityManager.createNativeQuery(OVERVIEW_SQL);
-        params.forEach(query::setParameter);
+        query.setParameter("month", filter.month(), LocalDate.class);
+        query.setParameter(CONTRACT_NO, filter.contractNo(), String.class);
+        query.setParameter("commissionItemId", filter.commissionItemId(), Long.class);
+        query.setParameter(ENTRY_TYPE_PARAM, filter.entryType(), String.class);
         query.setParameter("monthEnd", filter.month().withDayOfMonth(filter.month().lengthOfMonth()));
         return query.getResultList().stream().map(result -> {
             Object[] c = (Object[]) result;
@@ -311,7 +313,7 @@ public class AgentStatementRepository {
         sql.append(" WHERE e.basis_month = :month");
         if (filter.contractNo() != null) {
             sql.append(" AND strpos(lower(ic.contract_no), lower(:contractNo)) > 0");
-            params.put("contractNo", filter.contractNo());
+            params.put(CONTRACT_NO, filter.contractNo());
         }
         if (filter.commissionItemId() != null) {
             sql.append(" AND e.commission_item_id = :commissionItemId");
