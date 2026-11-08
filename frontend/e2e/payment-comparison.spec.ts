@@ -46,7 +46,8 @@ test('지급 등록 비교 안내는 앞 3개 행을 강조하고 안내 카드�
   await page.screenshot({ path: info.outputPath('payment-comparison.png') })
 })
 
-test('계약별 지급 화면에 다시 들어오면 저장된 초안을 복원하고 신규 일괄 저장을 반복하지 않는다', async ({ page }) => {
+for (const sourceBusinessKey of ['SCHEDULE-LINE-GA_TO_FC-7', 'GA-202607-L7']) {
+test(`계약별 지급 초안 복원·수정은 기존 식별키를 유지한다: ${sourceBusinessKey}`, async ({ page }) => {
   const contract = { contractId: 3, contractNo: 'C-003', productName: '가상 상품', contractDate: '2026-07-01' }
   const item = { commissionItemId: 1, itemCode: 'BASE_COMMISSION', itemName: '기본수수료', cashflowType: 'PAYMENT' }
   const header = { scheduleHeaderId: 5, activeYn: true, paymentStage: 'GA_TO_FC', scheduleRegime: 'CURRENT', schedulePurpose: 'OPERATIONAL', status: 'CONFIRMED' }
@@ -55,7 +56,7 @@ test('계약별 지급 화면에 다시 들어오면 저장된 초안을 복원�
     attributionDate: '2026-07-01', dueDate: '2026-07-01', lineStatus: 'PLANNED' }
   let payment = { commissionTransactionId: 12, contractId: 3, agentId: 2, commissionItemId: 1,
     paymentStage: 'GA_TO_FC', settlementMonth: '2026-07-01', sourceType: 'GA_MANUAL_PAYMENT',
-    sourceBusinessKey: 'SCHEDULE-LINE-GA_TO_FC-7', status: 'DRAFT', updatedAt: '2026-07-01T12:00:00',
+    sourceBusinessKey, status: 'DRAFT', updatedAt: '2026-07-01T12:00:00',
     amount: 800, cashflowType: 'PAYMENT', scheduledPaymentDate: '2026-07-15', evidenceRef: 'DOC-12',
     attributions: [{ contractId: 3, amount: 800, attributionDate: '2026-07-10' }] }
   const writes: string[] = []
@@ -64,6 +65,7 @@ test('계약별 지급 화면에 다시 들어오면 저장된 초안을 복원�
     if (request.method() !== 'GET' && !path.includes('/auth/')) writes.push(`${request.method()} ${path}`)
     if (path === '/api/v1/transactions/12' && request.method() === 'PUT') {
       expect(request.postDataJSON().expectedUpdatedAt).toBe(payment.updatedAt)
+      expect(request.postDataJSON().sourceBusinessKey).toBe(sourceBusinessKey)
       payment = { ...payment, ...request.postDataJSON(), updatedAt: '2026-07-01T12:01:00' }
     }
     const data = path.endsWith('/auth/refresh') ? { accessToken: 'resume' }
@@ -81,7 +83,7 @@ test('계약별 지급 화면에 다시 들어오면 저장된 초안을 복원�
   await expect(page.getByRole('button', { name: '사전검증', exact: true })).toBeEnabled()
   await expect(page.getByRole('spinbutton', { name: '귀속금액 7' })).toHaveValue('800')
   await page.getByRole('spinbutton', { name: '귀속금액 7' }).fill('900')
-  await page.getByRole('button', { name: '임시저장', exact: true }).click()
+  await page.locator('[data-guide-target="payment.batch.save"]').click()
   await expect(page.getByRole('button', { name: '사전검증', exact: true })).toBeEnabled()
   expect(writes).toEqual(['PUT /api/v1/transactions/12'])
   expect(payment.amount).toBe(900)
@@ -90,3 +92,4 @@ test('계약별 지급 화면에 다시 들어오면 저장된 초안을 복원�
   await expect(page.getByRole('spinbutton', { name: '귀속금액 7' })).toHaveValue('900')
   expect(writes).toEqual(['PUT /api/v1/transactions/12'])
 })
+}

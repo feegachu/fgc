@@ -7,7 +7,12 @@ export async function loadSchedulePayments(contractId: string, stage: string, mo
   const response = await apiClient.request<components['schemas']['ContractTransactionTabResponse']>(
     `/api/v1/contracts/${encodeURIComponent(contractId)}/transactions`, { signal })
   if (!Array.isArray(response.data?.transactions)) throw new Error('기존 지급 건을 확인하지 못했습니다. 다시 조회하세요.')
-  const keys = new Map(lineIds.map(id => [`SCHEDULE-LINE-${stage}-${id}`, id]))
+  // The demo loader also persists one payment per schedule line using its stable GA key.
+  // Only exact keys qualify; suffixed split payments and unrelated manual entries stay separate.
+  const keys = new Map(lineIds.flatMap(id => [
+    [`SCHEDULE-LINE-${stage}-${id}`, id] as const,
+    [`GA-${month.replace('-', '')}-L${id}`, id] as const,
+  ]))
   const result: Record<number, Payment> = {}
   for (const row of response.data.transactions) {
     if (row.paymentStage !== stage || row.settlementMonth?.slice(0, 7) !== month || row.sourceType !== 'GA_MANUAL_PAYMENT') continue

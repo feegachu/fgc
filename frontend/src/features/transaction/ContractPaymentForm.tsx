@@ -218,6 +218,7 @@ export function ContractPaymentForm({
         setResumeError('저장된 지급 건의 스케줄 정보를 목록에서 확인하세요.')
         return
       }
+      body.sourceBusinessKey = payment.sourceBusinessKey!
       restored[Number(key)] = { payment, fingerprint: JSON.stringify(body) }
       restoredEdits[Number(key)] = { amount: String(payment.amount), item: String(payment.commissionItemId) }
     }
@@ -260,7 +261,7 @@ export function ContractPaymentForm({
     const item = items.data.find((item) => String(item.commissionItemId) === edit.item)
     if (!item) throw new Error('검색 결과에서 수수료 항목을 선택하세요.')
     const cashflowType = item.cashflowType || line.cashflowType
-    return payload(
+    const body = payload(
       {
         ...line,
         expectedAmount: Number(edit.amount),
@@ -274,6 +275,8 @@ export function ContractPaymentForm({
       settlementMonth,
       evidence,
     )
+    body.sourceBusinessKey = saved[line.scheduleLineId!]?.payment.sourceBusinessKey ?? body.sourceBusinessKey
+    return body
   }
   const total = selected.reduce((sum, line) => sum + Number(values(line).amount || 0), 0)
   const balanced =

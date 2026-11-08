@@ -48,9 +48,11 @@ for (const multi of [false, true]) {
       // Restore the actual included allocation after checking the evidence gate.
       await page.locator('[data-inclusion]').first().selectOption('INCLUDED')
     }
-    await page.getByRole('button', { name: '도움말', exact: true }).click()
+    await page.getByRole('button', { name: '업무 비서 AI 열기, 피코', exact: true }).click()
+    const assistant = page.getByRole('dialog', { name: '피코 업무 비서' })
+    await assistant.getByRole('tab', { name: '업무 안내', exact: true }).click()
+    await assistant.getByRole('button').filter({ has: page.getByText('지급 초안 저장', { exact: true }) }).click()
     const card = page.getByRole('region', { name: '지급 업무 가이드' })
-    await card.getByRole('button', { name: '지급 초안 저장', exact: true }).click()
     for (let index = 0; index < 3; index++)
       await card.getByRole('button', { name: '확인하고 다음', exact: true }).click()
     await card.getByRole('button', { name: '다음', exact: true }).click()

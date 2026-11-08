@@ -2,7 +2,7 @@ import { selectEntity } from '../e2e/selectEntity'
 import { test,expect,login,api,responseFor,successful,sql } from './fixtures'
 test.use({video:'off'})
 const counts=()=>sql("SELECT json_build_array((SELECT count(*) FROM fgc.commission_transaction),(SELECT count(*) FROM fgc.transaction_attribution),(SELECT count(*) FROM fgc.cap_check),(SELECT count(*) FROM fgc.journal_header),(SELECT count(*) FROM fgc.exception_case),(SELECT count(*) FROM fgc.audit_log))")
-test('#733 실제 서버: 가상 귀속·신규 후보 무저장 계산',async({page},info)=>{
+test('#733 실제 서버: 저장된 지급 후보·가상 귀속 무저장 계산',async({page},info)=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message))
   await login(page,'settle01','/transactions/new?amount=0&month=2026-07')
   const contracts=await api(page,'/contracts?contractNo=FGC-FGL01-202607-0002&page=1&size=20')
@@ -13,13 +13,17 @@ test('#733 실제 서버: 가상 귀속·신규 후보 무저장 계산',async({
   await page.locator('#bizKey').fill('E2E-733-NO-WRITE');await page.locator('#amount').fill('20')
   if(!(await page.locator('[data-contract-id]').count()))await page.locator('#btn-add-attr').click()
   await selectEntity(page,page.locator('[data-contract-id]'),String(contract.contractId));await page.locator('[data-attr-date]').fill('2026-07-31');await page.locator('[data-attr-amount]').fill('20')
-  const before=counts(), workbench=page.locator('.transaction-form-page > .payment-calculation')
-  await workbench.locator('summary').click();await workbench.getByLabel('계산 업무').selectOption('PAYMENT_CANDIDATE')
-  const calculating=responseFor(page,'/assistant/calculations');await workbench.getByRole('button',{name:'계산 조회',exact:true}).click();const response=await calculating
+  const saving=responseFor(page,'/transactions');await page.locator('#btn-save').click();const payment=await successful(saving)
+  await page.getByRole('button',{name:'업무 비서 AI 열기, 피코',exact:true}).click()
+  const assistant=page.getByRole('dialog',{name:'피코 업무 비서'})
+  const saved=assistant.locator('.payment-calculation').filter({has:page.getByText('현재 지급 건 계산 조회',{exact:true})})
+  const before=counts()
+  const calculating=responseFor(page,'/assistant/calculations');await saved.getByRole('button',{name:'지급 후보 검토 조회',exact:true}).click();const response=await calculating
   expect(response.headers()['x-fgc-precheck-token']).toBeUndefined();expect(response.ok()).toBe(true)
-  const candidate=(await response.json()).data;expect(candidate.mode).toBe('HYPOTHETICAL');expect(candidate.evidenceKind).toBe('HYPOTHETICAL');expect(candidate.validity.stateToken).toBeTruthy();expect(candidate.recommendation.allowed).toBe(false)
-  await expect(workbench.getByText('가상 후보 · 실제 사전검증 완료를 뜻하지 않습니다.')).toBeVisible();expect(counts()).toBe(before)
-  const validating=responseFor(page,'/assistant/calculations/revalidate');await workbench.getByRole('button',{name:'최신 근거 재확인'}).click();expect((await successful(validating)).status).toBe(candidate.status);expect(counts()).toBe(before)
+  const candidate=(await response.json()).data;expect(candidate.mode).toBe('EXISTING');expect(candidate.resolvedScope.paymentId).toBe(String(payment.commissionTransactionId));expect(candidate.snapshotOnly).toBe(true);expect(candidate.validity.stateToken).toBeTruthy();expect(candidate.recommendation.allowed).toBe(false)
+  await expect(saved.getByText(/사전검증을 대신하지/)).toBeVisible();expect(counts()).toBe(before)
+  const workbench=assistant.locator('.payment-calculation').filter({has:page.getByText('업무 계산 도우미',{exact:true})})
+  await workbench.locator('summary').click()
   await workbench.getByLabel('계산 업무').selectOption('ATTRIBUTION_BALANCE');await workbench.getByLabel('지급액',{exact:true}).fill('1.49');await workbench.getByLabel('귀속 금액 (쉼표로 구분)').fill('0.50,0.50')
   const balancing=responseFor(page,'/assistant/calculations');await workbench.getByRole('button',{name:'계산 조회',exact:true}).click();expect((await successful(balancing)).amounts.differenceAmount).toBe('-1');await expect(workbench.getByText('-1원')).toBeVisible();expect(counts()).toBe(before)
   await info.attach('read-only-candidate-and-balance',{body:await page.screenshot(),contentType:'image/png'});expect(errors).toEqual([])
