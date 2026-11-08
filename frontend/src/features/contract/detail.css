@@ -391,7 +391,7 @@
 .contract-history-panel .data-table-viewport {
   margin-top: 0;
 }
-/* 사이드바를 편 1280px 화면에서 영향 보기까지 가로 스크롤 없이 보이는 폭. */
+/* 사이드바를 편 1280px 화면에서 후속 처리 요약까지 가로 스크롤 없이 보이는 폭. */
 .contract-detail-panel .contract-history-table {
   min-width: 56.5rem;
 }
