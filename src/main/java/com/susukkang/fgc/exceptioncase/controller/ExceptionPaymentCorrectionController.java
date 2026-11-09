@@ -44,4 +44,11 @@ public class ExceptionPaymentCorrectionController {
             @Valid @RequestBody ExceptionDuplicateCancelRequest request, @AuthenticationPrincipal FgcUserDetails user) {
         return ApiResponse.success(service.cancelDuplicate(id, request, user.getUserId(), user.getUsername()));
     }
+
+    @PostMapping("/reconcile-recovery")
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public ApiResponse<ExceptionSourceRecheckResponse> reconcileRecovery(@PathVariable Long id,
+            @Valid @RequestBody ExceptionRecoveryRecheckRequest request, @AuthenticationPrincipal FgcUserDetails user) {
+        return ApiResponse.success(service.reconcileRecovery(id, request, user.getUserId(), user.getUsername()));
+    }
 }

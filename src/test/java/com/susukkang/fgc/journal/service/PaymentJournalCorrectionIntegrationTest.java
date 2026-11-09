@@ -136,6 +136,7 @@ class PaymentJournalCorrectionIntegrationTest {
         startException(f.exception());
         var old = payments.get(f.payment());
         assertThat(exceptionPayments.context(f.exception(), 1L).payments()).extracting(p -> p.paymentId()).contains(f.payment());
+        assertThat(exceptionPayments.context(f.exception(), 1L).paymentJournalIds()).containsEntry(f.payment(), f.journal());
         var result = exceptionPayments.correct(f.exception(), new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
                 old.paymentId(), old.updatedAt(), paymentBody(old, "100000", old.settlementMonth())), 1L, "admin");
         assertThat(result.resolved()).as(result.message()).isTrue();
@@ -240,11 +241,15 @@ class PaymentJournalCorrectionIntegrationTest {
         execution.executeInTransaction(new ReconciliationExecutionRequest(run,validationRunId,TEST_MONTH,PaymentStage.GA_TO_FC,insurer,1L)); detection.bulkCreate(run);
         Long exception=id("SELECT e.exception_case_id FROM fgc.exception_case e JOIN fgc.reconciliation_result r ON e.source_entity_id=r.reconciliation_result_id::text WHERE e.source_entity_type='RECONCILIATION_RESULT' AND r.reconciliation_run_id=? AND r.contract_id=? AND r.result_type='DUPLICATE'",run,contractId);
         startException(exception);
+        var candidates = exceptionPayments.context(exception, 1L).paymentJournalIds();
+        assertThat(candidates).containsEntry(old.paymentId(), f.journal()).containsKey(other.transactionId());
         var result=exceptionPayments.cancelDuplicate(exception,new com.susukkang.fgc.exceptioncase.dto.ExceptionDuplicateCancelRequest(old.paymentId(),old.updatedAt(),"중복 기록 확인"),1L,"admin");
         assertThat(result.resolved()).isTrue();
         assertThat(result.action().actionType()).isEqualTo("CANCEL");
         assertThat(payments.get(old.paymentId()).status()).isEqualTo(CommissionPaymentStatus.CANCELLED);
         assertThat(payments.get(other.transactionId()).status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.journal_header WHERE journal_header_id=?", String.class, f.journal())).isEqualTo("REVERSED");
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.journal_header WHERE journal_header_id=?", String.class, candidates.get(other.transactionId()))).isEqualTo("POSTED");
     }
 
     private void startException(Long id) {
@@ -274,6 +279,69 @@ class PaymentJournalCorrectionIntegrationTest {
         assertThat(result.payment().status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
         assertThat(result.resolved()).as(result.message()).isTrue();
         assertThat(result.action().actionType()).isEqualTo("RECONCILE_AGAIN");
+    }
+
+    @Test
+    @WithMockUser(roles = "SETTLEMENT")
+    void paymentCorrectionOnlyShowsTheSelectedRecipientsIssueAcrossReconciliations() {
+        Fixture f = fixture(PaymentStage.GA_TO_FC, "50000", "22000");
+        var otherAgents = jdbcTemplate.queryForList("SELECT agent_id FROM fgc.agent WHERE agent_id<>? ORDER BY agent_id LIMIT 2", Long.class, f.agent());
+        assertThat(otherAgents).hasSize(2);
+        for (int i = 0; i < otherAgents.size(); i++) {
+            // 금액이 같아도 다른 수령인의 예외는 표시하지 않는다.
+            String amount = i == 0 ? "44000" : "22000";
+            Long agent = otherAgents.get(i);
+            Long line = id("""
+                    INSERT INTO fgc.schedule_line(schedule_header_id,line_no,contract_month_no,installment_no,due_date,
+                        commission_item_id,beneficiary_agent_id,basis_code,basis_amount,calculation_type,fixed_amount,expected_amount)
+                    SELECT l.schedule_header_id,?,l.contract_month_no,l.installment_no,l.due_date,
+                        l.commission_item_id,?,l.basis_code,?,l.calculation_type,?,?
+                    FROM fgc.schedule_line l JOIN fgc.schedule_header h USING(schedule_header_id)
+                    WHERE h.contract_id=? AND h.payment_stage='GA_TO_FC' AND l.line_no=1
+                    RETURNING schedule_line_id
+                    """, i + 2, agent, new BigDecimal(amount), new BigDecimal(amount), new BigDecimal(amount), contractId);
+            insertPostedJournal("EXPECTED_FC_PAYOUT", "SCHEDULE_LINE", line, contractId, agent, f.item(),
+                    amount, "EXPECTED_PAYOUT_EXPENSE", "EXPECTED_PAYOUT_PAYABLE");
+        }
+        corrections.reverse(new ReverseJournalCommand(f.journal(), "누락 지급 정정 준비", null, 1L));
+        Long run = id("SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE corrects_reconciliation_run_id=?", f.run());
+        assertThat(id("SELECT COUNT(*) FROM fgc.reconciliation_result WHERE reconciliation_run_id=? AND contract_id=? AND result_type='ACTUAL_MISSING'", run, contractId)).isEqualTo(3L);
+        Long exception = id("""
+                SELECT e.exception_case_id FROM fgc.exception_case e JOIN fgc.reconciliation_result r
+                  ON e.source_entity_type='RECONCILIATION_RESULT' AND e.source_entity_id=r.reconciliation_result_id::text
+                WHERE r.reconciliation_run_id=? AND r.contract_id=? AND r.expected_agent_id=? AND r.result_type='ACTUAL_MISSING'
+                """, run, contractId, f.agent());
+        startException(exception);
+        var context = exceptionPayments.context(exception, 1L);
+        assertThat(context.remainingIssues()).singleElement().satisfies(issue -> {
+            assertThat(issue.expectedAmount()).isEqualByComparingTo("22000");
+            assertThat(issue.actualAmount()).isZero();
+        });
+        var draft = payments.create(context.suggestedPayment());
+        jdbcTemplate.update("UPDATE fgc.transaction_attribution SET attributed_amount=21000 WHERE commission_transaction_id=?", draft.paymentId());
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET amount=21000,status='CONFIRMED' WHERE commission_transaction_id=?", draft.paymentId());
+        insertPostedJournal("CONFIRMED_FC_PAYOUT", "COMMISSION_TRANSACTION", draft.paymentId(), contractId, f.agent(), f.item(),
+                "21000", "CONFIRMED_PAYOUT_EXPENSE", "CONFIRMED_PAYOUT_PAYABLE");
+        assertThat(exceptionPayments.recheckSchedule(exception, 1L, "admin").resolved()).isFalse();
+        var current = exceptionPayments.context(exception, 1L);
+        assertThat(current.remainingIssues()).singleElement().satisfies(issue -> {
+            assertThat(issue.resultType()).isEqualTo("AMOUNT_DIFFERENCE");
+            assertThat(issue.expectedAmount()).isEqualByComparingTo("22000");
+            assertThat(issue.actualAmount()).isEqualByComparingTo("21000");
+            assertThat(issue.resultId()).isNotEqualTo(context.remainingIssues().getFirst().resultId());
+        });
+    }
+
+    @Test
+    @WithMockUser(roles = "SETTLEMENT")
+    void invalidContractPaymentIncludesItsOriginalPaymentForTheRecoveryChecklist() {
+        Fixture f = fixture();
+        jdbcTemplate.update("UPDATE fgc.reconciliation_result SET result_type='INVALID_CONTRACT_PAYMENT',expected_total_amount=0 WHERE reconciliation_run_id=? AND contract_id=?", f.run(), contractId);
+        startException(f.exception());
+        var context = exceptionPayments.context(f.exception(), 1L);
+        assertThat(context.correctionTarget()).isEqualTo("RECOVERY");
+        assertThat(context.payments()).extracting(p -> p.paymentId()).containsExactly(f.payment());
+        assertThat(context.paymentJournalIds()).containsEntry(f.payment(), f.journal());
     }
 
     @Test
@@ -340,7 +408,10 @@ class PaymentJournalCorrectionIntegrationTest {
         Fixture f = fixture();
         assertThat(arbitrage.sumPlannedCommissionAmount(contractId, PaymentStage.GA_TO_FC,
                 TEST_MONTH.plusMonths(1))).isEqualByComparingTo("50000");
+        var numbers = corrections.previewRepostNumbers(TEST_MONTH);
         var result = corrections.reverseAndRepost(command(f, "100000"));
+        assertThat(jdbcTemplate.queryForObject("SELECT journal_no FROM fgc.journal_header WHERE journal_header_id=?", String.class, result.journalHeaderId())).isEqualTo(numbers.reversalJournalNo());
+        assertThat(jdbcTemplate.queryForObject("SELECT journal_no FROM fgc.journal_header WHERE journal_header_id=?", String.class, result.repostedJournalHeaderId())).isEqualTo(numbers.repostedJournalNo());
         assertThat(arbitrage.sumPlannedCommissionAmount(contractId, PaymentStage.GA_TO_FC,
                 TEST_MONTH.plusMonths(1))).isEqualByComparingTo("0");
         assertThat(payments.get(f.payment()).status()).isEqualTo(CommissionPaymentStatus.CANCELLED);

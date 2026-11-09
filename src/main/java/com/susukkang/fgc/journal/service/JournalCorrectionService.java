@@ -4,6 +4,7 @@ import com.susukkang.fgc.journal.dto.JournalCorrectionResult;
 import com.susukkang.fgc.journal.dto.ReverseAndRepostJournalCommand;
 import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
 import com.susukkang.fgc.journal.dto.JournalRepostCommand;
+import java.time.LocalDate;
 
 /**
  * 설명 : FUN-047 원장 역분개와 재기표 서비스 계약
@@ -21,4 +22,8 @@ public interface JournalCorrectionService {
     JournalCorrectionResult reverseAndRepost(ReverseAndRepostJournalCommand command);
 
     JournalCorrectionResult reverseAndRepost(JournalRepostCommand command);
+
+    record JournalNumbers(String reversalJournalNo, String repostedJournalNo) {}
+
+    JournalNumbers previewRepostNumbers(LocalDate journalDate);
 }

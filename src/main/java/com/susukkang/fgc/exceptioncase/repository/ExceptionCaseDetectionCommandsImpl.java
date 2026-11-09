@@ -119,6 +119,8 @@ public class ExceptionCaseDetectionCommandsImpl implements ExceptionCaseDetectio
                                   ON vr.validation_run_id = rrn.validation_run_id
                              WHERE rr.reconciliation_run_id = :reconciliationRunId
                                AND rr.result_type <> 'MATCHED'
+                               AND NOT (rr.result_type = 'INVALID_CONTRACT_PAYMENT'
+                                   AND fgc.reconciliation_recovery_complete(rr.reconciliation_result_id))
                         )
                         SELECT COUNT(*) AS candidateCount,
                                COUNT(*) FILTER (WHERE recorded.new_case) AS createdCount

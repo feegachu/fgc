@@ -8,8 +8,8 @@ export type CandidateDetail = Schemas['ClawbackCandidateDetailResponse']
 export type CandidatePage = Schemas['PageResponseClawbackCandidateResponse']
 export type Calculation = Schemas['Calculation']
 export type CalculationRequest = Required<Schemas['ClawbackCalculationRequest']>
-export type NoticeDocument = Schemas['ClawbackNoticeDocumentResponse']
-export type NoticeRequest = Schemas['ClawbackNoticeDocumentRequest']
+export type NoticeDocument = Schemas['ClawbackNoticeDocumentResponse'] & { originalPaymentId?: number | null }
+export type NoticeRequest = Schemas['ClawbackNoticeDocumentRequest'] & { originalPaymentId?: number }
 export const noticeHistoryKey = (caseId: number) => ['clawback', 'notice-documents', caseId] as const
 export const noticeHistoryQuery = (caseId: number, page: number) =>
   queryOptions({
@@ -28,7 +28,7 @@ export const noticeHistoryQuery = (caseId: number, page: number) =>
       ) {
         throw new Error('발행 이력 응답을 확인할 수 없습니다. 다시 조회해 주세요.')
       }
-      return data
+      return data as Omit<typeof data, 'content'> & { content: NoticeDocument[] }
     },
     meta: { errorToast: false },
   })
@@ -43,6 +43,7 @@ export async function issueNotice(caseId: number, body: NoticeRequest, idempoten
     !Number.isSafeInteger(data.version) ||
     data.version! < 1 ||
     data.calculationVersion !== body.calculationVersion ||
+    (data.originalPaymentId ?? undefined) !== body.originalPaymentId ||
     !data.downloadPath
   ) {
     throw new Error('PDF 발행 응답을 확인할 수 없습니다. 같은 요청으로 재시도해 주세요.')

@@ -1169,6 +1169,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exceptions/{id}/payment-correction/reconcile-recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reconcileRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exceptions/{id}/review": {
         parameters: {
             query?: never;
@@ -1301,6 +1317,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/journals/repost-number-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["previewRepostNumbers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/journals/{journalHeaderId}": {
         parameters: {
             query?: never;
@@ -1347,6 +1379,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journals/{journalId}/reverse-and-repost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reverseAndRepost"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2553,6 +2601,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseJournalCorrectionResult: {
+            data?: components["schemas"]["JournalCorrectionResult"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseJournalDetailResponse: {
             data?: components["schemas"]["JournalDetailResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2565,6 +2618,11 @@ export interface components {
         };
         ApiResponseJournalImbalanceSearchResponse: {
             data?: components["schemas"]["JournalImbalanceSearchResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseJournalNumbers: {
+            data?: components["schemas"]["JournalNumbers"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -3551,6 +3609,8 @@ export interface components {
             calculationVersion: number;
             /** @description IF-API-84에서 받은 sourceVersion. 계산판·현재 원천과 다르면 409 FGC-IMPL-STATE_CHANGED */
             expectedSourceVersion: string;
+            /** Format: int64 */
+            originalPaymentId?: number;
         };
         ClawbackNoticeDocumentResponse: {
             /** Format: int32 */
@@ -3562,6 +3622,8 @@ export interface components {
             documentNo?: string;
             /** @description IF-API-67A 다운로드 경로. 호출 시 권한을 다시 검사한다 */
             downloadPath?: string;
+            /** Format: int64 */
+            originalPaymentId?: number;
             sha256?: string;
             /** Format: int32 */
             version?: number;
@@ -4611,6 +4673,9 @@ export interface components {
             correctionTarget?: string;
             /** Format: date */
             deferrableFrom?: string;
+            paymentJournalIds?: {
+                [key: string]: number;
+            };
             /** @enum {string} */
             paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
             payments?: components["schemas"]["CommissionPaymentResponse"][];
@@ -4655,6 +4720,14 @@ export interface components {
             resultLabel?: string;
             resultType?: string;
             sourceLink?: string;
+        };
+        ExceptionRecoveryRecheckRequest: {
+            /** Format: int64 */
+            candidateId: number;
+            /** Format: int64 */
+            deductionPaymentId: number;
+            /** Format: int64 */
+            originalPaymentId: number;
         };
         ExceptionReviewContext: {
             administratorReviewRequired?: boolean;
@@ -4950,6 +5023,15 @@ export interface components {
             /** @enum {string} */
             status?: "NEW" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
         };
+        JournalCorrectionResult: {
+            correctionGroupKey?: string;
+            /** Format: int64 */
+            journalHeaderId?: number;
+            /** Format: int64 */
+            repostedJournalHeaderId?: number;
+            /** Format: int64 */
+            reversalOfId?: number;
+        };
         JournalDetailLineResponse: {
             accountCode?: string;
             accountName?: string;
@@ -5074,6 +5156,10 @@ export interface components {
             status?: "DRAFT" | "POSTED" | "REVERSED";
             statusLabel?: string;
             statusTone?: string;
+        };
+        JournalNumbers: {
+            repostedJournalNo?: string;
+            reversalJournalNo?: string;
         };
         JournalSearchResponse: {
             content?: components["schemas"]["JournalItemResponse"][];
@@ -8752,6 +8838,32 @@ export interface operations {
             };
         };
     };
+    reconcileRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExceptionRecoveryRecheckRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExceptionSourceRecheckResponse"];
+                };
+            };
+        };
+    };
     context_1: {
         parameters: {
             query?: never;
@@ -8939,6 +9051,28 @@ export interface operations {
             };
         };
     };
+    previewRepostNumbers: {
+        parameters: {
+            query: {
+                journalDate: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseJournalNumbers"];
+                };
+            };
+        };
+    };
     findByJournalHeaderId: {
         parameters: {
             query?: never;
@@ -9009,6 +9143,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseReverseJournalResponse"];
+                };
+            };
+        };
+    };
+    reverseAndRepost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journalId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JournalCorrectionActionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseJournalCorrectionResult"];
                 };
             };
         };

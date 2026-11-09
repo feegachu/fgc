@@ -152,9 +152,11 @@ public class ExceptionCaseService {
     public ExceptionOptionsResponse options() {
         return new ExceptionOptionsResponse(
                 Arrays.stream(ExceptionType.values())
+                        .filter(type -> type != ExceptionType.JOURNAL_CORRECTION_REQUIRED)
                         .map(type -> new ExceptionOptionsResponse.Option(type.name(), type.label()))
                         .toList(),
                 reasonCodes().stream()
+                        .filter(code -> !ExceptionType.JOURNAL_CORRECTION_REQUIRED.name().equals(code))
                         .map(code -> new ExceptionOptionsResponse.Option(code, ExceptionCaseResponseDTO.labelOf(code)))
                         .toList(),
                 Arrays.stream(ExceptionSeverity.values())

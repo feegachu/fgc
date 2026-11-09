@@ -3,10 +3,6 @@
   gap: 1.25rem;
   min-width: 0;
 }
-.ledger-react-page .guidance,
-.modal-body .ledger-action-guidance {
-  display: block;
-}
 .ledger-react-number {
   overflow-wrap: anywhere;
 }
@@ -51,4 +47,12 @@
   .ledger-react-filters .filter-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+.journal-repost-modal .modal-body {
+  display: grid;
+  gap: 1rem;
+}
+.journal-repost-table .field-control {
+  min-width: 6rem;
+  text-align: right;
 }

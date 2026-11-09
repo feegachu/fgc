@@ -1,6 +1,7 @@
 package com.susukkang.fgc.exceptioncase.service;
 
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.clawback.service.ClawbackCandidateQueryService;
 import com.susukkang.fgc.common.code.*;
 import com.susukkang.fgc.common.exception.*;
 import com.susukkang.fgc.exceptioncase.dto.*;
@@ -18,6 +19,7 @@ import com.susukkang.fgc.transaction.service.CommissionPaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.math.BigDecimal;
 import java.util.*;
 
 /** 지급 원천 수정·확정 게이트·재대사·예외 이력을 같은 트랜잭션에서 처리한다. */
@@ -34,6 +36,7 @@ public class ExceptionPaymentCorrectionService {
     private final JournalCorrectionService journals;
     private final PaymentCorrectionReconciliationService reconciliation;
     private final AuditLogService audit;
+    private final ClawbackCandidateQueryService clawbacks;
     private final JournalPersistenceService journalPersistence;
     private final JournalHeaderRepository journalHeaders;
     private final com.susukkang.fgc.cap.service.CapCheckService capChecks;
@@ -50,12 +53,18 @@ public class ExceptionPaymentCorrectionService {
         String contractLink = source.contractId() == null ? null : "/contracts/" + source.contractId();
         String scheduleLink = scope != null && scope.scheduleHeaderId() != null ? "/schedules/" + scope.scheduleHeaderId()
                 : contractLink == null ? null : contractLink + "?tab=schedules";
-        return new ExceptionPaymentContext(!"PAYMENT".equals(correctionTarget) ? List.of() : repository.paymentIds(id).stream().map(payments::get).toList(),
+        var paymentIds = Set.of("PAYMENT", "RECOVERY").contains(correctionTarget) ? repository.paymentIds(id) : List.<Long>of();
+        Map<Long, Long> paymentJournalIds = new LinkedHashMap<>();
+        for (Long paymentId : paymentIds) {
+            Long journalId = repository.postedJournal(paymentId);
+            if (journalId != null) paymentJournalIds.put(paymentId, journalId);
+        }
+        return new ExceptionPaymentContext(paymentIds.stream().map(payments::get).toList(),
                 repository.suggestedPayment(source), scope == null ? null : capChecks.findDetail(scope.checkId()).orElse(null),
                 scope != null && scope.scheduledBasis(), scheduleLink,
                 scope == null || scope.policyVersionId() == null ? null : "/policies?tab=management&policyVersionId=" + scope.policyVersionId() + "&asOf=" + scope.asOfDate(),
                 correctionTarget, scope != null ? scope.stage() : reco == null ? null : reco.stage(), contractLink, repository.remainingIssues(source),
-                reco == null ? null : reco.resultType(), reco != null && "ACTUAL_MISSING".equals(reco.resultType()) && !repository.hasRegisteredActual(reco), repository.deferrableFrom(source.contractId()));
+                reco == null ? null : reco.resultType(), reco != null && "ACTUAL_MISSING".equals(reco.resultType()) && !repository.hasRegisteredActual(reco), repository.deferrableFrom(source.contractId()), paymentJournalIds);
     }
 
     @Transactional
@@ -197,7 +206,10 @@ public class ExceptionPaymentCorrectionService {
         var runs = repository.reconciliationRuns(source);
         requireTarget(cases.findByIdForUpdate(id), actor);
         var reco = repository.reconciliationSource(source);
-        if (reco == null || !"DUPLICATE".equals(reco.resultType()) || !repository.paymentIds(id).contains(request.paymentId())) throw invalid("paymentId");
+        if (reco == null || !"DUPLICATE".equals(reco.resultType()) || runs.isEmpty()) throw invalid("paymentId");
+        var paymentIds = repository.paymentIds(id);
+        if (!paymentIds.contains(request.paymentId()) || paymentIds.stream().filter(paymentId -> !paymentId.equals(request.paymentId()))
+                .map(payments::get).noneMatch(payment -> payment.status() == CommissionPaymentStatus.CONFIRMED)) throw invalid("paymentId");
         if (!paymentWrites.lockPayment(request.paymentId())) throw invalid("paymentId");
         var old = payments.get(request.paymentId());
         if (old.status() != CommissionPaymentStatus.CONFIRMED || !old.updatedAt().toInstant().equals(request.expectedUpdatedAt().toInstant())) throw new FgcBusinessException(FgcErrorCode.TRAN_010);
@@ -216,8 +228,64 @@ public class ExceptionPaymentCorrectionService {
         var latest = queries.findActionsByCaseIds(List.of(id)).stream().max(Comparator.comparingInt(ExceptionActionRow::actionSeq)).map(ExceptionActionResponse::from).orElse(null);
         boolean resolved = cases.findByIdForUpdate(id).status() == ExceptionStatus.RESOLVED;
         return new ExceptionPaymentCorrectionResponse(payments.get(old.paymentId()), resolved,
-                resolved ? "중복 지급 기록을 역분개·취소하고 재대사 일치를 확인했습니다." : "선택한 기록을 취소했습니다. 남은 대사 차이를 확인하세요.",
+                resolved ? "중복 지급 기록을 역분개·취소하고 재대사 일치를 확인했습니다." : "선택한 기록을 취소하고 재대사했습니다. 남은 대사 차이를 확인하세요.",
                 latest, repository.remainingIssues(source), null);
+    }
+
+    @Transactional
+    public ExceptionSourceRecheckResponse reconcileRecovery(Long id, ExceptionRecoveryRecheckRequest request, Long actor, String login) {
+        repository.lockValidations(id);
+        var source = repository.source(id);
+        var reco = repository.reconciliationSource(source);
+        if (reco == null || !"RECOVERY".equals(correctionTarget(null, reco))
+                || !repository.paymentIds(id).contains(request.originalPaymentId())
+                || request.originalPaymentId().equals(request.deductionPaymentId())) throw invalid("originalPaymentId");
+        var runs = repository.reconciliationRuns(source);
+        if (runs.isEmpty()) throw invalid("reconciliationRun");
+        for (Long paymentId : List.of(request.originalPaymentId(), request.deductionPaymentId()).stream().sorted().toList()) {
+            if (!paymentWrites.lockPayment(paymentId)) throw invalid("deductionPaymentId");
+        }
+        requireTarget(cases.findByIdForUpdate(id), actor);
+        if (!source.equals(repository.source(id))) throw invalid("exceptionCaseId");
+        var original = payments.get(request.originalPaymentId());
+        var deduction = payments.get(request.deductionPaymentId());
+        var detail = clawbacks.detail(request.candidateId());
+        var candidate = detail.candidate();
+        var calculation = detail.latestCalculation();
+        if (calculation == null || !Objects.equals(candidate.contractId(), source.contractId())
+                || !"STATUS_EVENT".equals(candidate.triggerType().name())
+                || !"CALCULATED".equals(candidate.calculationStatus().name())
+                || !Objects.equals(candidate.sourceVersion(), calculation.sourceVersion())) throw invalid("clawbackCalculation");
+        var originalAttributions = detail.paymentAttributions().stream()
+                .filter(row -> Objects.equals(row.commissionTransactionId(), original.paymentId()))
+                .map(row -> row.transactionAttributionId()).collect(java.util.stream.Collectors.toSet());
+        BigDecimal amount = calculation.lines().stream().filter(line -> originalAttributions.contains(line.transactionAttributionId()))
+                .map(line -> line.clawbackAmount()).reduce(BigDecimal.ZERO, BigDecimal::add);
+        String recoveryKey = original.paymentId() + ":" + request.candidateId();
+        if (amount.signum() <= 0 || original.status() != CommissionPaymentStatus.CONFIRMED
+                || deduction.status() != CommissionPaymentStatus.CONFIRMED || !"DEDUCTION".equals(deduction.cashflowType())
+                || !"CLAWBACK".equals(deduction.commissionItemCode())
+                || !("GA_MANUAL_PAYMENT".equals(deduction.sourceType()) || "CLAWBACK".equals(deduction.sourceType()))
+                || deduction.paymentStage() != original.paymentStage() || !Objects.equals(deduction.agentId(), original.agentId())
+                || !Objects.equals(deduction.contractId(), source.contractId()) || deduction.amount().compareTo(amount) != 0
+                || deduction.attributions().isEmpty() || deduction.attributions().stream().anyMatch(row -> !Objects.equals(row.contractId(), source.contractId()))
+                || !(Objects.equals(deduction.sourceBusinessKey(), "CLAWBACK-RECOVERY:" + recoveryKey)
+                    || Objects.equals(deduction.sourceBusinessKey(), "EXCP-RECOVERY:" + id + ":" + recoveryKey))
+                || deduction.evidenceRef() == null || deduction.evidenceRef().isBlank()) throw invalid("deductionPaymentId");
+        String calculationRef = "환수 계산 v" + calculation.calculationVersion() + " · 원지급 " + original.paymentId();
+        String noticeRef = calculationRef.equals(deduction.evidenceRef()) ? null : deduction.evidenceRef();
+        if (!repository.registerRecovery(source, original.paymentId(), deduction.paymentId(), request.candidateId(),
+                calculation.calculationVersion(), noticeRef)) throw invalid("recoveryEvidence");
+
+        String evidence = (noticeRef == null ? calculationRef : "환수 통지서 " + noticeRef) + " · 차감 " + deduction.sourceBusinessKey();
+        String reason = "원지급 " + original.paymentId() + "번의 환수 차감 " + amount.stripTrailingZeros().toPlainString() + "원 확정 확인 · " + evidence;
+        reconciliation.refresh(runs, "EXCP-RECOVERY-" + id, actor, reason);
+        boolean resolved = repository.recoveryComplete(source) && repository.remainingIssues(source).isEmpty();
+        var actionRequest = new ExceptionActionRequest(ExceptionActionType.RECONCILE_AGAIN, reason, evidence);
+        var action = resolved ? exceptions.action(id, actionRequest, actor, login)
+                : exceptions.recordPendingPaymentCorrection(id, actionRequest, actor, login);
+        return new ExceptionSourceRecheckResponse(null, resolved, resolved ? "환수 차감 확정을 확인해 재대사하고 예외를 해결했습니다."
+                : "환수 차감을 반영했습니다. 같은 예외에 남은 지급 건을 확인하세요.", action);
     }
 
     @Transactional
@@ -298,6 +366,7 @@ public class ExceptionPaymentCorrectionService {
         if (reco == null) return "PAYMENT";
         if ("INVALID_CONTRACT_PAYMENT".equals(reco.resultType())) return reco.stage() == PaymentStage.GA_TO_FC ? "RECOVERY" : "CONTRACT";
         if (reco.expectedAmount().signum() == 0 && Set.of("COMMON_COST", "SETTLEMENT_SUPPORT", "NEWCOMER_SUPPORT").contains(Objects.toString(reco.itemCode(), ""))) return "REVIEW";
+        if ("EXPECTED_MISSING".equals(reco.resultType())) return "SCHEDULE";
         if (reco.expectedAmount().signum() == 0) return "SCHEDULE";
         return "PAYMENT";
     }

@@ -105,6 +105,19 @@ public class ReconciliationResultRepository {
     private final EntityManager entityManager;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
+    public BigDecimal confirmedRecoveryAmount(List<Long> attributionIds) {
+        if (attributionIds.isEmpty()) return BigDecimal.ZERO;
+        return (BigDecimal) entityManager.createNativeQuery("""
+                SELECT COALESCE(SUM((line->>'clawbackAmount')::numeric), 0)
+                FROM fgc.transaction_attribution a JOIN fgc.exception_payment_recovery r
+                  ON r.original_payment_id=a.commission_transaction_id AND r.contract_id=a.contract_id
+                JOIN fgc.commission_transaction d ON d.commission_transaction_id=r.deduction_payment_id AND d.status='CONFIRMED'
+                JOIN fgc.clawback_calculation c USING(clawback_calculation_id)
+                CROSS JOIN LATERAL jsonb_array_elements(c.result_snapshot->'lines') line
+                WHERE a.transaction_attribution_id IN (:ids) AND (line->>'transactionAttributionId')::bigint=a.transaction_attribution_id
+                """).setParameter("ids", attributionIds).getSingleResult();
+    }
+
     /** 충돌은 예외를 발생시키지 않으므로 호출 트랜잭션이 rollback-only가 되지 않는다. */
     @Transactional
     public int insertResult(ReconciliationResultInsertRow row) {

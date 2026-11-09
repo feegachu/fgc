@@ -11,5 +11,10 @@ public record ClawbackNoticeDocumentRequest(
         @Schema(description = "PDF 원본으로 쓸 계산판. case의 최신 판이 아니면 409 FGC-IMPL-STATE_CHANGED")
         @NotNull @Positive Integer calculationVersion,
         @Schema(description = "IF-API-84에서 받은 sourceVersion. 계산판·현재 원천과 다르면 409 FGC-IMPL-STATE_CHANGED")
-        @NotBlank @Size(max = 128) String expectedSourceVersion
-) { }
+        @NotBlank @Size(max = 128) String expectedSourceVersion,
+        @Positive Long originalPaymentId
+) {
+    public ClawbackNoticeDocumentRequest(Integer calculationVersion, String expectedSourceVersion) {
+        this(calculationVersion, expectedSourceVersion, null);
+    }
+}

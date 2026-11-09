@@ -13,5 +13,11 @@ public record ClawbackNoticeDocumentResponse(
         OffsetDateTime createdAt,
         Long createdBy,
         @Schema(description = "IF-API-67A 다운로드 경로. 호출 시 권한을 다시 검사한다")
-        String downloadPath
-) { }
+        String downloadPath,
+        Long originalPaymentId
+) {
+    public ClawbackNoticeDocumentResponse(String documentNo, Integer version, Integer calculationVersion, String sha256,
+            OffsetDateTime createdAt, Long createdBy, String downloadPath) {
+        this(documentNo, version, calculationVersion, sha256, createdAt, createdBy, downloadPath, null);
+    }
+}

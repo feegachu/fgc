@@ -52,9 +52,11 @@ function failureText(error: unknown) {
 export function ClawbackCalculation({
   detail,
   itemName,
+  unsavedScope = '',
 }: {
   detail: CandidateDetail
   itemName: (commissionItemId?: number) => string
+  unsavedScope?: string
 }) {
   const client = useQueryClient()
   const placement = useContext(ClawbackActionPlacement)
@@ -73,7 +75,7 @@ export function ClawbackCalculation({
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const keyFor = usePolicyRequest()
-  const clearUnsaved = useUnsavedWork(Boolean(reason.trim()), reason)
+  const clearUnsaved = useUnsavedWork(Boolean(reason.trim()), reason, unsavedScope)
   const trimmed = reason.trim()
   const ready = canCalculate && !issuingNotice && policyId != null && trimmed.length > 0 && Boolean(c.sourceVersion)
   const mutation = useMutation({

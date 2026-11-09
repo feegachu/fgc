@@ -300,6 +300,9 @@ public class ExceptionCaseQueryRepository {
     private String buildWhere(ExceptionCaseSearchDTO criteria, List<ExceptionStatus> statuses,
                               Map<String, Object> parameters) {
         StringBuilder where = new StringBuilder(" WHERE 1 = 1");
+        if (criteria.getType() != com.susukkang.fgc.common.code.ExceptionType.JOURNAL_CORRECTION_REQUIRED) {
+            where.append(" AND ec.exception_type <> 'JOURNAL_CORRECTION_REQUIRED'");
+        }
         append(where, parameters, "ec.exception_type = :type", "type", criteria.getType());
         if (criteria.getReasonCode() != null && !criteria.getReasonCode().isBlank()) {
             append(where, parameters, "ec.reason_code = :reasonCode", "reasonCode", criteria.getReasonCode());

@@ -541,10 +541,101 @@ describe('EXCP-W01 예외함', () => {
     expect(screen.getByLabelText(/증빙/)).toHaveValue('검토')
   })
 
+  it('비유효 계약 지급은 통지서 없이도 해당 수령인의 계산액으로 차감 등록을 연다', async () => {
+    searchResponse = () => search([{ ...baseCase, type: 'RECONCILIATION_MISMATCH', reconciliationResultType: 'INVALID_CONTRACT_PAYMENT',
+      status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }])
+    const payment = { commissionTransactionId: 77, contractId: 3, agentId: 1, commissionItemId: 1, commissionItemName: '기본 수수료',
+      amount: 390000, paymentStage: 'GA_TO_FC', status: 'CONFIRMED' }
+    const original = vi.mocked(apiClient.request).getMockImplementation()!
+    vi.mocked(apiClient.request).mockImplementation((async (path: string, init: Parameters<typeof apiClient.request>[1] = {}) => {
+      if (path.endsWith('/payment-correction')) return envelope({ payments: [payment], correctionTarget: 'RECOVERY' })
+      if (path.startsWith('/api/v1/clawbacks/candidates?')) return envelope({ content: [{ candidateId: 42, contractId: 3, triggerType: 'STATUS_EVENT' }] })
+      if (path === '/api/v1/clawbacks/candidates/42') return envelope({
+        candidate: { candidateId: 42, clawbackCaseId: 5, contractId: 3, sourceVersion: 'v1', calculationStatus: 'CALCULATED', paidAmount: 500000, allowedActions: ['CALCULATE'] },
+        policyCandidates: [{ policyVersionId: 4 }], paymentAttributions: [
+          { commissionTransactionId: 77, transactionAttributionId: 900 }, { commissionTransactionId: 78, transactionAttributionId: 901 },
+        ], latestCalculation: { clawbackCaseId: 5, calculationVersion: 1, sourceVersion: 'v1', amount: 60000, lines: [
+          { transactionAttributionId: 900, commissionItemId: 1, clawbackAmount: 12000 },
+          { transactionAttributionId: 901, commissionItemId: 1, clawbackAmount: 48000 },
+        ] },
+      })
+      if (path.startsWith('/api/v1/clawbacks/5/notice-documents?')) return envelope({ page: 1, totalPages: 0, totalElements: 0, content: [] })
+      if (path.startsWith('/api/v1/transactions?')) return envelope({ content: [], totalPages: 0 })
+      if (path.startsWith('/api/v1/base/agents')) return envelope({ content: [{ agentId: 1, agentCode: 'FC-001', agentName: '설계사', rankCode: 'FC', agentStatus: 'ACTIVE' }] })
+      if (path.startsWith('/api/v1/base/commission-items/search')) return envelope({ content: [{ commissionItemId: 2, itemCode: 'CLAWBACK', itemName: '환수', cashflowType: 'DEDUCTION' }] })
+      if (path.startsWith('/api/v1/base/commission-items?')) return envelope([{ commissionItemId: 2, itemCode: 'CLAWBACK', itemName: '환수', cashflowType: 'DEDUCTION' }])
+      if (path.startsWith('/api/v1/contracts')) return envelope({ content: [{ contractId: 3, contractNo: 'C-0001', productName: '상품', contractDate: '2026-07-01' }] })
+      return original(path, init)
+    }) as typeof apiClient.request)
+    const { actions } = renderPage('/app/exceptions?selected=11')
+    await actions.click(await screen.findByRole('button', { name: '예외 건 처리' }))
+    const checklist = within(await screen.findByRole('dialog', { name: '비유효 계약 지급 · 환수 점검' }))
+    expect(await checklist.findByText('환수액 계산 완료 · PDF는 필요할 때 출력하세요.')).toBeInTheDocument()
+    expect(checklist.getByText('이 지급 건의 환수액 12,000원')).toBeInTheDocument()
+    await actions.click(checklist.getByRole('button', { name: '환수액 계산 · PDF 열기' }))
+    const calculation = within(await screen.findByRole('dialog', { name: '환수액 계산 · PDF 출력' }))
+    expect(calculation.getByRole('form', { name: '환수액 계산' })).toBeInTheDocument()
+    const pdf = calculation.getByRole('button', { name: 'PDF 출력하기' })
+    expect(pdf).toBeEnabled()
+    expect(pdf.closest('.modal-footer')).toContainElement(calculation.getByRole('button', { name: '점검목록으로' }))
+    await actions.click(calculation.getByRole('button', { name: '점검목록으로' }))
+    const register = checklist.getByRole('button', { name: '수수료 지급 차감 등록' })
+    await waitFor(() => expect(register).toBeEnabled())
+    await actions.click(register)
+    const deduction = within(await screen.findByRole('dialog', { name: '수수료 지급 · 환수 차감 등록' }))
+    expect(await deduction.findByLabelText(/금액 \(원\)/)).toHaveValue(12000)
+    expect(deduction.getByLabelText(/지급\/차감/)).toHaveValue('DEDUCTION')
+    expect(deduction.getByLabelText('1번 귀속 내역 귀속금액')).toHaveValue(12000)
+  })
+
+  it('금액 차이 예외는 해당 지급 원장을 모달로 열고 기존 역분개·재기표 절차로 연결한다', async () => {
+    const mismatch: ExceptionCase = { ...baseCase, type: 'RECONCILIATION_MISMATCH', reconciliationResultType: 'AMOUNT_DIFFERENCE', title: '금액 차이 20,000원 — 예상 845,000 / 실제 825,000',
+      status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }
+    searchResponse = () => search([mismatch])
+    const original = vi.mocked(apiClient.request).getMockImplementation()!
+    vi.mocked(apiClient.request).mockImplementation((async (path: string, init: Parameters<typeof apiClient.request>[1] = {}) => {
+      if (path.endsWith('/payment-correction') && !init.method) return envelope({ payments: [
+        { commissionTransactionId: 77, amount: 825000, status: 'CONFIRMED' },
+      ], paymentJournalIds: { '77': 70 }, reconciliationResultType: 'AMOUNT_DIFFERENCE' })
+      if (path.startsWith('/api/v1/journals/repost-number-preview?')) return envelope({ reversalJournalNo: 'JV-2026-07-0096', repostedJournalNo: 'JV-2026-07-0097' })
+      if (path === '/api/v1/journals/70') return envelope({ ...journal, status: 'POSTED', journalType: 'CONFIRMED_FC_PAYOUT',
+        debitTotal: 825000, creditTotal: 825000, lines: [
+          { lineNo: 1, accountCode: '1100', accountName: '미수수수료', debitAmount: 825000, creditAmount: 0, memo: '차변' },
+          { lineNo: 2, accountCode: '4100', accountName: '수수료수익', debitAmount: 0, creditAmount: 825000, memo: '대변' },
+        ] })
+      return original(path, init)
+    }) as typeof apiClient.request)
+    postResponse = (path, body) => {
+      expect(path).toBe('/api/v1/journals/70/reverse-and-repost')
+      expect(body).toMatchObject({ lines: [
+        { originalLineNo: 1, debitAmount: 845000, creditAmount: 0 },
+        { originalLineNo: 2, debitAmount: 0, creditAmount: 845000 },
+      ] })
+      return { reversalOfId: 70, journalHeaderId: 71, repostedJournalHeaderId: 72 }
+    }
+    const { actions } = renderPage('/app/exceptions?selected=11')
+    await actions.click(await screen.findByRole('button', { name: '예외 건 처리' }))
+    const ledger = await screen.findByRole('dialog', { name: '검증원장 · 지급 기록 정정' })
+    expect(await within(ledger).findByRole('table', { name: '분개별 차변·대변 내역' })).toHaveTextContent('825,000')
+    expect(within(ledger).queryByRole('button', { name: '사전검증' })).not.toBeInTheDocument()
+    await actions.click(within(ledger).getByRole('button', { name: '역분개 + 재기표' }))
+    const correction = within(await screen.findByRole('dialog', { name: /^역분개 \+ 재기표$/ }))
+    expect(correction.getByText(mismatch.title!)).toBeInTheDocument()
+    expect(await correction.findByText('JV-2026-07-0097')).toBeInTheDocument()
+    expect(correction.getByRole('table', { name: '원분개 · 역분개 · 신규 재기표' }).querySelectorAll('tbody tr')).toHaveLength(6)
+    const debit = correction.getByLabelText('1행 차변')
+    await actions.clear(debit); await actions.type(debit, '845000')
+    const credit = correction.getByLabelText('2행 대변')
+    await actions.clear(credit); await actions.type(credit, '845000')
+    await actions.type(correction.getByLabelText(/사유/), '기록 오류 정정')
+    await actions.click(correction.getByRole('button', { name: '등록' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /^역분개 \+ 재기표$/ })).not.toBeInTheDocument())
+    expect(requests().filter(([path, init]) => init?.method === 'POST' && path.includes('/payment-correction'))).toHaveLength(0)
+  })
+
   it.each([
     { resolved: true, mode: '' }, { resolved: false, mode: '' },
-    { resolved: true, mode: 'RECORD_ONLY' }, { resolved: true, mode: 'SETTLEMENT_COMPLETED' },
-  ])('지급 수정은 하단 검증·저장과 처리 구분($mode)을 반영한다', async ({ resolved, mode }) => {
+  ])('지급 수정은 하단 검증·저장을 반영한다 ($resolved)', async ({ resolved, mode }) => {
     searchResponse = () => search([{ ...baseCase, ...(mode ? { type: 'RECONCILIATION_MISMATCH' as const, reconciliationResultType: 'AMOUNT_DIFFERENCE' } : {}), status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }])
     let saved = false
     const payment = { commissionTransactionId: 77, sourceType: 'GA_MANUAL_PAYMENT', status: 'CONFIRMED',
@@ -620,7 +711,7 @@ describe('EXCP-W01 예외함', () => {
 
   it.each([
     { type: 'CAP_VIOLATION' as const, reason: 'CAP_LIMIT_VIOLATION', target: 'SCHEDULE', scheduled: true, title: '보험사 지급기준·한도 검토' },
-    { type: 'RECONCILIATION_MISMATCH' as const, reason: 'EXPECTED_MISSING', target: 'SCHEDULE', scheduled: false, title: '예상 스케줄 확인·재생성' },
+    { type: 'RECONCILIATION_MISMATCH' as const, reason: 'EXPECTED_MISSING', target: 'SCHEDULE', scheduled: false, title: '계약 상세 · C-0001' },
     { type: 'RECONCILIATION_MISMATCH' as const, reason: 'INVALID_CONTRACT_PAYMENT', target: 'CONTRACT', scheduled: false, title: '계약 상태·예상 스케줄 확인' },
   ])('$reason 원인은 지급 편집 대신 스케줄·계약 확인과 재검증을 제공한다', async ({ type, reason, target, scheduled, title }) => {
     currentUser = scheduled || target === 'CONTRACT' ? { ...user, roleCode: 'GA_ADMIN', canProcess: false } : user
@@ -664,6 +755,10 @@ describe('EXCP-W01 예외함', () => {
       expect(await within(dialog).findByRole('table', { name: '보험회사→GA 예상 스케줄' })).toBeInTheDocument()
       await actions.click(regenerate)
       await waitFor(() => expect(requests().some(([path]) => path.startsWith('/api/v1/contracts/3/schedules/regenerate'))).toBe(true))
+      const recheck = within(dialog).getByRole('button', { name: '재대사' })
+      expect(regenerate.closest('.modal-footer')).toContainElement(recheck)
+      await waitFor(() => expect(recheck).toBeEnabled())
+      await actions.click(recheck)
     }
     await waitFor(() => expect(screen.queryByRole('dialog', { name: title })).not.toBeInTheDocument())
     expect(await screen.findByText('2. 정정')).toBeInTheDocument()

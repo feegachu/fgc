@@ -515,6 +515,56 @@
     "element": "KpiCard"
   },
   {
+    "id": "exception.recovery.calculate",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.calculation-close",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.candidate",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "exception.recovery.close",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.continue",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.deduction",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.deduction-close",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.discard",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.payment",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "exception.recovery.recheck",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
     "id": "exception.summary.allocation_evidence_missing",
     "file": "features/exception/ExceptionPage.tsx",
     "element": "Link"
@@ -2085,6 +2135,21 @@
     "element": "select"
   },
   {
+    "id": "features.exception.duplicate-journal.back",
+    "file": "features/exception/DuplicateJournalModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.duplicate-journal.close",
+    "file": "features/exception/DuplicateJournalModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.duplicate-journal.confirm",
+    "file": "features/exception/DuplicateJournalModal.tsx",
+    "element": "Button"
+  },
+  {
     "id": "features.exception.exception-page.button",
     "file": "features/exception/ExceptionPage.tsx",
     "element": "button"
@@ -2261,8 +2326,13 @@
   },
   {
     "id": "features.exception.payment-correction.cancel-duplicate",
-    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "file": "features/exception/DuplicateJournalModal.tsx",
     "element": "Button"
+  },
+  {
+    "id": "features.exception.payment-correction.cap-overage",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "section"
   },
   {
     "id": "features.exception.payment-correction.close",
@@ -2291,26 +2361,16 @@
   },
   {
     "id": "features.exception.payment-correction.duplicate-guide",
-    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "file": "features/exception/DuplicateJournalModal.tsx",
     "element": "section"
   },
   {
     "id": "features.exception.payment-correction.duplicate-mode",
-    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "file": "features/exception/DuplicateJournalModal.tsx",
     "element": "select"
   },
   {
     "id": "features.exception.payment-correction.journal",
-    "file": "features/exception/PaymentCorrectionModal.tsx",
-    "element": "Link"
-  },
-  {
-    "id": "features.exception.payment-correction.missing-guide",
-    "file": "features/exception/PaymentCorrectionModal.tsx",
-    "element": "section"
-  },
-  {
-    "id": "features.exception.payment-correction.missing-schedule",
     "file": "features/exception/PaymentCorrectionModal.tsx",
     "element": "Link"
   },
@@ -2360,6 +2420,21 @@
     "element": "input"
   },
   {
+    "id": "features.exception.reconciliation-journal.close",
+    "file": "features/exception/ReconciliationJournalModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.reconciliation-journal.correction",
+    "file": "features/exception/ReconciliationJournalModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.reconciliation-journal.payment",
+    "file": "features/exception/ReconciliationJournalModal.tsx",
+    "element": "select"
+  },
+  {
     "id": "features.exception.review-panel",
     "file": "features/exception/ReviewPanel.tsx",
     "element": "section"
@@ -2388,11 +2463,6 @@
     "id": "features.exception.review.evidence",
     "file": "features/exception/ReviewPanel.tsx",
     "element": "input"
-  },
-  {
-    "id": "features.exception.review.link",
-    "file": "features/exception/ReviewPanel.tsx",
-    "element": "Link"
   },
   {
     "id": "features.exception.review.reason",
@@ -3658,6 +3728,56 @@
     "id": "ledger.kpi.debit",
     "file": "features/ledger/LedgerExplorer.tsx",
     "element": "KpiCard"
+  },
+  {
+    "id": "ledger.repost.account",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "ledger.repost.close",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.repost.continue",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.repost.credit",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "ledger.repost.debit",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "ledger.repost.discard",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.repost.evidence",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "ledger.repost.reason",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "ledger.repost.submit",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.repost.table",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "table"
   },
   {
     "id": "navigation.group.admin",

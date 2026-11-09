@@ -125,6 +125,7 @@ export function TransactionForm({
   role,
   onReload,
   onCorrect,
+  onConfirmed,
   correctionReady = true,
   onPreview,
   actionContainer,
@@ -139,6 +140,7 @@ export function TransactionForm({
   role: string
   onReload: () => Promise<void>
   onCorrect?: (payment: PaymentPayload, expectedUpdatedAt?: string) => Promise<void>
+  onConfirmed?: (payment: Payment) => void
   correctionReady?: boolean
   onPreview?: (payment: PaymentPayload) => Promise<Precheck>
   actionContainer?: HTMLElement | null
@@ -595,7 +597,9 @@ export function TransactionForm({
       // Keep the verified completion screen mounted; the list/detail refresh on their next opening.
       void queryClient.invalidateQueries({ queryKey: ['transactions'], refetchType: 'none' })
       toast('수수료 지급 건을 확정했습니다.', 'success')
-      if (!helpOpen) {
+      if (onConfirmed) {
+        onConfirmed(response)
+      } else if (!helpOpen) {
         void navigate(returnTo)
       } else {
         // A guide read must never turn a committed business success into a retryable failure.

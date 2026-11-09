@@ -110,7 +110,7 @@ export function ExceptionPage() {
     else if (selected.type === 'POLICY_MISSING' && selected.contractId) {
       try {
         const { data } = await apiClient.request<{ offeringMismatch?: boolean }>(`/api/v1/exceptions/${selected.exceptionCaseId}/review`)
-        const link = data?.offeringMismatch ? `/contracts/${selected.contractId}/edit` : correctionLink!
+        const link = data?.offeringMismatch ? `/contracts/${selected.contractId}/edit?${new URLSearchParams({ returnTo: `/exceptions?${params}` })}` : correctionLink!
         void navigate(month ? withMonth(link, month) : link)
       } catch { setCorrectionOpen(true) }
     } else setCorrectionOpen(true)

@@ -6,9 +6,12 @@ import { Field } from '../../components/Field'
 import { DataTable } from '../../components/DataTable'
 import { StatusBadge } from '../../components/StatusBadge'
 import { ReviewPanel } from './ReviewPanel'
+import { DuplicateJournalModal } from './DuplicateJournalModal'
+import { ReconciliationJournalModal } from './ReconciliationJournalModal'
+import { RecoveryChecklistModal } from './RecoveryChecklistModal'
 import { Modal } from '../../components/Modal'
 import { apiClient, ApiError } from '../../lib/api/client'
-import { errorText, won } from '../../lib/format'
+import { errorText, rateText, won } from '../../lib/format'
 import { useUnsavedWorkStore } from '../../stores/unsavedWork'
 import { toast } from '../../stores/toasts'
 import { useAuth } from '../auth/useAuth'
@@ -18,7 +21,7 @@ import type { ExceptionAction, ExceptionCase } from './api'
 import type { components } from '../../lib/api/schema'
 
 interface Issue { resultId?: number; resultType?: string; resultLabel?: string; expectedAmount?: number; actualAmount?: number; differenceAmount?: number; installmentNo?: number; expectedAgent?: string | null; actualAgent?: string | null; sourceLink?: string }
-interface Context { payments: Payment[]; suggestedPayment?: PaymentPayload | null; capBasis?: components['schemas']['CapCheckBasisResponse'] | null; scheduledBasis?: boolean; scheduleLink?: string | null; policyLink?: string | null; correctionTarget?: 'PAYMENT' | 'SCHEDULE' | 'CONTRACT' | 'RECOVERY' | 'REVIEW'; paymentStage?: string; contractLink?: string | null; remainingIssues?: Issue[]; reconciliationResultType?: string | null; canRegisterPayment?: boolean; deferrableFrom?: string | null }
+interface Context { payments: Payment[]; paymentJournalIds?: Record<string, number>; suggestedPayment?: PaymentPayload | null; capBasis?: components['schemas']['CapCheckBasisResponse'] | null; scheduledBasis?: boolean; scheduleLink?: string | null; policyLink?: string | null; correctionTarget?: 'PAYMENT' | 'SCHEDULE' | 'CONTRACT' | 'RECOVERY' | 'REVIEW'; paymentStage?: string; contractLink?: string | null; remainingIssues?: Issue[]; reconciliationResultType?: string | null; canRegisterPayment?: boolean; deferrableFrom?: string | null }
 interface Receipt { payment: Payment; resolved: boolean; message: string; action?: ExceptionAction | null; deferredPayment?: Payment | null }
 interface Recheck { capBasis?: components['schemas']['CapCheckBasisResponse'] | null; resolved: boolean; message: string; action?: ExceptionAction | null }
 const TransactionForm = lazy(() => import('../transaction/TransactionFormPage').then(module => ({ default: module.TransactionForm })))
@@ -43,8 +46,8 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
   const [plannedAction, setPlannedAction] = useState('')
   const [deferredDate, setDeferredDate] = useState('')
   const [receiptConfirmed, setReceiptConfirmed] = useState(false)
-  const [duplicateMode, setDuplicateMode] = useState('')
   const [actionContainer, setActionContainer] = useState<HTMLDivElement | null>(null)
+  const [scheduleActions, setScheduleActions] = useState<HTMLDivElement | null>(null)
   const scope = `exception:${item.exceptionCaseId}:payment:`
   useEffect(() => () => useUnsavedWorkStore.getState().mark(scope + 'workflow', false), [scope])
   const path = `/api/v1/exceptions/${item.exceptionCaseId}/payment-correction`
@@ -64,6 +67,7 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
   const missingActual = reconciliationType === 'ACTUAL_MISSING'
   const canRegister = missingActual && context.data?.canRegisterPayment !== false
   const amountDifference = reconciliationType === 'AMOUNT_DIFFERENCE'
+  const expectedMissing = reconciliationType === 'EXPECTED_MISSING'
   const duplicate = reconciliationType === 'DUPLICATE'
   const workflowValid = (!amountDifference || Boolean(correctionMode && (correctionMode !== 'SETTLEMENT_COMPLETED' || settlementEvidence.trim())))
     && (plannedAction !== 'DEFER' || Boolean(deferredDate)) && (!missingActual || context.data?.paymentStage !== 'INSURER_TO_GA' || receiptConfirmed)
@@ -122,34 +126,19 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
     },
     onError: error => toast(errorText(error, '재검증하지 못했습니다.'), 'error'),
   })
-  const cancelDuplicate = useMutation({
-    mutationKey: ['exception', 'write', item.exceptionCaseId],
-    mutationFn: async () => {
-      const { data } = await apiClient.request<Receipt>(path + '/cancel-duplicate', { method: 'POST', body: {
-        paymentId: payment?.commissionTransactionId, expectedUpdatedAt: payment?.updatedAt, evidenceRef: payment?.evidenceRef ?? null,
-      } })
-      if (!data) throw new Error('취소 결과를 확인하지 못했습니다.')
-      return data
-    }, meta: { errorToast: false },
-    onSuccess: async result => {
-      if (result.action) applyActionToCache(client, item.exceptionCaseId!, result.action)
-      toast(result.message, result.resolved ? 'success' : 'warning')
-      void client.invalidateQueries({ queryKey: ['transactions'], refetchType: 'none' })
-      void client.invalidateQueries({ queryKey: ['reconciliations'], refetchType: 'none' })
-      if (result.resolved) onClose(); else await context.refetch()
-    }, onError: error => toast(errorText(correctionError(error)), 'error'),
-  })
   const pending = useIsMutating({ mutationKey: ['exception', 'write', item.exceptionCaseId] }) > 0
   const sourceCorrection = context.data?.scheduledBasis || context.data?.correctionTarget === 'SCHEDULE' || context.data?.correctionTarget === 'CONTRACT'
   const invalidContract = context.data?.correctionTarget === 'CONTRACT'
   const insurer = context.data?.paymentStage === 'INSURER_TO_GA'
   const externalInsurer = context.data?.scheduledBasis && insurer
-  const manualReview = context.data?.correctionTarget === 'RECOVERY' || context.data?.correctionTarget === 'REVIEW'
+  const manualReview = context.data?.correctionTarget === 'REVIEW'
   const basisGroups = Object.entries((context.data?.capBasis?.details ?? []).filter(d => d.classificationSnapshot === 'INCLUDED').reduce<Record<string, { count: number; amount: number }>>((groups, d) => {
     const key = d.commissionItemName ?? '기타'
     groups[key] = { count: (groups[key]?.count ?? 0) + 1, amount: (groups[key]?.amount ?? 0) + Number(d.amount ?? 0) }
     return groups
   }, {}))
+  const cap = context.data?.capBasis?.capCheck
+  const excess = cap?.includedAmount != null && cap.limitAmount != null ? Math.max(0, Number(cap.includedAmount) - Number(cap.limitAmount)) : 0
   const dirty = () => Object.keys(useUnsavedWorkStore.getState().owners).some(owner => owner.startsWith(`exception:${item.exceptionCaseId}:`))
   function close() { if (!pending) { if (dirty()) setDiscard(true); else onClose() } }
   function choose(value: string) {
@@ -157,19 +146,24 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
     setSelectedId(value)
     setMessage('')
   }
+  if (amountDifference && context.data) return <ReconciliationJournalModal item={item} payments={context.data.payments}
+    paymentJournalIds={context.data.paymentJournalIds ?? {}} onClose={onClose} />
+  if (duplicate && context.data) return <DuplicateJournalModal item={item} payments={context.data.payments}
+    paymentJournalIds={context.data.paymentJournalIds ?? {}} onChanged={async () => { await context.refetch() }} onClose={onClose} />
+  if (context.data?.correctionTarget === 'RECOVERY') return <RecoveryChecklistModal item={item} payments={context.data.payments} onClose={onClose} />
   return <>
-    <Modal open title={manualReview ? context.data?.correctionTarget === 'RECOVERY' ? '환수·차감 및 반려 처리' : '스케줄 밖 지급 근거 검토' : externalInsurer ? '보험사 지급기준·한도 검토' : sourceCorrection ? invalidContract ? '계약 상태·예상 스케줄 확인' : '예상 스케줄 확인·재생성' : '수수료 지급 건 등록·수정'} className="modal-large exception-payment-modal"
+    <Modal open title={manualReview ? '스케줄 밖 지급 근거 검토' : externalInsurer ? '보험사 지급기준·한도 검토' : sourceCorrection ? expectedMissing ? `계약 상세 · ${item.contractNo ?? '-'}` : invalidContract ? '계약 상태·예상 스케줄 확인' : '예상 스케줄 확인·재생성' : '수수료 지급 건 등록·수정'} className="modal-large exception-payment-modal"
       onClose={close} closeOnBackdrop={false} closeOnEscape={!pending}
       footer={<>
-        {(sourceCorrection || item.type === 'RECONCILIATION_MISMATCH') && <Button data-guide-feature="features.exception.payment-correction.recheck" loading={recheck.isPending} disabled={pending || dirty()} onClick={() => recheck.mutate()}>{context.data?.scheduledBasis ? '스케줄 재검증' : '재대사'}</Button>}
-        {duplicate && duplicateMode === 'RECORD_ONLY' && <Button data-guide-feature="features.exception.payment-correction.cancel-duplicate" disabled={pending || !payment || !user?.canProcess} loading={cancelDuplicate.isPending} onClick={() => cancelDuplicate.mutate()}>선택한 중복 기록 역분개·취소</Button>}
+        {expectedMissing && sourceCorrection && <div ref={setScheduleActions} />}
+        {!missingActual && (sourceCorrection || item.type === 'RECONCILIATION_MISMATCH') && <Button data-guide-feature="features.exception.payment-correction.recheck" loading={recheck.isPending} disabled={pending || dirty()} onClick={() => recheck.mutate()}>{context.data?.scheduledBasis ? '스케줄 재검증' : '재대사'}</Button>}
         <div className="exception-payment-footer-actions" ref={setActionContainer} />
         <Button data-guide-feature="features.exception.payment-correction.close" variant="secondary" disabled={pending} onClick={close}>닫기</Button>
       </>}>
       {context.isPending && <p role="status">지급 원천을 불러오는 중입니다.</p>}
       {context.error && <p role="alert" className="field-error">{errorText(context.error)}</p>}
       {context.data && <>
-        {manualReview ? <ReviewPanel item={item} onClosed={onClose} /> : sourceCorrection ? <section data-guide-feature="features.exception.schedule-correction" className="exception-schedule-correction">
+        {manualReview ? <ReviewPanel item={item} onClosed={onClose} initialEvidence={item.contractNo} /> : sourceCorrection ? <section data-guide-feature="features.exception.schedule-correction" className="exception-schedule-correction">
           <p className="exception-correction-source">{insurer ? '보험회사→GA' : 'GA→설계사'} · {context.data.scheduledBasis ? '예상 스케줄 기준 한도 검증' : '예상·실제 대사'}</p>
           {context.data.scheduledBasis && <><div className="exception-schedule-amounts">
             <div><span>예상 지급계획</span><strong>{won(context.data.capBasis?.capCheck?.includedAmount)}</strong></div>
@@ -190,19 +184,21 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
           {item.contractId && <Suspense fallback={<p role="status">계약·스케줄을 불러오는 중입니다.</p>}><ScheduleCorrectionPanel
             contractId={item.contractId} exceptionId={item.exceptionCaseId!}
             readOnly={Boolean(externalInsurer)}
-            onRegenerated={async () => { await recheck.mutateAsync() }}
+            actionContainer={expectedMissing ? scheduleActions : undefined}
+            onRegenerated={async () => {
+              if (expectedMissing) setMessage('스케줄을 재생성했습니다. 재대사로 예상 지급과 실제 지급을 비교하세요.')
+              else await recheck.mutateAsync()
+            }}
           /></Suspense>}
           {externalInsurer && <ReviewPanel item={item} onClosed={onClose} />}
         </section> : <>
-        {missingActual && <section data-guide-feature="features.exception.payment-correction.missing-guide" className="exception-correction-workflow">
-          <h3>누락 지급 등록 · 재대사</h3>
-          <p>예상 스케줄의 수령인·항목·회차와 정산월을 확인하고 등록하세요. 저장 시 지급 확정과 재대사를 진행하며, 일치하면 재대사 이력으로 종결합니다.</p>
-          {context.data.scheduleLink && <Link data-guide-feature="features.exception.payment-correction.missing-schedule" to={context.data.scheduleLink}>예상 항목·회차 확인</Link>}
-          {!canRegister && <p>등록된 지급 건이 있습니다. 기존 초안이면 아래에서 확정하고, 이미 확정했다면 하단의 재대사로 일치 여부를 확인하세요.</p>}
-          {insurer && <label className="checkbox-label"><input data-guide-feature="features.exception.payment-correction.receipt-confirmed" type="checkbox" checked={receiptConfirmed}
-            onChange={event => { setReceiptConfirmed(event.target.checked); useUnsavedWorkStore.getState().mark(scope + 'workflow', event.target.checked) }} />보험사 명세·입금 확인 완료</label>}
-          {insurer && <p>미입금이면 등록하지 않고 검토 의견에 보험사 문의 내용과 요청 문서를 남겨 검토중으로 유지하세요.</p>}
+        {item.type === 'CAP_VIOLATION' && <section data-guide-feature="features.exception.payment-correction.cap-overage" className="guidance guidance-neutral">
+          <strong className="guidance-title">{excess > 0 ? `한도 초과 · 최소 ${won(excess)} 줄여야 합니다.` : '검출 당시 한도 초과 내역'}</strong>
+          {item.description && <p className="guidance-copy">{rateText(item.description)}</p>}
+          <p className="guidance-copy">지급액과 귀속금액을 함께 조정한 뒤 사전검증을 다시 실행하세요.</p>
         </section>}
+        {missingActual && insurer && <label className="checkbox-label"><input data-guide-feature="features.exception.payment-correction.receipt-confirmed" type="checkbox" checked={receiptConfirmed}
+          onChange={event => { setReceiptConfirmed(event.target.checked); useUnsavedWorkStore.getState().mark(scope + 'workflow', event.target.checked) }} />보험사 명세·입금 확인 완료</label>}
         {!context.data.scheduledBasis && ['CAP_WARNING', 'CAP_VIOLATION', 'CAP_REVIEW_REQUIRED'].includes(item.type ?? '') && payment && <section data-guide-feature="features.exception.payment-correction.defer-guide" className="exception-correction-workflow">
           <Field label="감액·이연 구분"><select data-guide-feature="features.exception.payment-correction.planned-action" className="select-control" value={plannedAction} disabled={pending} onChange={event => { setPlannedAction(event.target.value); useUnsavedWorkStore.getState().mark(scope + 'workflow', true) }}>
             <option value="">변경 내용으로 자동 판단</option><option value="REDUCE">초과분 감액</option><option value="DEFER">초과분을 2차년도 이후로 이연</option>
@@ -210,12 +206,6 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
           {plannedAction === 'DEFER' && <Field label="초과분 지급 예정일" required helper={`현재 지급액을 잔여 한도 이내로 줄이세요. 차액은 ${context.data.deferrableFrom ?? '계약 2차년도'} 이후 지급 초안으로 분리하며 지금 확정하지 않습니다.`}>
             <input data-guide-feature="features.exception.payment-correction.deferred-date" type="date" min={context.data.deferrableFrom ?? undefined} value={deferredDate} disabled={pending} onChange={event => { setDeferredDate(event.target.value); useUnsavedWorkStore.getState().mark(scope + 'workflow', true) }} />
           </Field>}
-        </section>}
-        {duplicate && <section data-guide-feature="features.exception.payment-correction.duplicate-guide" className="exception-correction-workflow">
-          <h3>중복 지급 확인</h3><Field label="중복 유형" required><select data-guide-feature="features.exception.payment-correction.duplicate-mode" className="select-control" value={duplicateMode} onChange={event => setDuplicateMode(event.target.value)}>
-            <option value="">실제 송금 내역을 확인하고 선택하세요</option><option value="RECORD_ONLY">기록만 중복 · 선택한 기록 역분개·취소</option><option value="ACTUAL_DUPLICATE">실제로 중복 송금 · 차감 후 반려</option>
-          </select></Field>
-          <p>기록만 중복이면 아래에서 중복 건의 지급 관리번호를 고르고 취소하세요. 실제로 두 번 송금했다면 환수·차감 근거를 남겨 반려해야 합니다.</p>
         </section>}
         {amountDifference && <section data-guide-feature="features.exception.payment-correction.amount-guide" className="exception-correction-workflow">
           <h3>금액 부족·초과 정정</h3>
@@ -262,7 +252,7 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
             </div>
           </div>)}
         </section>}
-        {duplicate ? duplicateMode === 'ACTUAL_DUPLICATE' ? <ReviewPanel item={item} onClosed={onClose} /> : null : (payment || id === 'new' && canRegister && draft) ? <Suspense fallback={<p role="status">지급 입력 화면을 불러오는 중입니다.</p>}><TransactionForm
+        {payment || id === 'new' && canRegister && draft ? <Suspense fallback={<p role="status">지급 입력 화면을 불러오는 중입니다.</p>}><TransactionForm
           key={`${id}:${context.dataUpdatedAt}`} entry={{ contractId: item.contractId ? String(item.contractId) : undefined }}
           initialId={payment ? id : null} draft={draft ?? undefined}
           month={draft?.settlementMonth?.slice(0, 7) ?? item.validationMonth?.slice(0, 7) ?? ''}

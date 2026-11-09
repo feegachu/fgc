@@ -78,7 +78,7 @@ public class PaymentCorrectionReconciliationService {
             execution.executeInTransaction(new ReconciliationExecutionRequest(newId, old.getValidationRunId(),
                     old.getSettlementMonth(), row.getPaymentStage(), old.getInsurerId(), actor));
             if (old.getValidationRunId() != null) detection.bulkCreate(newId);
-            resolveMatchedExceptions(oldId, newId, groupKey, actor, correctionReason);
+            if (!groupKey.startsWith("EXCP-RECOVERY-")) resolveMatchedExceptions(oldId, newId, groupKey, actor, correctionReason);
         }
     }
 

@@ -1381,6 +1381,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseJournalCorrectionResult" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/JournalCorrectionResult"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseJournalDetailResponse" : {
         "properties" : {
           "data" : {
@@ -1413,6 +1427,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/JournalImbalanceSearchResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseJournalNumbers" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/JournalNumbers"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -3746,9 +3774,17 @@
             "maxLength" : 128,
             "minLength" : 0,
             "type" : "string"
+          },
+          "originalPaymentId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
           }
         },
-        "required" : [ "calculationVersion", "expectedSourceVersion" ],
+        "required" : [
+          "calculationVersion",
+          "expectedSourceVersion"
+        ],
         "type" : "object"
       },
       "ClawbackNoticeDocumentResponse" : {
@@ -3771,6 +3807,10 @@
           "downloadPath" : {
             "description" : "IF-API-67A 다운로드 경로. 호출 시 권한을 다시 검사한다",
             "type" : "string"
+          },
+          "originalPaymentId" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "sha256" : {
             "type" : "string"
@@ -6415,6 +6455,13 @@
             "format" : "date",
             "type" : "string"
           },
+          "paymentJournalIds" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "object"
+          },
           "paymentStage" : {
             "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
             "type" : "string"
@@ -6549,6 +6596,31 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "ExceptionRecoveryRecheckRequest" : {
+        "properties" : {
+          "candidateId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "deductionPaymentId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "originalPaymentId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [
+          "candidateId",
+          "deductionPaymentId",
+          "originalPaymentId"
+        ],
         "type" : "object"
       },
       "ExceptionReviewContext" : {
@@ -7281,6 +7353,26 @@
         },
         "type" : "object"
       },
+      "JournalCorrectionResult" : {
+        "properties" : {
+          "correctionGroupKey" : {
+            "type" : "string"
+          },
+          "journalHeaderId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "repostedJournalHeaderId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reversalOfId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "JournalDetailLineResponse" : {
         "properties" : {
           "accountCode" : {
@@ -7589,6 +7681,17 @@
             "type" : "string"
           },
           "statusTone" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "JournalNumbers" : {
+        "properties" : {
+          "repostedJournalNo" : {
+            "type" : "string"
+          },
+          "reversalJournalNo" : {
             "type" : "string"
           }
         },
@@ -14535,6 +14638,47 @@
         "tags" : [ "exception-payment-correction-controller" ]
       }
     },
+    "/api/v1/exceptions/{id}/payment-correction/reconcile-recovery" : {
+      "post" : {
+        "operationId" : "reconcileRecovery",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "id",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExceptionRecoveryRecheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExceptionSourceRecheckResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [
+          "exception-payment-correction-controller"
+        ]
+      }
+    },
     "/api/v1/exceptions/{id}/review" : {
       "get" : {
         "operationId" : "context_1",
@@ -14904,6 +15048,37 @@
         "tags" : [ "검증원장" ]
       }
     },
+    "/api/v1/journals/repost-number-preview" : {
+      "get" : {
+        "operationId" : "previewRepostNumbers",
+        "parameters" : [
+          {
+            "in" : "query",
+            "name" : "journalDate",
+            "required" : true,
+            "schema" : {
+              "format" : "date",
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseJournalNumbers"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [
+          "journal-correction-controller"
+        ]
+      }
+    },
     "/api/v1/journals/{journalHeaderId}" : {
       "get" : {
         "description" : "분개 헤더 + 라인 목록 + 차변/대변 합계·차액·균형 여부를 반환한다.",
@@ -15005,6 +15180,47 @@
           }
         },
         "tags" : [ "journal-correction-controller" ]
+      }
+    },
+    "/api/v1/journals/{journalId}/reverse-and-repost" : {
+      "post" : {
+        "operationId" : "reverseAndRepost",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "journalId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/JournalCorrectionActionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseJournalCorrectionResult"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [
+          "journal-correction-controller"
+        ]
       }
     },
     "/api/v1/news/headlines" : {

@@ -6,6 +6,7 @@ import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.*;
 import com.susukkang.fgc.common.exception.*;
+import com.susukkang.fgc.contract.service.ContractService;
 import com.susukkang.fgc.exceptioncase.dto.*;
 import com.susukkang.fgc.exceptioncase.repository.*;
 import jakarta.persistence.EntityManager;
@@ -26,6 +27,7 @@ public class ExceptionSourceReviewService {
     private final ExceptionCaseService actions;
     private final CapCheckService caps;
     private final ArbitrageService arbitrage;
+    private final ContractService contracts;
 
     @Transactional
     public ExceptionReviewContext context(Long id, Long actor) {
@@ -65,7 +67,8 @@ public class ExceptionSourceReviewService {
                 : "DATA_QUALITY".equals(source.type()) ? "기준일·금융/해약환급금 스냅샷·예정 지표의 근거를 확인하세요. 외부 자료가 없으면 의견을 남겨 보류하고, 참고 지표나 의도한 시연 자료라면 판단 근거를 남겨 반려하세요."
                 : "CAP_WARNING".equals(source.type()) ? "잔여 한도를 확인하고 추가 지급 전 사전검증 계획을 기록하세요. 검토가 끝났다면 반려로 종결할 수 있습니다."
                 : "원지급과 실제 송금·입금 여부를 확인하세요. 청약철회 지급이나 실제 중복 송금은 환수·차감 후 통지서와 차감 관리번호를 남겨 반려합니다. 지급 기록이 남으므로 대사 일치로 강제 해결하지 않습니다. 스케줄 밖의 정상 지급은 지급 근거를 확인해 반려하고, 확인되지 않은 보험사 입금은 의견을 남겨 검토중으로 유지하세요.";
-        boolean canRecheck = "CAP_CHECK".equals(source.sourceType()) || "ARBITRAGE_CHECK".equals(source.sourceType());
+        boolean canRecheck = "CAP_CHECK".equals(source.sourceType()) || "ARBITRAGE_CHECK".equals(source.sourceType())
+                || ("POLICY_MISSING".equals(source.type()) && source.contractId() != null && !mismatch);
         return new ExceptionReviewContext(status, contractDate, mismatch, queries.requiresRejectionEvidence(id), admin, canRecheck, guidance, links);
     }
 
@@ -78,7 +81,11 @@ public class ExceptionSourceReviewService {
         boolean resolved = false;
         ExceptionActionType action = ExceptionActionType.CORRECT;
         String basis = "";
-        if (!context.offeringMismatch() && "CAP_CHECK".equals(source.sourceType())) {
+        if (!context.offeringMismatch() && "POLICY_MISSING".equals(source.type()) && source.contractId() != null) {
+            var schedules = contracts.regenerateSchedules(source.contractId(), "정책 없음 예외 재검증 · " + id);
+            resolved = schedules.size() >= 2;
+            basis = "재생성된 예상 스케줄 " + schedules;
+        } else if (!context.offeringMismatch() && "CAP_CHECK".equals(source.sourceType())) {
             var scope = sources.capScope(id);
             if (scope != null) {
                 var saved = caps.calculateAndSave(CapCalculationCommand.manual(source.contractId(), scope.stage(), scope.asOfDate(), null));

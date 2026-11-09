@@ -94,7 +94,7 @@ public class ClawbackCandidateQueryRepository {
                            'attributedAmount', ta.attributed_amount, 'scheduleLineId', ta.schedule_line_id)
                            ORDER BY ta.transaction_attribution_id), '[]'::jsonb) AS rows,
                          COALESCE(jsonb_agg(jsonb_build_array(to_jsonb(ta), to_jsonb(ct))
-                           ORDER BY ta.transaction_attribution_id), '[]'::jsonb) AS raw_rows,
+                           ORDER BY ta.transaction_attribution_id) FILTER (WHERE ct.cashflow_type = 'PAYMENT'), '[]'::jsonb) AS raw_rows,
                          COALESCE(SUM(ROUND(ta.attributed_amount, 0)) FILTER (
                            WHERE ct.status = 'CONFIRMED' AND ct.cashflow_type = 'PAYMENT'), 0) AS paid_amount,
                          COALESCE(bool_or(ct.status = 'CONFIRMED' AND ct.cashflow_type = 'PAYMENT'

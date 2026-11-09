@@ -10,4 +10,4 @@ public record ExceptionPaymentContext(List<CommissionPaymentResponse> payments,
         boolean scheduledBasis, String scheduleLink, String policyLink,
         String correctionTarget, com.susukkang.fgc.common.code.PaymentStage paymentStage, String contractLink,
         List<ExceptionReconciliationIssue> remainingIssues, String reconciliationResultType,
-        boolean canRegisterPayment, java.time.LocalDate deferrableFrom) {}
+        boolean canRegisterPayment, java.time.LocalDate deferrableFrom, java.util.Map<Long, Long> paymentJournalIds) {}

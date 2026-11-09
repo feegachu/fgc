@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.clawback.dto.ClawbackCandidateDetailResponse.Calculation;
+import com.susukkang.fgc.clawback.dto.ClawbackCandidateDetailResponse;
 import com.susukkang.fgc.clawback.dto.ClawbackNoticeDocumentRequest;
 import com.susukkang.fgc.clawback.dto.ClawbackNoticeDocumentResponse;
 import com.susukkang.fgc.clawback.repository.ClawbackCandidateQueryRepository;
@@ -62,7 +63,8 @@ public class ClawbackNoticeDocumentService {
         if (idempotencyKey == null || !idempotencyKey.matches("[A-Za-z0-9._:-]{1,100}")) {
             throw invalid("Idempotency-Key");
         }
-        String hash = sha256((caseId + "\n" + request.calculationVersion() + "\n" + request.expectedSourceVersion())
+        String hash = sha256((caseId + "\n" + request.calculationVersion() + "\n" + request.expectedSourceVersion()
+                + (request.originalPaymentId() == null ? "" : "\n" + request.originalPaymentId()))
                 .getBytes(StandardCharsets.UTF_8));
         if (!store.tryLockRequest(idempotencyKey)) throw new FgcBusinessException(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS);
         var prior = store.findRequest(idempotencyKey);
@@ -76,12 +78,15 @@ public class ClawbackNoticeDocumentService {
 
         var clawbackCase = store.lockCase(caseId).orElseThrow(() -> notFound(caseId));
         LatestCalculation latest = store.findLatestCalculation(caseId).orElse(null);
-        String currentSourceVersion = clawbackCase.candidateId() == null ? null
-                : candidates.findById(clawbackCase.candidateId()).map(d -> d.candidate().sourceVersion()).orElse(null);
+        var detail = clawbackCase.candidateId() == null ? null : candidates.findById(clawbackCase.candidateId()).orElse(null);
+        String currentSourceVersion = detail == null ? null : detail.candidate().sourceVersion();
         ensureFresh(request, latest, currentSourceVersion);
 
         Calculation calculation = decode(latest.snapshotJson());
-        NoticeHeader header = store.findHeader(caseId, calculation.policyVersionId());
+        Long originalPayment = request.originalPaymentId();
+        if (originalPayment != null) calculation = forPayment(calculation, detail, originalPayment);
+        NoticeHeader header = originalPayment == null ? store.findHeader(caseId, calculation.policyVersionId())
+                : store.findHeader(caseId, calculation.policyVersionId(), originalPayment);
         String documentNo = "CLN-" + caseId;
         int version = documents.nextVersion(documentNo);
         OffsetDateTime issuedAt = OffsetDateTime.now(SEOUL).truncatedTo(ChronoUnit.MICROS);
@@ -92,8 +97,20 @@ public class ClawbackNoticeDocumentService {
         long documentId = documents.insert(new GeneratedDocumentRepository.NewDocument(documentNo, version,
                 DOCUMENT_KIND, SOURCE_ENTITY_TYPE, caseId, calculation.calculationVersion(), storageKey, contentHash,
                 userId, issuedAt));
+        if (originalPayment != null) store.savePaymentScope(documentId, originalPayment);
         store.saveRequest(idempotencyKey, userId, caseId, hash, documentId);
         return toResponse(documents.findById(documentId).orElseThrow());
+    }
+
+    private Calculation forPayment(Calculation calculation, ClawbackCandidateDetailResponse detail, long originalPayment) {
+        var attributions = detail.paymentAttributions().stream()
+                .filter(row -> row.commissionTransactionId() == originalPayment && "CONFIRMED".equals(row.status()) && "PAYMENT".equals(row.cashflowType()))
+                .map(row -> row.transactionAttributionId()).collect(java.util.stream.Collectors.toSet());
+        var lines = calculation.lines().stream().filter(line -> attributions.contains(line.transactionAttributionId())).toList();
+        if (lines.isEmpty()) throw invalid("originalPaymentId");
+        var amount = lines.stream().map(line -> line.clawbackAmount()).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        return new Calculation(calculation.clawbackCaseId(), calculation.candidateId(), calculation.calculationVersion(), calculation.sourceVersion(),
+                calculation.policyVersionId(), calculation.calculatedAt(), calculation.calculatedBy(), amount, lines, calculation.basis());
     }
 
     /**
@@ -139,7 +156,7 @@ public class ClawbackNoticeDocumentService {
         if (!store.caseExists(caseId)) throw notFound(caseId);
         long total = documents.countBySource(DOCUMENT_KIND, SOURCE_ENTITY_TYPE, caseId);
         var content = documents.findBySource(DOCUMENT_KIND, SOURCE_ENTITY_TYPE, caseId, size, (long) (page - 1) * size)
-                .stream().map(ClawbackNoticeDocumentService::toResponse).toList();
+                .stream().map(this::toResponse).toList();
         return PageResponse.of(content, page, size, total, "version,desc");
     }
 
@@ -231,10 +248,10 @@ public class ClawbackNoticeDocumentService {
         return value == null ? null : LocalDate.parse(value.toString());
     }
 
-    static ClawbackNoticeDocumentResponse toResponse(StoredDocument document) {
+    private ClawbackNoticeDocumentResponse toResponse(StoredDocument document) {
         return new ClawbackNoticeDocumentResponse(document.documentNo(), document.versionNo(),
                 document.sourceVersionNo(), document.contentHash(), document.createdAt(), document.createdBy(),
-                "/api/v1/documents/" + document.documentNo() + ".pdf?version=" + document.versionNo());
+                "/api/v1/documents/" + document.documentNo() + ".pdf?version=" + document.versionNo(), store.findPaymentScope(document.documentId()));
     }
 
     private Calculation decode(String json) {

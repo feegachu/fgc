@@ -105,17 +105,17 @@ export function LedgerExplorer() {
     </section>}
       </div>
     </div>
-    {action && detail.data && evidenceVisible && <JournalActionModal key={`${action}-${evidenceId}`} action={action} detail={detail.data} allowed={canReverse && !!eligible} month={month} onClose={() => setAction(null)} />}
+    {action && detail.data && evidenceVisible && <JournalActionModal key={`${action}-${evidenceId}`} action={action} detail={detail.data} allowed={canReverse && !!eligible} onClose={() => setAction(null)} />}
   </div>
 }
 
-function JournalTable({ entries, selected, onSelect, paginated }: { entries: LedgerEntry[]; selected: string; onSelect: (id: number) => void; paginated: boolean }) {
+export function JournalTable({ entries, selected, onSelect, paginated }: { entries: LedgerEntry[]; selected: string; onSelect?: (id: number) => void; paginated: boolean }) {
   const total = (key: 'debitTotal' | 'creditTotal') => entries.reduce((sum, entry) => sum + entry[key], 0)
   return <div className="data-table-viewport"><table data-guide-feature="ledger.explorer.table-1" className="data-table ledger-entry-table"><caption className="visually-hidden">분개별 차변·대변 내역</caption>
     <thead><tr><th>분개일 · 분개번호</th><th>계정과목</th><th>적요</th><th className="text-right">차변</th><th className="text-right">대변</th></tr></thead>
     {entries.map(entry => <tbody key={entry.journalHeaderId} className={selected === String(entry.journalHeaderId) ? 'is-selected' : undefined}>
       {(entry.lines.length ? entry.lines : [null]).map((line, index) => <tr key={line?.lineNo ?? 'empty'}>
-        {index === 0 && <td rowSpan={Math.max(1, entry.lines.length)} className="ledger-journal-cell"><span>{date(entry.journalDate)}</span><button data-guide-feature="ledger.explorer.button-3" type="button" onClick={() => onSelect(entry.journalHeaderId)}>{entry.journalNo}</button>
+        {index === 0 && <td rowSpan={Math.max(1, entry.lines.length)} className="ledger-journal-cell"><span>{date(entry.journalDate)}</span>{onSelect ? <button data-guide-feature="ledger.explorer.button-3" type="button" aria-pressed={selected === String(entry.journalHeaderId)} onClick={() => onSelect(entry.journalHeaderId)}>{entry.journalNo}</button> : <strong>{entry.journalNo}</strong>}
           <div><span className="ledger-type-label">{JOURNAL_TYPE[entry.journalType as keyof typeof JOURNAL_TYPE] ?? entry.journalType}</span><span className={entry.debitTotal === entry.creditTotal ? 'is-balanced' : 'is-unbalanced'}>{entry.debitTotal === entry.creditTotal ? '✓ 균형' : '불일치'}</span><small>{JOURNAL_STATUS[entry.status as keyof typeof JOURNAL_STATUS] ?? entry.status}</small></div></td>}
         <td>{line?.accountName ?? '상세 행 없음'}</td><td>{line?.memo || entry.description || '—'}</td><td className="text-right">{line?.debitAmount ? int(line.debitAmount) : '—'}</td><td className="text-right">{line?.creditAmount ? int(line.creditAmount) : '—'}</td>
       </tr>)}

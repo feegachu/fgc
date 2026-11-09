@@ -210,9 +210,13 @@ public class ExceptionPaymentRepository {
                 LEFT JOIN fgc.agent ea ON ea.agent_id=n.expected_agent_id
                 LEFT JOIN fgc.agent aa ON aa.agent_id=n.actual_agent_id
                 WHERE NOT run.superseded_yn AND run.status='COMPLETED' AND n.result_type<>'MATCHED'
-                  AND (n.match_group_key=old.match_group_key OR
-                    (n.contract_id=old.contract_id AND n.commission_item_id IS NOT DISTINCT FROM old.commission_item_id
-                     AND n.installment_no IS NOT DISTINCT FROM old.installment_no))
+                  AND NOT (n.result_type='INVALID_CONTRACT_PAYMENT' AND fgc.reconciliation_recovery_complete(n.reconciliation_result_id))
+                  AND (n.match_group_key=old.match_group_key OR EXISTS (
+                    SELECT 1 FROM fgc.reconciliation_match om JOIN fgc.reconciliation_match nm
+                      ON (om.schedule_line_id IS NOT NULL AND nm.schedule_line_id=om.schedule_line_id)
+                      OR (om.transaction_attribution_id IS NOT NULL AND nm.transaction_attribution_id=om.transaction_attribution_id)
+                    WHERE om.reconciliation_result_id=old.reconciliation_result_id
+                      AND nm.reconciliation_result_id=n.reconciliation_result_id))
                 ORDER BY n.reconciliation_result_id
                 """).setParameter("id", source.sourceId()).getResultList();
         return rows.stream().map(value -> {
@@ -228,6 +232,42 @@ public class ExceptionPaymentRepository {
     public Long replacement(String group) {
         return (Long) em.createNativeQuery("SELECT replacement_payment_id FROM fgc.payment_journal_correction WHERE correction_group_key = :key")
                 .setParameter("key", group).getSingleResult();
+    }
+
+    @Transactional
+    public boolean registerRecovery(Source source, Long originalPayment, Long deductionPayment, Long candidate,
+                                    int version, String documentNo) {
+        em.createNativeQuery("""
+                INSERT INTO fgc.exception_payment_recovery(original_payment_id,contract_id,deduction_payment_id,
+                    clawback_calculation_id,generated_document_id,exception_case_id)
+                SELECT :original,:contract,:deduction,c.clawback_calculation_id,d.generated_document_id,:exception
+                FROM fgc.clawback_calculation c
+                LEFT JOIN LATERAL (
+                  SELECT d.generated_document_id FROM fgc.generated_document d
+                  LEFT JOIN fgc.clawback_notice_payment_scope scope USING(generated_document_id)
+                  WHERE d.source_entity_id=c.clawback_case_id AND d.source_entity_type='CLAWBACK_CASE'
+                    AND d.document_kind='CLAWBACK_NOTICE' AND d.source_version_no=c.version_no AND (
+                      (scope.original_payment_id=:original AND d.document_no || '-v' || d.version_no=:document)
+                      OR (scope.original_payment_id IS NULL AND d.document_no=:document))
+                  ORDER BY d.version_no DESC LIMIT 1
+                ) d ON TRUE
+                WHERE c.candidate_id=:candidate AND c.version_no=:version
+                  AND (CAST(:document AS text) IS NULL OR d.generated_document_id IS NOT NULL)
+                ON CONFLICT DO NOTHING
+                """).setParameter("original", originalPayment).setParameter("contract", source.contractId())
+                .setParameter("deduction", deductionPayment).setParameter("exception", source.id()).setParameter("candidate", candidate)
+                .setParameter("version", version).setParameter("document", documentNo).executeUpdate();
+        return Boolean.TRUE.equals(em.createNativeQuery("""
+                SELECT EXISTS (SELECT 1 FROM fgc.exception_payment_recovery r JOIN fgc.clawback_calculation c USING(clawback_calculation_id)
+                  WHERE r.original_payment_id=:original AND r.contract_id=:contract AND r.deduction_payment_id=:deduction
+                    AND c.candidate_id=:candidate AND c.version_no=:version)
+                """).setParameter("original", originalPayment).setParameter("contract", source.contractId()).setParameter("deduction", deductionPayment)
+                .setParameter("candidate", candidate).setParameter("version", version).getSingleResult());
+    }
+
+    public boolean recoveryComplete(Source source) {
+        return Boolean.TRUE.equals(em.createNativeQuery("SELECT fgc.reconciliation_recovery_complete(CAST(:id AS bigint))")
+                .setParameter("id", source.sourceId()).getSingleResult());
     }
 
     @Transactional
