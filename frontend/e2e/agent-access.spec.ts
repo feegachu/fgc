@@ -2,8 +2,11 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 // UI 전용 fixture. 실제 JWT·소유권·PostgreSQL 검증은 AgentDataScopeIntegrationTest에서 수행한다.
-async function agentFixture(page: Page, commission = 300000) {
+async function agentFixture(page: Page, commission = 300000, insurers = [{ insurerId: 1, name: '가상생명' }]) {
   const unexpected: string[] = []
+  const contractCount = insurers.length
+  const previousMonthCount = contractCount > 1 ? 1 : 0
+  const currentMonthCount = contractCount - previousMonthCount
   await page.addInitScript(() => localStorage.setItem('fgc.lastActivityAt', String(Date.now())))
   await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname
@@ -20,16 +23,20 @@ async function agentFixture(page: Page, commission = 300000) {
       priorityContracts: [], priorityContractTotal: 0, dataStatus: 'AVAILABLE',
       myCommission: { month: '2026-07', expected: { amount: commission, count: 1 }, held: { amount: 0, count: 0 },
         clawback: { amount: 0, count: 0 }, dataStatus: 'AVAILABLE' },
-      portfolio: { contractCount: 1,
-        insurers: [{ insurerId: 1, name: '가상생명', contractCount: 1, monthlyEquivalentFirstPremiumSum: 100000 }],
-        monthly: [{ month: '2026-06', newContractCount: 0, monthlyEquivalentFirstPremiumSum: 0 },
-          { month: '2026-07', newContractCount: 1, monthlyEquivalentFirstPremiumSum: 100000 }],
-        categories: [{ code: 'HEALTH_PROTECTION', label: '건강보장', count: 1 }],
-        statuses: [{ code: 'ACTIVE', label: '정상', count: 1 }] },
+      portfolio: { contractCount,
+        insurers: insurers.map((insurer) => ({ ...insurer, contractCount: 1, monthlyEquivalentFirstPremiumSum: 100000 })),
+        monthly: [{ month: '2026-06', newContractCount: previousMonthCount, monthlyEquivalentFirstPremiumSum: 100000 * previousMonthCount },
+          { month: '2026-07', newContractCount: currentMonthCount, monthlyEquivalentFirstPremiumSum: 100000 * currentMonthCount }],
+        categories: [{ code: 'HEALTH_PROTECTION', label: '건강보장', count: contractCount }],
+        statuses: [{ code: 'ACTIVE', label: '정상', count: contractCount }] },
       basis: { asOf: '2026-07-31', warnings: [] },
     })
     if (path === '/api/v1/base/insurers') return fulfill({ content: [], totalPages: 0, totalElements: 0 })
     if (path === '/api/v1/base/products') return fulfill({ content: [], totalPages: 0, totalElements: 0 })
+    if (path === '/api/v1/base/commission-items') return fulfill([])
+    if (path === '/api/v1/agent/me/statements') return fulfill({
+      items: { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 },
+    })
     const contract = {
       contractId: 1, contractNo: 'FGC-FGL01-202607-0001', insurerName: '가상생명', productName: 'GOLDEN 상품',
       contractDate: '2026-07-10', monthlyEquivalentFirstPremium: 100000, contractStatus: 'ACTIVE',
@@ -69,6 +76,78 @@ test('AGENT 첫 화면은 포트폴리오이고 본인 계약 목록은 전체 �
   await expect(page.getByRole('link', { name: '신규 등록' })).toHaveCount(0)
   expect(unexpected).toEqual([])
   await page.screenshot({ path: 'e2e-artifacts/634-agent-contracts.png', fullPage: true })
+})
+
+test('설계사 기준 정산월 선택은 로고 보라와 연한 배경을 사용한다', async ({ page }) => {
+  await agentFixture(page)
+  await page.goto('./')
+  const month = page.getByRole('button', { name: '기준 정산월 2026-07' })
+  await month.click()
+  const calendar = page.getByRole('dialog', { name: '기준 정산월 선택' })
+  const july = calendar.getByRole('gridcell', { name: '7월' })
+  await expect(month).toHaveCSS('border-top-color', 'rgb(127, 87, 172)')
+  await expect(july).toHaveAttribute('aria-selected', 'true')
+  await expect(july).toHaveCSS('color', 'rgb(81, 58, 149)')
+  await expect(july).toHaveCSS('background-color', 'rgb(231, 217, 255)')
+  await expect(calendar.locator('.month-selector-scope')).toHaveCSS('background-color', 'rgb(244, 239, 255)')
+})
+
+test('설계사 포트폴리오는 확정 색상으로 차트를 표시한다', async ({ page }) => {
+  await agentFixture(page, 300000, [
+    { insurerId: 41, name: '미래가상생명' },
+    { insurerId: 45, name: '안전가상손해보험' },
+    { insurerId: 43, name: '새봄가상생명' },
+  ])
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('./')
+  await expect(page.getByRole('article', { name: '설계사 프로필' })).toHaveCSS('background-color', 'rgb(235, 226, 255)')
+  await expect(page.locator('#main-content')).toHaveCSS('background-color', 'rgb(247, 242, 255)')
+  await expect(page.getByRole('button', { name: '개발자 도구' })).toHaveCount(0)
+
+  const donut = page.getByRole('img', { name: '보험사별 계약 건수 도넛 차트' })
+  await expect(donut.locator('path')).toHaveCount(3)
+  await expect(donut.locator('path').nth(0)).toHaveCSS('fill', 'rgb(231, 126, 204)')
+  await expect(donut.locator('path').nth(1)).toHaveCSS('fill', 'rgb(98, 167, 245)')
+  await expect(donut.locator('path').nth(2)).toHaveCSS('fill', 'rgb(172, 232, 142)')
+  await expect(page.getByRole('button', { name: /새봄가상생명/ }).locator('.ah-lg-dot'))
+    .toHaveCSS('background-color', 'rgb(172, 232, 142)')
+  await expect(page.locator('.ah-bar.is-current')).toHaveCSS('fill', 'rgb(152, 106, 219)')
+  await expect(page.locator('.ah-bar:not(.is-current)')).toHaveCSS('fill', 'rgb(208, 188, 240)')
+  await expect(page.locator('.ah-line')).toHaveCSS('stroke', 'rgb(159, 154, 213)')
+  await expect(page.locator('.ah-pd-fill')).toHaveCSS('background-color', 'rgb(136, 78, 163)')
+  await expect(page.locator('.ah-status-legend li').filter({ hasText: '정상' }).locator('.ah-sg-dot'))
+    .toHaveCSS('background-color', 'rgb(131, 222, 140)')
+})
+
+test('보험계약, 수수료 명세, 수수료 지급 열 머리글은 설계사 화면에만 새 색을 쓴다', async ({ page }) => {
+  await agentFixture(page)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('contracts')
+  const sidebar = page.locator('#app-sidebar')
+  const tableHeaders = (name: string) => page.getByRole('table', { name }).getByRole('columnheader')
+  const expectHeaderColors = (name: string, count: number) => expect.poll(() => tableHeaders(name).evaluateAll((headers) =>
+    headers.map((header) => getComputedStyle(header).backgroundColor),
+  )).toEqual(Array(count).fill('rgb(233, 235, 246)'))
+
+  await expect(page.locator('.contract-list-page')).toHaveCSS('background-color', 'rgb(246, 242, 254)')
+  await expectHeaderColors('보험계약 검색 결과', 8)
+
+  await sidebar.getByRole('link', { name: '수수료 명세', exact: true }).click()
+  await expect(page.locator('.ast-page')).toHaveCSS('background-color', 'rgb(246, 242, 254)')
+  await expectHeaderColors('검색 조건에 해당하는 설계사 수수료 명세', 8)
+
+  await sidebar.getByRole('link', { name: '수수료 지급', exact: true }).click()
+  await expectHeaderColors('조회 조건에 해당하는 수수료 지급 건', 11)
+  await expect(page.getByRole('button', { name: '개발자 도구' })).toHaveCount(0)
+
+  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: {
+    data: { loginId: 'admin', userName: '관리자', roleCode: 'GA_ADMIN', canProcess: true, demoMonth: '2026-07' },
+    error: null,
+    requestId: 'agent-color-admin',
+  } }))
+  await page.goto('contracts')
+  await expect(page.locator('.app-shell')).not.toHaveClass(/is-agent/)
+  await expect(tableHeaders('보험계약 검색 결과').first()).toHaveCSS('background-color', 'rgb(241, 245, 249)')
 })
 
 for (const { width, expand } of [{ width: 1280, expand: false }, { width: 1200, expand: true }]) {

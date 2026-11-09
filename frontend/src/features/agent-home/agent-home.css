@@ -11,6 +11,7 @@
   --body: var(--color-text-secondary);
   --muted: var(--color-text-tertiary);
   --ease: cubic-bezier(0.2, 0, 0, 1);
+  --premium-series: #9f9ad5;
   display: grid;
   gap: var(--space-4);
   color: var(--ink);
@@ -51,7 +52,7 @@
     gap: 12px;
     padding: 24px 20px;
     min-height: 230px;
-    background: var(--brand-50);
+    background: #ebe2ff;
     border-right: 1px solid var(--border);
     text-align: center;
   }
@@ -134,14 +135,13 @@
   & .ah-trend { height: 246px; }
   & .ah-trend svg { width: 100%; height: 100%; display: block; }
   & .ah-axis { font-size: 12px; fill: var(--muted); }
-  /* 추이 그래프는 개편 전(#739)의 채도 낮은 보라 계열을 쓴다. */
-  & .ah-bar { fill: color-mix(in srgb, #7f57ac 30%, white); transition: opacity 0.15s; }
-  & .ah-bar.is-current { fill: #7f57ac; }
+  & .ah-bar { fill: #d0bcf0; transition: opacity 0.15s; }
+  & .ah-bar.is-current { fill: #986adb; }
   & .ah-bar.is-hover { opacity: 0.8; }
   & .ah-bar-hit { fill: transparent; }
-  & .ah-line { stroke: #8467a5; }
-  & .ah-line-dot { fill: #8467a5; stroke: #fff; }
-  & .ah-axis-premium { fill: #8467a5; }
+  & .ah-line { stroke: var(--premium-series); }
+  & .ah-line-dot { fill: var(--premium-series); stroke: #fff; }
+  & .ah-axis-premium { fill: var(--premium-series); }
   & .ah-best-tag rect { fill: #6a4893; }
   & .ah-best { font-size: 12px; font-weight: 700; fill: #fff; }
   & .ah-bar-hit.is-hover { fill: rgb(127 87 172 / 6%); }
