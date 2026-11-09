@@ -107,7 +107,7 @@ public class ExceptionCaseController {
             @PathVariable Long id,
             @Valid @RequestBody ExceptionActionRequest request,
             @AuthenticationPrincipal FgcUserDetails principal) {
-        return ApiResponse.success(exceptionCaseService.action(
+        return ApiResponse.success(exceptionCaseService.userAction(
                 id,
                 request,
                 principal.getUserId(),

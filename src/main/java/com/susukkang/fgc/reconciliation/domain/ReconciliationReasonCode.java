@@ -21,6 +21,7 @@ public enum ReconciliationReasonCode {
     AMOUNT_DIFFERENCE(100, "금액 차이", ReconciliationResultType.AMOUNT_DIFFERENCE),
     REVIEW_REQUIRED(110, "검토필요", ReconciliationResultType.REVIEW_REQUIRED),
     UNKNOWN(120, "분류 불가", ReconciliationResultType.REVIEW_REQUIRED),
+    RECOVERY_CONFIRMED(998, "환수 차감 반영", ReconciliationResultType.MATCHED),
     MATCHED(999, "일치", ReconciliationResultType.MATCHED);
 
     private final int priority;

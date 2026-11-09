@@ -111,6 +111,9 @@ class RoleApiAuthorizationMatrixIntegrationTest {
              "parameters":[],"clawbackRules":[]}""";
     private static final String REASON = """
             {"reason":"권한 시험"}""";
+    private static final String JOURNAL_CORRECTION = """
+            {"reason":"권한 시험","journalDate":"2026-01-01","description":"권한 시험",
+             "lines":[{"accountCode":"X","debitAmount":1,"creditAmount":0}]}""";
 
     private record Row(String id, HttpMethod method, String pattern, String body, Set<Actor> allowed) {
 
@@ -183,11 +186,18 @@ class RoleApiAuthorizationMatrixIntegrationTest {
                 // 원장 정정 — IF-36·36A, 예외 처리 — IF-44·44A
                 row("IF-36", POST, "/api/v1/journals/{}/reverse", REASON, PROCESS_OR_GA),
                 row("IF-36A", POST, "/api/v1/journals/{}/correction-exceptions", REASON, PROCESS_OR_GA),
+                row("원장 역분개·재기표", POST, "/api/v1/journals/{}/reverse-and-repost", JOURNAL_CORRECTION, PROCESS_OR_GA),
                 row("IF-44", POST, "/api/v1/exceptions/{}/actions",
                         "{\"actionType\":\"COMMENT\",\"reason\":\"권한 시험\"}", PROCESS_OR_GA),
-                row("IF-44A", POST, "/api/v1/exceptions/{}/journal-correction", """
-                        {"reason":"권한 시험","journalDate":"2026-01-01","description":"권한 시험",
-                         "lines":[{"accountCode":"X","debitAmount":1,"creditAmount":0}]}""", PROCESS_OR_GA),
+                row("IF-44A", POST, "/api/v1/exceptions/{}/journal-correction", JOURNAL_CORRECTION, PROCESS_OR_GA),
+                row("예외 지급 정정", POST, "/api/v1/exceptions/{}/payment-correction", "{\"payment\":" + PAYMENT + "}", PROCESS),
+                row("예외 지급 사전검증", POST, "/api/v1/exceptions/{}/payment-correction/precheck", "{\"payment\":" + PAYMENT + "}", PROCESS),
+                row("예외 지급 재검증", POST, "/api/v1/exceptions/{}/payment-correction/recheck", null, PROCESS_OR_GA),
+                row("중복 지급 취소", POST, "/api/v1/exceptions/{}/payment-correction/cancel-duplicate", """
+                        {"paymentId":999999999,"expectedUpdatedAt":"2026-01-01T00:00:00Z"}""", PROCESS),
+                row("환수 차감 재대사", POST, "/api/v1/exceptions/{}/payment-correction/reconcile-recovery", """
+                        {"candidateId":999999999,"originalPaymentId":999999999,"deductionPaymentId":999999998}""", PROCESS),
+                row("예외 원천 재검증", POST, "/api/v1/exceptions/{}/review/recheck", null, PROCESS),
                 // 대사 — IF-38·42, 검증 실행 — IF-45·48·51
                 row("IF-38", POST, "/api/v1/reconciliations", """
                         {"settlementMonth":"2026-01","paymentStage":"GA_TO_FC","insurerId":999999999,"validationRunId":999999999}""", PROCESS),

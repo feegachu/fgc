@@ -183,6 +183,7 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                 .contractId(original.getContractId())
                 .policyVersionId(original.getPolicyVersionId())
                 .description(command.description().trim())
+                .replacementPayment(command.replacementPayment())
                 .lines(correctedLines)
                 .build();
     }
@@ -248,7 +249,7 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
             }
         }
 
-        reconciliationCorrection.refresh(affectedRuns, correctionGroupKey, command.requestedBy());
+        reconciliationCorrection.refresh(affectedRuns, correctionGroupKey, command.requestedBy(), command.reason());
         recordAudit(original, reversalId, repostedId, correctionGroupKey,
                 request, command.requestedBy(), originalLines, correctedDraft);
 
@@ -451,9 +452,23 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
     }
 
     private String nextJournalNo(LocalDate journalDate) {
+        return formatJournalNo(journalDate, nextJournalSequence(journalDate));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public JournalNumbers previewRepostNumbers(LocalDate journalDate) {
+        int sequence = nextJournalSequence(journalDate);
+        return new JournalNumbers(formatJournalNo(journalDate, sequence), formatJournalNo(journalDate, sequence + 1));
+    }
+
+    private int nextJournalSequence(LocalDate journalDate) {
+        return journalHeaderRepository.findNextJournalSeq(String.valueOf(journalDate.getYear()), String.format("%02d", journalDate.getMonthValue()));
+    }
+
+    private String formatJournalNo(LocalDate journalDate, int seq) {
         String year = String.valueOf(journalDate.getYear());
         String month = String.format("%02d", journalDate.getMonthValue());
-        int seq = journalHeaderRepository.findNextJournalSeq(year, month);
         if (seq > MAX_MONTHLY_SEQ) {
             throw new IllegalStateException("journal_no 월간 일련번호 상한 초과");
         }

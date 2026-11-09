@@ -108,6 +108,20 @@ export async function requestCorrection(id: number, body: Schemas['JournalCorrec
   if (!data) throw new Error('정정 요청 결과를 확인할 수 없습니다.')
   return data
 }
+export async function reverseAndRepostJournal(id: number, body: Schemas['JournalCorrectionActionRequest']) {
+  const { data } = await apiClient.request<{ reversalOfId: number; journalHeaderId: number; repostedJournalHeaderId: number }>(
+    `/api/v1/journals/${id}/reverse-and-repost`, { method: 'POST', body },
+  )
+  if (!data || data.reversalOfId !== id || !Number.isSafeInteger(data.journalHeaderId) || data.journalHeaderId <= 0
+    || !Number.isSafeInteger(data.repostedJournalHeaderId) || data.repostedJournalHeaderId <= 0) throw new Error('정정 결과를 확인하지 못했습니다. 다시 등록하지 말고 원장 이력을 확인하세요.')
+  return data
+}
+export const repostNumberQuery = (journalDate?: string) => queryOptions({
+  queryKey: ['journals', 'repost-number-preview', journalDate], enabled: Boolean(journalDate),
+  queryFn: ({ signal }) => get<{ reversalJournalNo?: string; repostedJournalNo?: string }>(
+    `/api/v1/journals/repost-number-preview?${new URLSearchParams({ journalDate: journalDate! })}`, signal),
+  meta: { errorToast: false },
+})
 /** #414 응답의 selected 쿼리를 그대로 유지하며, 외부 주소·잘못된 경로로 이동하지 않는다. */
 export function correctionTarget(value?: string) {
   const target = safeRedirect(value)

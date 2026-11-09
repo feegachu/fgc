@@ -515,6 +515,56 @@
     "element": "KpiCard"
   },
   {
+    "id": "exception.recovery.calculate",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.calculation-close",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.candidate",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "exception.recovery.close",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.continue",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.deduction",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.deduction-close",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.discard",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "exception.recovery.payment",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "exception.recovery.recheck",
+    "file": "features/exception/RecoveryChecklistModal.tsx",
+    "element": "Button"
+  },
+  {
     "id": "exception.summary.allocation_evidence_missing",
     "file": "features/exception/ExceptionPage.tsx",
     "element": "Link"
@@ -2040,12 +2090,17 @@
     "element": "Button"
   },
   {
-    "id": "features.exception.action-panel.button",
-    "file": "features/exception/ActionPanel.tsx",
+    "id": "features.exception-page.process",
+    "file": "features/exception/ExceptionPage.tsx",
     "element": "Button"
   },
   {
-    "id": "features.exception.action-panel.button-2",
+    "id": "features.exception.action-panel.assignee",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.action-panel.button",
     "file": "features/exception/ActionPanel.tsx",
     "element": "Button"
   },
@@ -2060,6 +2115,11 @@
     "element": "input"
   },
   {
+    "id": "features.exception.action-panel.journal-history",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "Button"
+  },
+  {
     "id": "features.exception.action-panel.link",
     "file": "features/exception/ActionPanel.tsx",
     "element": "Link"
@@ -2070,14 +2130,29 @@
     "element": "Link"
   },
   {
+    "id": "features.exception.action-panel.reason",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "textarea"
+  },
+  {
     "id": "features.exception.action-panel.select",
     "file": "features/exception/ActionPanel.tsx",
     "element": "select"
   },
   {
-    "id": "features.exception.action-panel.textarea",
-    "file": "features/exception/ActionPanel.tsx",
-    "element": "textarea"
+    "id": "features.exception.duplicate-journal.back",
+    "file": "features/exception/DuplicateJournalModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.duplicate-journal.close",
+    "file": "features/exception/DuplicateJournalModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.duplicate-journal.confirm",
+    "file": "features/exception/DuplicateJournalModal.tsx",
+    "element": "Button"
   },
   {
     "id": "features.exception.exception-page.button",
@@ -2133,6 +2208,11 @@
     "id": "features.exception.exception-page.summary",
     "file": "features/exception/ExceptionPage.tsx",
     "element": "summary"
+  },
+  {
+    "id": "features.exception.information",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "section"
   },
   {
     "id": "features.exception.journal-correction-modal.button",
@@ -2238,6 +2318,206 @@
     "id": "features.exception.journal-correction-modal.textarea",
     "file": "features/exception/JournalCorrectionModal.tsx",
     "element": "textarea"
+  },
+  {
+    "id": "features.exception.payment-correction.amount-guide",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.payment-correction.basis",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "summary"
+  },
+  {
+    "id": "features.exception.payment-correction.cancel-duplicate",
+    "file": "features/exception/DuplicateJournalModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.payment-correction.cap-overage",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.payment-correction.close",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.payment-correction.continue",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.payment-correction.defer-guide",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.payment-correction.deferred-date",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.payment-correction.discard",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.payment-correction.duplicate-guide",
+    "file": "features/exception/DuplicateJournalModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.payment-correction.duplicate-mode",
+    "file": "features/exception/DuplicateJournalModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.payment-correction.journal",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.payment-correction.mode",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.payment-correction.payment",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.payment-correction.planned-action",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.payment-correction.receipt-confirmed",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.payment-correction.recheck",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.payment-correction.remaining",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.payment-correction.result",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.payment-correction.schedule",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.payment-correction.settlement-evidence",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.reconciliation-journal.close",
+    "file": "features/exception/ReconciliationJournalModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.reconciliation-journal.correction",
+    "file": "features/exception/ReconciliationJournalModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.reconciliation-journal.payment",
+    "file": "features/exception/ReconciliationJournalModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.review-panel",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.review.close",
+    "file": "features/exception/SourceReviewModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.review.comment",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.review.continue",
+    "file": "features/exception/SourceReviewModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.review.discard",
+    "file": "features/exception/SourceReviewModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.review.evidence",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.review.reason",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "features.exception.review.recheck",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.review.reject",
+    "file": "features/exception/ReviewPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.schedule-correction",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.schedule-correction.contract",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.schedule-correction.contract-preview",
+    "file": "features/exception/ScheduleCorrectionPanel.tsx",
+    "element": "div"
+  },
+  {
+    "id": "features.exception.schedule-correction.contract-summary",
+    "file": "features/exception/ScheduleCorrectionPanel.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.schedule-correction.policy",
+    "file": "features/exception/PaymentCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.schedule-correction.regenerate",
+    "file": "features/exception/ScheduleCorrectionPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.schedule-correction.schedule-list",
+    "file": "features/exception/ScheduleCorrectionPanel.tsx",
+    "element": "section"
   },
   {
     "id": "features.ledger.ledger-page.button",
@@ -2900,6 +3180,16 @@
     "element": "section"
   },
   {
+    "id": "features.transaction.correction.precheck-footer",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.correction.save-footer",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
     "id": "features.transaction.payment-guide.button",
     "file": "features/transaction/PaymentGuide.tsx",
     "element": "Button"
@@ -3443,6 +3733,56 @@
     "id": "ledger.kpi.debit",
     "file": "features/ledger/LedgerExplorer.tsx",
     "element": "KpiCard"
+  },
+  {
+    "id": "ledger.repost.account",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "ledger.repost.close",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.repost.continue",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.repost.credit",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "ledger.repost.debit",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "ledger.repost.discard",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.repost.evidence",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "ledger.repost.reason",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "ledger.repost.submit",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.repost.table",
+    "file": "features/ledger/JournalRepostModal.tsx",
+    "element": "table"
   },
   {
     "id": "navigation.group.admin",

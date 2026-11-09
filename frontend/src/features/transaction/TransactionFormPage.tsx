@@ -9,6 +9,7 @@ import { nameWithCode } from '../../lib/screenText'
 import { settlementEntry, subscribeSettlementEntry } from '../assistant/settlement/entry'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
@@ -28,6 +29,7 @@ import { AttributionEditor } from './AttributionEditor'
 import { CapPanel, ConfirmationModal, GatePanel } from './ConfirmationPanels'
 import { confirmPayment, contractQuery, draftQuery, formError, precheckPayment, readPayment, saveDraft } from './form-api'
 import type { Payment, Precheck } from './form-api'
+import type { PaymentPayload } from './form-api'
 import {
   availableItems,
   blockedContractId,
@@ -113,7 +115,7 @@ export default function TransactionFormPage() {
   </>
 }
 
-function TransactionForm({
+export function TransactionForm({
   entry,
   returnTo,
   initialId,
@@ -122,6 +124,12 @@ function TransactionForm({
   canProcess,
   role,
   onReload,
+  onCorrect,
+  onConfirmed,
+  correctionReady = true,
+  onPreview,
+  actionContainer,
+  unsavedScope = '',
 }: {
   entry: PaymentEntry
   returnTo: string
@@ -131,6 +139,12 @@ function TransactionForm({
   canProcess: boolean
   role: string
   onReload: () => Promise<void>
+  onCorrect?: (payment: PaymentPayload, expectedUpdatedAt?: string) => Promise<void>
+  onConfirmed?: (payment: Payment) => void
+  correctionReady?: boolean
+  onPreview?: (payment: PaymentPayload) => Promise<Precheck>
+  actionContainer?: HTMLElement | null
+  unsavedScope?: string
 }) {
   const navigate = useNavigate()
   const root = useRef<HTMLDivElement>(null)
@@ -238,7 +252,7 @@ function TransactionForm({
   const rows = rawRows.map((row) => normalizeRow(row, insurer, newcomer))
   const normalized = !loading && !referenceError && rows.some((row, index) => rowWasNormalized(rawRows[index], row))
   const needsSave = dirty || normalized
-  useUnsavedWork(inputEdited && needsSave && !confirmed)
+  useUnsavedWork(inputEdited && needsSave && !confirmed, undefined, unsavedScope)
   const confirmationNeedsRetry = Boolean(confirmError) && isRetryableConfirmation(confirmFailure)
   const confirmationRejected = confirmFailure != null && !isRetryableConfirmation(confirmFailure)
   const blockerId = result && confirmFailure ? blockedContractId(result, confirmFailure.code) : undefined
@@ -279,7 +293,12 @@ function TransactionForm({
       ...row,
       contractId: contracts.some((contract) => String(contract.contractId) === row.contractId) ? row.contractId : '',
     }))
-    return buildPayload(validatedForm, validatedRows, newcomer)
+    const payload = buildPayload(validatedForm, validatedRows, newcomer)
+    // 금액만 정정할 때 기존 지급예정일을 정산월 1일로 바꾸지 않는다.
+    if (onCorrect && draft?.scheduledPaymentDate && draft.settlementMonth?.slice(0, 7) === form.settlementMonth) {
+      payload.scheduledPaymentDate = draft.scheduledPaymentDate
+    }
+    return payload
   }
   const missingEvidence = rows.some((row) =>
     (newcomer || row.decision.startsWith('EXCLUDED')) && !row.evidenceRef.trim(),
@@ -405,7 +424,7 @@ function TransactionForm({
     setFieldError(error)
   }
   async function save() {
-    if (!ready || locked || missingEvidence || confirmationNeedsRetry || actionLock.current) return
+    if (!ready || locked || missingEvidence || confirmationNeedsRetry || actionLock.current || !correctionReady) return
     setFieldError(undefined)
     setSaveError('')
     let payload
@@ -417,6 +436,19 @@ function TransactionForm({
     }
     actionLock.current = true
     setBusy('save')
+    if (onCorrect) {
+      try {
+        await onCorrect(payload, expectedUpdatedAt)
+        setInputEdited(false)
+        setDirty(false)
+      } catch (error) {
+        setSaveError(showError(error, '지급 건을 수정하지 못했습니다.'))
+      } finally {
+        actionLock.current = false
+        setBusy(null)
+      }
+      return
+    }
     const observer = guide.current!
     const operation = observer.begin('save')
     try {
@@ -481,6 +513,25 @@ function TransactionForm({
     }
   }
   async function precheck() {
+    if (onPreview) {
+      if (!ready || missingEvidence || actionLock.current || !correctionReady) return
+      let payload
+      try { payload = validatedPayload() } catch (error) {
+        if (error instanceof FormValidationError) showFieldError(error)
+        return
+      }
+      actionLock.current = true
+      setBusy('precheck')
+      setResult(null)
+      setPrecheckError('')
+      try {
+        const checked = await onPreview(payload)
+        setResult(checked)
+        toast(checked.confirmable ? '사전검증을 통과했습니다. 수정 저장 시 다시 검증합니다.' : '사전검증 결과에서 차단 사유를 확인하세요.', checked.confirmable ? 'success' : 'warning')
+      } catch (error) { setPrecheckError(showError(error, '사전검증을 하지 못했습니다.')) }
+      finally { actionLock.current = false; setBusy(null) }
+      return
+    }
     if (!ready || !paymentId || needsSave || confirmationNeedsRetry || actionLock.current) return
     actionLock.current = true
     setBusy('precheck')
@@ -546,7 +597,9 @@ function TransactionForm({
       // Keep the verified completion screen mounted; the list/detail refresh on their next opening.
       void queryClient.invalidateQueries({ queryKey: ['transactions'], refetchType: 'none' })
       toast('수수료 지급 건을 확정했습니다.', 'success')
-      if (!helpOpen) {
+      if (onConfirmed) {
+        onConfirmed(response)
+      } else if (!helpOpen) {
         void navigate(returnTo)
       } else {
         // A guide read must never turn a committed business success into a retryable failure.
@@ -573,12 +626,20 @@ function TransactionForm({
       data-guide-screen="TRAN-W02"
       data-guide-version="1.0"
       ref={root}
-      className={`publishing-page transaction-page transaction-form-page${helpOpen ? ' has-payment-guide' : ''}`}
+      className={`publishing-page transaction-page transaction-form-page${helpOpen ? ' has-payment-guide' : ''}${onCorrect ? ' exception-payment-form' : ''}`}
       data-guide-target="payment.form"
       data-transaction-form
       aria-busy={loading || busy !== null}
     >
-      <header className="page-header transaction-page-header">
+      {onCorrect && actionContainer && createPortal(<>
+        <Button data-guide-feature="features.transaction.correction.precheck-footer" variant="secondary" loading={busy === 'precheck'} disabled={!ready || missingEvidence || busy !== null || !correctionReady} onClick={() => void precheck()}>
+          <span className="material-symbols-rounded" aria-hidden="true">calculate</span>사전검증
+        </Button>
+        <Button data-guide-feature="features.transaction.correction.save-footer" loading={busy === 'save'} disabled={!ready || locked || missingEvidence || !result?.confirmable || busy !== null || !correctionReady} onClick={() => void save()}>
+          <span className="material-symbols-rounded" aria-hidden="true">save</span>{initialId ? '수정 저장' : '등록 저장'}
+        </Button>
+      </>, actionContainer)}
+      {!onCorrect && <header className="page-header transaction-page-header">
         <div className="page-header-copy">
           <h1 className="page-title">지급 건 등록, 귀속, 확정</h1>
         </div>
@@ -604,7 +665,7 @@ function TransactionForm({
             도움말
           </button>} />
         </div>
-      </header>
+      </header>}
       {(loading || referenceError) && (
         <div
           id="transaction-form-status"
@@ -826,9 +887,15 @@ function TransactionForm({
           </div>
         </div>
         <div className="transaction-form-column">
-          <GatePanel result={result} />
-          <CapPanel result={result} pending={busy === 'precheck'} error={precheckError} contracts={contracts} />
-          <section data-guide-feature="features.transaction.transaction-form-page.section-2" className="surface transaction-action-panel" aria-labelledby="transaction-actions-title">
+          {onCorrect ? <>
+            <CapPanel result={result} pending={busy === 'precheck'} error={precheckError} contracts={contracts} />
+            <GatePanel result={result} correction />
+            {saveError && <p role="alert" className="field-error">{saveError}</p>}
+          </> : <>
+            <GatePanel result={result} />
+            <CapPanel result={result} pending={busy === 'precheck'} error={precheckError} contracts={contracts} />
+          </>}
+          {!onCorrect && <section data-guide-feature="features.transaction.transaction-form-page.section-2" className="surface transaction-action-panel" aria-labelledby="transaction-actions-title">
             <h2 className="visually-hidden" id="transaction-actions-title">
               지급 건 작업
             </h2>
@@ -838,16 +905,16 @@ function TransactionForm({
                 data-guide-target="payment.save"
                 variant="secondary"
                 loading={busy === 'save'}
-                disabled={!ready || locked || missingEvidence || confirmationNeedsRetry}
+                disabled={!ready || locked || missingEvidence || confirmationNeedsRetry || Boolean(onPreview && !result?.confirmable)}
                 onClick={() => void save()}
                 aria-describedby="transaction-action-help transaction-permission-help"
               >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   save
                 </span>
-                {busy === 'save' ? '저장 중' : initialId && !locked ? '수정 저장' : '임시저장 (검증 없음)'}
+                {busy === 'save' ? '저장 중' : onCorrect ? initialId ? '수정 저장' : '등록 및 재검증' : initialId && !locked ? '수정 저장' : '임시저장 (검증 없음)'}
               </Button>
-              <Button data-guide-feature="features.transaction.transaction-form-page.btn-precheck"
+              {!onCorrect && <><Button data-guide-feature="features.transaction.transaction-form-page.btn-precheck"
                 id="btn-precheck"
                 data-guide-target="payment.precheck"
                 variant="secondary"
@@ -888,6 +955,7 @@ function TransactionForm({
                   확정 결과를 확인하지 못했습니다. 확정 창을 다시 열어 결과를 확인하세요.
                 </p>
               )}
+              </>}
               {!canProcess && (
                 <p className="field-error" id="transaction-permission-help">
                   현재 계정은 조회만 가능하며 저장/사전검증/확정을 실행할 수 없습니다.
@@ -914,7 +982,7 @@ function TransactionForm({
                 </>
               )}
             </div>
-          </section>
+          </section>}
         </div>
       </ResizableSplit>
       {helpOpen && (

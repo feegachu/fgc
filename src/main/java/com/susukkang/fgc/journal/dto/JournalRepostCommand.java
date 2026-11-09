@@ -17,6 +17,11 @@ public record JournalRepostCommand(
         Long requestedBy,
         LocalDate journalDate,
         String description,
-        List<JournalRepostLineCommand> lines
+        List<JournalRepostLineCommand> lines,
+        com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest replacementPayment
 ) {
+    public JournalRepostCommand(Long journalHeaderId, String reason, String evidenceRef, Long requestedBy,
+                                LocalDate journalDate, String description, List<JournalRepostLineCommand> lines) {
+        this(journalHeaderId, reason, evidenceRef, requestedBy, journalDate, description, lines, null);
+    }
 }

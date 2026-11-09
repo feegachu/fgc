@@ -288,6 +288,11 @@ const revisedScheduleColumns: TableColumn<ScheduleLine>[] = [
   ['installment', '60px'], ['amount', '120px'], ['recipient', '90px'],
   ['item', '140px'], ['dueDate', '110px'], ['status', '90px'],
 ].map(([key, width]) => ({ ...scheduleColumns.find(column => column.key === key)!, width }))
+/** 예외 처리 모달에서도 계약 상세와 동일한 예상 스케줄을 표시한다. */
+export function ContractSchedulesView({ id }: { id: string }) {
+  return <RevisedDetail.Provider value><SchedulesTab id={id} /></RevisedDetail.Provider>
+}
+
 function SchedulesTab({ id }: { id: string }) {
   return (
     <>

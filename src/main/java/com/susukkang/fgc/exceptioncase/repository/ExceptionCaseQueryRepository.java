@@ -1,6 +1,7 @@
 package com.susukkang.fgc.exceptioncase.repository;
 
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.SqlSort;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRow;
@@ -37,7 +38,31 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ExceptionCaseQueryRepository {
+    private static final List<String> HANDLER_ROLES = List.of(
+            Roles.SETTLEMENT, Roles.GA_ADMIN, Roles.SYSTEM_ADMIN);
+    private static final String ASSIGNABLE_USERS = """
+            FROM AppUser u JOIN u.role r
+            WHERE u.accountStatus = 'ACTIVE' AND r.roleCode IN :roles
+            """;
     private static final String SEVERITY = "severity";
+
+    public boolean requiresAdministratorReview(Long id) {
+        return (Boolean) entityManager.createNativeQuery("""
+                SELECT EXISTS(SELECT 1 FROM fgc.exception_case e JOIN fgc.cap_check c
+                  ON c.cap_check_id=e.cap_check_id OR (e.source_entity_type='CAP_CHECK' AND c.cap_check_id::text=e.source_entity_id)
+                WHERE e.exception_case_id=:id AND e.exception_type='CAP_VIOLATION'
+                  AND c.payment_stage='INSURER_TO_GA' AND c.candidate_transaction_id IS NULL)
+                """).setParameter("id", id).getSingleResult();
+    }
+
+    public boolean requiresRejectionEvidence(Long id) {
+        return (Boolean) entityManager.createNativeQuery("""
+                SELECT EXISTS(SELECT 1 FROM fgc.exception_case e LEFT JOIN fgc.reconciliation_result r
+                  ON e.source_entity_type='RECONCILIATION_RESULT' AND r.reconciliation_result_id::text=e.source_entity_id
+                WHERE e.exception_case_id=:id AND (e.exception_type='CAP_VIOLATION'
+                  OR r.result_type IN ('INVALID_CONTRACT_PAYMENT','EXPECTED_MISSING','DUPLICATE')))
+                """).setParameter("id", id).getSingleResult();
+    }
 
 
     private static final String FROM_SQL = """
@@ -257,10 +282,27 @@ public class ExceptionCaseQueryRepository {
                 """, LocalDate.class).getResultList();
     }
 
+    public List<ExceptionAssigneeRow> findAssignableUsers() {
+        return entityManager.createQuery("""
+                SELECT new com.susukkang.fgc.exceptioncase.dto.ExceptionAssigneeRow(u.userId, u.loginId)
+                """ + ASSIGNABLE_USERS + " ORDER BY u.loginId", ExceptionAssigneeRow.class)
+                .setParameter("roles", HANDLER_ROLES).getResultList();
+    }
+
+    public boolean isAssignableUser(Long userId) {
+        return entityManager.createQuery("SELECT COUNT(u) " + ASSIGNABLE_USERS
+                        + " AND u.userId = :userId", Long.class)
+                .setParameter("roles", HANDLER_ROLES).setParameter("userId", userId)
+                .getSingleResult() > 0;
+    }
+
     // 조건식만 조립하며 모든 입력값은 바인딩한다. 목록·count의 필터가 어긋나지 않게 공유한다.
     private String buildWhere(ExceptionCaseSearchDTO criteria, List<ExceptionStatus> statuses,
                               Map<String, Object> parameters) {
         StringBuilder where = new StringBuilder(" WHERE 1 = 1");
+        if (criteria.getType() != com.susukkang.fgc.common.code.ExceptionType.JOURNAL_CORRECTION_REQUIRED) {
+            where.append(" AND ec.exception_type <> 'JOURNAL_CORRECTION_REQUIRED'");
+        }
         append(where, parameters, "ec.exception_type = :type", "type", criteria.getType());
         if (criteria.getReasonCode() != null && !criteria.getReasonCode().isBlank()) {
             append(where, parameters, "ec.reason_code = :reasonCode", "reasonCode", criteria.getReasonCode());

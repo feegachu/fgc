@@ -121,13 +121,14 @@ test('쪽 제목은 왼쪽 끝에, 도움말은 오른쪽 끝에 있고 격자�
   await page.goto(`validation-runs?month=${month}`)
   await expect.poll(() => headerLayout(page, '.page-header', '.page-title')).toEqual(atEdges)
 
-  // EXCP-W01은 처리 양식 안에 있다. 칸을 채우지 않고 오른쪽에 붙는다.
+  // 예외 상세의 도움말은 모달 헤더 오른쪽에 있다.
   await page.goto(`exceptions?month=${month}`)
   await expect.poll(() => headerLayout(page, '.page-header', '.page-title'), { message: 'exceptions' }).toEqual(atEdges)
   await page.locator('.exception-row').first().click()
-  const formHelp = page.locator('.exception-action-form > .button:first-child')
-  await expect(formHelp).toHaveText('도움말')
-  expect((await formHelp.boundingBox())!.width).toBeLessThan(160)
+  const detail = page.getByRole('dialog', { name: /^예외 상세/ })
+  const detailHelp = detail.locator('.exception-detail-help').getByRole('button', { name: '도움말', exact: true })
+  await expect(detailHelp).toBeVisible()
+  expect((await detailHelp.boundingBox())!.width).toBeLessThan(160)
 
 })
 

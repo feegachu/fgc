@@ -380,7 +380,7 @@
     "steps": [
       {
         "targetId": "exception.actionInput",
-        "instruction": "선택한 예외의 허용 조치와 처리 사유를 입력하세요. 증빙과 원래 건 정정 필요 여부를 확인하세요. 조치 저장은 재검증·재대사를 대신하지 않습니다."
+        "instruction": "다른 담당자를 배정하거나 직접 검토를 시작하려면 조치와 처리 사유를 입력하고 저장하세요. 검토 담당자는 하단 예외 건 처리에서 지급 원천을 수정하고 재검증할 수 있습니다."
       },
       {
         "targetId": "exception.actionSave",

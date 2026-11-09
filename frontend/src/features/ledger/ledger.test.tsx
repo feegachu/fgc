@@ -289,18 +289,22 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     expect((await within(screen.getByRole('region', { name: '분개 상세' })).findAllByText('역분개됨'))[0]).toBeVisible()
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
-  it('정정 예외 요청 응답 redirectUrl의 selected를 유지하여 예외함으로 이동한다', async () => {
+  it('역분개와 재기표를 원장 화면에서 한 번에 등록한다', async () => {
     const { router, user } = renderAt('/journals?selected=11', (url, options) => {
-      if (url.endsWith('/correction-exceptions')) {
-        expect(options?.body).toEqual({ reason: '재기표 필요', evidenceRef: undefined })
-        return { exceptionCaseId: 8, redirectUrl: '/exceptions?selected=8' }
+      if (url.endsWith('/reverse-and-repost')) {
+        expect(options?.body).toMatchObject({ reason: '재기표 필요', journalDate: '2026-07-01', lines: [
+          { originalLineNo: 1, accountCode: 'COMMISSION_EXPENSE', debitAmount: 1200000, creditAmount: 0 },
+          { originalLineNo: 2, accountCode: 'COMMISSION_PAYABLE', debitAmount: 0, creditAmount: 1200000 },
+        ] })
+        return { reversalOfId: 11, journalHeaderId: 12, repostedJournalHeaderId: 13 }
       }
     })
     await user.click(await screen.findByRole('button', { name: '역분개 + 재기표' }))
-    await user.type(screen.getByRole('textbox', { name: '정정 요청 사유' }), '재기표 필요')
-    await user.click(screen.getByRole('button', { name: '예외함에서 정정 계속' }))
-    await waitFor(() => expect(router.state.location.pathname).toBe('/exceptions'))
-    expect(router.state.location.search).toContain('selected=8')
+    await user.type(screen.getByRole('textbox', { name: '사유' }), '재기표 필요')
+    await user.click(screen.getByRole('button', { name: '등록' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(router.state.location.pathname).toBe('/journals')
+    expect(calls.filter(call => call.options?.method === 'POST').map(call => call.url)).toEqual(['/api/v1/journals/11/reverse-and-repost'])
   })
   it('이미 역분개된 서버 오류 코드·메시지는 그대로 표시하고 모달을 유지한다', async () => {
     const { user } = renderAt('/journals?selected=11', (url) => {

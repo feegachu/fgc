@@ -26,6 +26,7 @@ type Props = {
   refreshing: boolean
   onRefresh: () => Promise<unknown>
   compact?: boolean
+  originalPaymentId?: number
 }
 const isStatus = (error: unknown, status: number) => error instanceof ApiError && error.status === status
 
@@ -34,7 +35,7 @@ export function ClawbackDocuments(props: Props) {
   if (!props.roleCode || ![...writers, 'COMPLIANCE'].includes(props.roleCode)) return null
   return <NoticePanel {...props} />
 }
-function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false }: Props) {
+function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false, originalPaymentId }: Props) {
   const placement = useContext(ClawbackActionPlacement)
   const candidate = detail.candidate
   const calculation = detail.latestCalculation
@@ -48,9 +49,10 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false 
   const request = {
     calculationVersion: calculation?.calculationVersion ?? 0,
     expectedSourceVersion: candidate?.sourceVersion ?? '',
+    ...(originalPaymentId ? { originalPaymentId } : {}),
   }
   // 로그아웃 시 비워지는 공통 캐시에 응답 유실 시도의 키를 보존한다. 선택·필터 변경에도 같은 시도를 재사용한다.
-  const attemptKey = ['clawback', 'notice-attempt', caseId, request.calculationVersion, request.expectedSourceVersion]
+  const attemptKey = ['clawback', 'notice-attempt', caseId, request.calculationVersion, request.expectedSourceVersion, originalPaymentId]
   const issue = useMutation({
     mutationKey,
     retry: false,
@@ -86,11 +88,13 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false 
   const canIssue = writers.includes(roleCode ?? '') && !denied
   const hasAttempt = Boolean(client.getQueryData(attemptKey))
   const blocked = !current || conflict || refreshing || history.isFetching || Boolean(history.error) || issuing
+    || Boolean(originalPaymentId && !calculation?.lines?.length)
+  const existing = history.data?.content.find(row => row.calculationVersion === calculation?.calculationVersion && (row.originalPaymentId ?? undefined) === originalPaymentId)
   async function generate() {
     if (actionLock.current || blocked || !canIssue) return
     actionLock.current = true
     try {
-      const issued = compact ? issue.data ?? history.data?.content?.find(row => row.calculationVersion === calculation?.calculationVersion) ?? await issue.mutateAsync() : await issue.mutateAsync()
+      const issued = compact ? issue.data ?? existing ?? await issue.mutateAsync() : await issue.mutateAsync()
       if (compact || placement.revised) await download(issued)
     } catch {
       /* 화면에 실패를 표시하고 같은 시도를 재시도하도록 멱등키를 보존한다. */
@@ -129,10 +133,9 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false 
     </Button>
   </DisabledButtonHint>
   if (compact) {
-    const existing = history.data?.content?.find(row => row.calculationVersion === calculation?.calculationVersion)
     const disabled = blocked || !!downloading || (!canIssue && !existing) || denied
     const reason = denied ? '문서를 조회할 권한이 없습니다.' : !canIssue && !existing ? '계산 담당자가 PDF를 준비한 후 조회할 수 있습니다.' : issueReason
-    return <div className="claw-pdf-action">
+    const button = (
       <DisabledButtonHint disabled={disabled} reason={reason}>
         <Button data-guide-feature="clawback.pdf-viewer.open" variant="secondary" loading={issuing || !!downloading} disabled={disabled}
           onClick={event => { viewerTrigger.current = event.currentTarget; void (canIssue ? generate() : existing && download(existing)) }}>
@@ -142,6 +145,9 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false 
           </svg>PDF 출력하기
         </Button>
       </DisabledButtonHint>
+    )
+    return <div className="claw-pdf-action">
+      {placement.document ? createPortal(button, placement.document) : button}
       {(issue.error || downloadError || history.error) && <div className="claw-pdf-error" role="alert">
         <p>{denied ? 'PDF 조회 권한이 없습니다.' : conflict ? '계산 근거가 바뀌었습니다. 다시 조회하고 계산해 주세요.' : downloadError ? 'PDF를 불러오지 못했습니다. 다시 눌러 재시도하세요.' : 'PDF를 준비하지 못했습니다. 같은 요청으로 다시 시도하세요.'}</p>
         {!denied && (conflict || history.error) && <Button data-guide-feature="clawback.pdf-viewer.refresh" variant="ghost" onClick={() => void refresh()}>다시 조회</Button>}

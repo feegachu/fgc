@@ -9,12 +9,15 @@ import com.susukkang.fgc.reconciliation.dto.ReconciliationClassificationContext;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchInsertRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchSource;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultInsertRow;
+import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
 import com.susukkang.fgc.reconciliation.repository.ReconciliationResultRepository;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
@@ -92,6 +95,16 @@ public class ReconciliationResultPersistenceService {
         context.setMissingJournalEvidence(candidate.sourceMatches().stream()
                 .anyMatch(source -> source.journalHeaderId() == null));
         ReconciliationClassification classification = reasonClassifier.classify(candidate, context);
+        BigDecimal deduction = BigDecimal.ZERO;
+        if (request.paymentStage() == PaymentStage.GA_TO_FC && classification.resultType() == ReconciliationResultType.INVALID_CONTRACT_PAYMENT) {
+            deduction = reconciliationResultRepository.confirmedRecoveryAmount(candidate.sourceMatches().stream()
+                    .map(ReconciliationMatchSource::transactionAttributionId).filter(Objects::nonNull).distinct().toList());
+        }
+        BigDecimal actual = candidate.actualTotalAmount().subtract(deduction).max(BigDecimal.ZERO);
+        BigDecimal difference = deduction.signum() == 0 ? candidate.differenceAmount() : actual.subtract(candidate.expectedTotalAmount());
+        if (deduction.signum() > 0 && difference.signum() == 0) {
+            classification = new ReconciliationClassification(ReconciliationResultType.MATCHED, "RECOVERY_CONFIRMED", List.of());
+        }
         row.setReconciliationRunId(request.reconciliationRunId());
         row.setMatchGroupKey(candidate.matchGroupKey());
         row.setContractId(candidate.contractId());
@@ -102,15 +115,15 @@ public class ReconciliationResultPersistenceService {
         row.setInstallmentNo(candidate.installmentNo());
         row.setResultType(classification.resultType().name());
         row.setExpectedTotalAmount(candidate.expectedTotalAmount());
-        row.setActualTotalAmount(candidate.actualTotalAmount());
-        row.setDifferenceAmount(candidate.differenceAmount());
+        row.setActualTotalAmount(actual);
+        row.setDifferenceAmount(difference);
         row.setPrimaryReasonCode(classification.primaryReasonCode());
         row.setSecondaryReasonCodes(classification.secondaryReasonCodes());
-        row.setDetailSnapshotJson(writeSnapshot(request.paymentStage(), candidate));
+        row.setDetailSnapshotJson(writeSnapshot(request.paymentStage(), candidate, deduction));
         return row;
     }
 
-    private String writeSnapshot(PaymentStage paymentStage, ReconciliationCandidate candidate) {
+    private String writeSnapshot(PaymentStage paymentStage, ReconciliationCandidate candidate, BigDecimal deduction) {
         try {
             return objectMapper.writeValueAsString(new DetailSnapshot(
                     paymentStage,
@@ -120,7 +133,8 @@ public class ReconciliationResultPersistenceService {
                     candidate.dueMonth(),
                     candidate.expectedJournalHeaderIds(),
                     candidate.actualJournalHeaderIds(),
-                    candidate.sourceMatches()
+                    candidate.sourceMatches(),
+                    candidate.actualTotalAmount(), deduction
             ));
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("대사 비교 snapshot을 직렬화하지 못했습니다.", exception);
@@ -135,7 +149,9 @@ public class ReconciliationResultPersistenceService {
             java.time.LocalDate dueMonth,
             List<Long> expectedJournalHeaderIds,
             List<Long> actualJournalHeaderIds,
-            List<ReconciliationMatchSource> sources
+            List<ReconciliationMatchSource> sources,
+            BigDecimal originalActualAmount,
+            BigDecimal recoveryDeductionAmount
     ) {
     }
 }

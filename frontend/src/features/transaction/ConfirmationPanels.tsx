@@ -12,7 +12,7 @@ import type { CapPreview, Contract, Precheck } from './form-api'
 import { gateStates, hasRecordableBlocker, isRetryableConfirmation, RECORDABLE_CODES } from './form-model'
 import type { FormValues } from './form-model'
 
-export function GatePanel({ result }: { result: Precheck | null }) {
+export function GatePanel({ result, correction = false }: { result: Precheck | null; correction?: boolean }) {
   return (
     <PrecheckResultPanel titleId="transaction-gate-title">
       <header className="surface-header transaction-surface-header">
@@ -29,9 +29,9 @@ export function GatePanel({ result }: { result: Precheck | null }) {
             </span>
             <div>
               <div className="transaction-gate-label">
-                {index + 1}. {gate.label}, {gate.state === 'pass' ? '통과' : gate.state === 'fail' ? '차단' : '미확인'}
+                {index + 1}. {correction && index === 0 ? '수정 입력 준비' : gate.label}, {gate.state === 'pass' ? '통과' : gate.state === 'fail' ? '차단' : '미확인'}
               </div>
-              {result && (
+              {result && (!correction || gate.failures.length > 0) && (
                 <div className="transaction-gate-detail">
                   {gate.failures.length
                     ? gate.failures.map((blocker) => rateText(blocker.message || '확정 차단 사유를 확인하세요.')).join(' / ')

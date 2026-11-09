@@ -29,7 +29,7 @@ export function exceptionTypeTone(type = ''): StatusTone {
 export function exceptionStatusTone(status?: string): StatusTone {
   if (status === 'NEW') return 'error'
   if (status === 'IN_REVIEW') return 'info'
-  if (status === 'RESOLVED') return 'success'
+  if (status === 'RESOLVED' || status === 'REJECTED') return 'success'
   return 'review'
 }
 

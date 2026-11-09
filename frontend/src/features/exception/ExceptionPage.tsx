@@ -2,8 +2,9 @@ import { guideFeatureId } from '../assistant/feature-ids'
 import { typeBadgeTone } from '../exception/rules'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useIsMutating, useQuery } from '@tanstack/react-query'
-import { type CSSProperties, useState } from 'react'
-import { Link, useOutletContext, useSearchParams } from 'react-router'
+import { apiClient } from '../../lib/api/client'
+import { type CSSProperties, useId, useState } from 'react'
+import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
 import { KpiCardContent } from '../../components/KpiCard'
 import { Modal } from '../../components/Modal'
@@ -19,8 +20,13 @@ import { monthText } from '../../lib/screenText'
 import { formatSort, parseSort, sortBinding } from '../../lib/tableSort'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { withMonth } from '../../stores/workspace'
-import { usePermission } from '../auth/useAuth'
-import { ActionPanel } from './ActionPanel'
+import { useAuth, usePermission } from '../auth/useAuth'
+import { ActionPanel, ExceptionDetail } from './ActionPanel'
+import { JournalCorrectionModal } from './JournalCorrectionModal'
+import { PaymentCorrectionModal } from './PaymentCorrectionModal'
+import { ReviewPanel } from './ReviewPanel'
+import { SourceReviewModal } from './SourceReviewModal'
+import { toast } from '../../stores/toasts'
 import { Disclosure } from './Disclosure'
 import {
   ALL_STATUS,
@@ -59,7 +65,12 @@ function filtersFromParams(params: URLSearchParams): ExceptionFilters {
 
 /** 기존 예외 필터·조치 흐름을 유지하고 관리자 목록 헤더 간격을 공통 목록에 맞춘다. */
 export function ExceptionPage() {
+  const disabledReasonId = useId()
+  const navigate = useNavigate()
+  const { user } = useAuth()
   const canHandle = usePermission('canHandleException')
+  const [helpContainer, setHelpContainer] = useState<HTMLDivElement | null>(null)
+  const [correctionOpen, setCorrectionOpen] = useState(false)
   const [params, setParams] = useSearchParams()
   const filters = filtersFromParams(params)
   const selectedId = params.get('selected')
@@ -71,6 +82,39 @@ export function ExceptionPage() {
   const data = search.data
   const rows = data?.content ?? []
   const selected = rows.find((row) => String(row.exceptionCaseId) === selectedId)
+  const ownReview = selected?.status === 'IN_REVIEW' && selected.assigneeLoginId === user?.loginId
+  const sourceCorrection = ['CAP_WARNING', 'CAP_VIOLATION', 'CAP_REVIEW_REQUIRED', 'RECONCILIATION_MISMATCH'].includes(selected?.type ?? '')
+  const scheduleReconciliation = selected?.type === 'RECONCILIATION_MISMATCH' && ['EXPECTED_MISSING', 'INVALID_CONTRACT_PAYMENT'].includes(selected.reconciliationResultType ?? selected.reasonCode ?? '')
+  const paymentCorrection = selected?.type === 'RECONCILIATION_MISMATCH' && !scheduleReconciliation || sourceCorrection && selected?.sourceEntityType === 'COMMISSION_TRANSACTION'
+  const correctionLink = selected?.type === 'POLICY_MISSING' ? '/policies?create=1'
+    : selected?.type === 'POLICY_DUPLICATE' ? '/policies'
+    : selected?.type === 'REFUND_TABLE_MISSING' ? '/policies?tab=refund'
+    : selected?.type === 'PRODUCT_CODE_MISMATCH' ? '/base?tab=products' : selected?.sourceLink
+  const canCorrect = canHandle && ownReview && (paymentCorrection ? user?.canProcess === true
+    : sourceCorrection || selected?.type === 'JOURNAL_CORRECTION_REQUIRED' || Boolean(correctionLink))
+  const disabledReason = processing ? '처리 중입니다. 저장이 끝난 뒤 다시 시도하세요.'
+    : !canHandle ? '예외를 처리할 권한이 없습니다.'
+    : selected?.status === 'RESOLVED' ? '이미 해결된 예외입니다.'
+    : selected?.status === 'REJECTED' ? '종결된 예외입니다. 먼저 재검토를 시작하세요.'
+    : selected?.status === 'NEW' ? '먼저 검토 시작을 저장하거나 담당자를 배정하세요.'
+    : !selected?.assigneeLoginId ? '검토 시작을 저장해 담당자를 지정하세요.'
+    : !ownReview ? `${selected.assigneeLoginId} 담당자가 검토중입니다. 담당자만 처리할 수 있습니다.`
+    : paymentCorrection && !user?.canProcess ? '수수료 지급 건을 등록·수정할 권한이 없습니다.'
+    : !canCorrect ? '이 예외에 연결된 원인 수정 화면이 없습니다.' : ''
+  async function processException() {
+    if (!canCorrect || !selected) return
+    if (Object.keys(useUnsavedWorkStore.getState().owners).some(owner => owner.startsWith(`exception:${selected.exceptionCaseId}:`))) {
+      toast('작성 중인 배정 또는 검토 메모를 먼저 저장하세요.', 'warning'); return
+    }
+    if (sourceCorrection || selected.type === 'JOURNAL_CORRECTION_REQUIRED') setCorrectionOpen(true)
+    else if (selected.type === 'POLICY_MISSING' && selected.contractId) {
+      try {
+        const { data } = await apiClient.request<{ offeringMismatch?: boolean }>(`/api/v1/exceptions/${selected.exceptionCaseId}/review`)
+        const link = data?.offeringMismatch ? `/contracts/${selected.contractId}/edit?${new URLSearchParams({ returnTo: `/exceptions?${params}` })}` : correctionLink!
+        void navigate(month ? withMonth(link, month) : link)
+      } catch { setCorrectionOpen(true) }
+    } else setCorrectionOpen(true)
+  }
 
   function apply(next: Partial<Record<keyof ExceptionFilters, string>>, resetPage = true) {
     setParams((current) => {
@@ -100,6 +144,7 @@ export function ExceptionPage() {
     Object.keys(unsaved.owners).filter(owner => owner.startsWith(`exception:${selectedId}:`))
       .forEach(owner => unsaved.mark(owner, false))
     setConfirmClose(false)
+    setCorrectionOpen(false)
     setParams(current => { const next = new URLSearchParams(current); next.delete('selected'); return next }, { replace: true })
   }
   function closeDetail() {
@@ -217,12 +262,14 @@ export function ExceptionPage() {
       cellClassName: 'tabular-nums exception-disclosure-cell',
       render: (row) => {
         const reference = sourceReference(row.sourceEntityType, row.contractNo)
-        return row.sourceLink ? (
+        const sourceLink = row.sourceEntityType === 'CAP_CHECK' && !row.sourceDeleted
+          ? `/cap-checks${row.contractNo ? `?contractNo=${encodeURIComponent(row.contractNo)}` : ''}` : row.sourceLink
+        return sourceLink ? (
           <Disclosure
             singleLine
-            preview={<Link data-guide-feature="features.exception.exception-page.link" to={row.sourceLink}>{reference}</Link>}
+            preview={<Link data-guide-feature="features.exception.exception-page.link" to={sourceLink}>{reference}</Link>}
             full={
-              <Link data-guide-feature="features.exception.exception-page.link-2" className="button button-secondary" to={row.sourceLink}>
+              <Link data-guide-feature="features.exception.exception-page.link-2" className="button button-secondary" to={sourceLink}>
                 {reference} 열기
               </Link>
             }
@@ -327,31 +374,39 @@ export function ExceptionPage() {
             </section>
           <Modal open={Boolean(selected)} title={`예외 상세 · ${selected?.contractNo ?? selectedId ?? ''}`}
             className="modal-large exception-detail-modal" onClose={closeDetail} closeOnEscape={!processing}
-            footer={<Button data-guide-feature="features.exception-page.button-1" variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button>}>
+            headerActions={<div className="exception-detail-help" ref={setHelpContainer} />}
+            footer={<>
+              {selected && canHandle && <span className="exception-review-owner text-secondary">{ownReview ? '내가 검토중인 예외입니다.' : selected.assigneeLoginId ? `${selected.assigneeLoginId} 담당` : '검토를 시작하면 원인을 수정할 수 있습니다.'}</span>}
+              <span className="exception-process-tooltip" tabIndex={disabledReason ? 0 : undefined} aria-describedby={disabledReason ? disabledReasonId : undefined}>
+                <Button data-guide-feature="features.exception-page.process" disabled={Boolean(disabledReason)} onClick={processException}>예외 건 처리</Button>
+                {disabledReason && <span id={disabledReasonId} className="exception-process-tooltip-content" role="tooltip">{disabledReason}</span>}
+              </span>
+              <Button data-guide-feature="features.exception-page.button-1" variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button>
+            </>}>
             {processing && <p role="status">처리 중입니다. 완료 후 창을 닫을 수 있습니다.</p>}
             <div className="exception-side-panels">
+              <div className="exception-main-panels">
+                <section data-guide-feature="features.exception.information" className="surface exception-information">
+                  <div className="surface-header"><span className="surface-title">예외 정보</span></div>
+                  <div className="surface-body">{selected && <ExceptionDetail item={selected} />}</div>
+                </section>
+                <section data-guide-feature="features.exception.exception-page.section-4" className="surface" data-guide-target="exception.action">
+                  <div className="surface-header"><span className="surface-title">담당 배정 · 검토</span></div>
+                  <div className="surface-body">{selected && <ActionPanel key={selected.exceptionCaseId} item={selected} helpContainer={helpContainer} />}</div>
+                </section>
+                {selected && canHandle && ownReview && !correctionOpen && <ReviewPanel key={`review-${selected.exceptionCaseId}`} item={selected} />}
+              </div>
+              <div className="exception-history-panels">
               <section data-guide-feature="features.exception.exception-page.section-3" className="surface">
                 <div className="surface-header">
                   <span className="surface-title">검출 이력</span>
-                  <span className="text-secondary exception-card-note">수정할 수 없는 기록입니다</span>
+                  <span className="text-secondary exception-card-note">{selected?.detectionCount ?? 0}회 검출</span>
                 </div>
                 <div className="surface-body">
                   {selected ? (
                     <div data-guide-target="exception.detail"><Occurrences item={selected} /></div>
                   ) : (
                     <p className="text-secondary exception-placeholder">-</p>
-                  )}
-                </div>
-              </section>
-              <section data-guide-feature="features.exception.exception-page.section-4" className="surface" data-guide-target="exception.action">
-                <div className="surface-header">
-                  <span className="surface-title">처리</span>
-                </div>
-                <div className="surface-body">
-                  {selected ? (
-                    <ActionPanel key={selected.exceptionCaseId} item={selected} />
-                  ) : (
-                    <p className="text-secondary exception-placeholder">왼쪽 목록에서 한 건을 고르세요.</p>
                   )}
                 </div>
               </section>
@@ -363,8 +418,13 @@ export function ExceptionPage() {
                   {selected ? <History item={selected} /> : <p className="text-secondary exception-placeholder">-</p>}
                 </div>
               </section>
+              </div>
             </div>
           </Modal>
+          {selected && correctionOpen && (sourceCorrection
+            ? <PaymentCorrectionModal item={selected} onClose={() => setCorrectionOpen(false)} />
+            : selected.type === 'JOURNAL_CORRECTION_REQUIRED' ? <JournalCorrectionModal item={selected} open onClose={() => setCorrectionOpen(false)} />
+            : <SourceReviewModal item={selected} onClose={() => setCorrectionOpen(false)} />)}
           <Modal open={confirmClose} title="작성 중인 내용을 닫을까요?" onClose={() => setConfirmClose(false)}
             footer={<><Button data-guide-feature="features.exception-page.button-2" variant="secondary" onClick={() => setConfirmClose(false)}>계속 작성</Button>
               <Button data-guide-feature="features.exception-page.button-3" onClick={dismissDetail}>입력 버리고 닫기</Button></>}>

@@ -9,20 +9,26 @@ import com.susukkang.fgc.journal.dto.JournalCorrectionExceptionResponse;
 import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
 import com.susukkang.fgc.journal.dto.ReverseJournalRequest;
 import com.susukkang.fgc.journal.dto.ReverseJournalResponse;
+import com.susukkang.fgc.journal.dto.JournalRepostCommand;
+import com.susukkang.fgc.journal.dto.JournalRepostLineCommand;
+import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionRequest;
 import com.susukkang.fgc.journal.service.JournalCorrectionService;
 import com.susukkang.fgc.journal.service.JournalCorrectionExceptionService;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 설명 : IF-API-36·36A 원장 역분개 및 정정 예외 생성 API
+ * 설명 : IF-API-36·36A·36B·36C 원장 역분개, 재기표, 번호 미리보기 및 기존 정정 예외 API
  *
  * @author yslee
  * @since 2026-08-20
@@ -37,6 +43,12 @@ public class JournalCorrectionController {
     private final JournalCorrectionExceptionService journalCorrectionExceptionService;
 
     @PreAuthorize(Roles.CAN_REVERSE_JOURNAL)
+    @GetMapping("/repost-number-preview")
+    public ApiResponse<JournalCorrectionService.JournalNumbers> previewRepostNumbers(@RequestParam LocalDate journalDate) {
+        return ApiResponse.success(journalCorrectionService.previewRepostNumbers(journalDate));
+    }
+
+    @PreAuthorize(Roles.CAN_REVERSE_JOURNAL)
     @PostMapping("/{journalId}/reverse")
     public ApiResponse<ReverseJournalResponse> reverse(
             @PathVariable Long journalId,
@@ -46,6 +58,19 @@ public class JournalCorrectionController {
                 new ReverseJournalCommand(
                         journalId, request.reason(), request.evidenceRef(), principal.getUserId()));
         return ApiResponse.success(ReverseJournalResponse.from(result));
+    }
+
+    /** 원분개 역분개와 신규 재기표를 함께 적용한다. */
+    @PreAuthorize(Roles.CAN_REVERSE_JOURNAL)
+    @PostMapping("/{journalId}/reverse-and-repost")
+    public ApiResponse<JournalCorrectionResult> reverseAndRepost(
+            @PathVariable Long journalId,
+            @Valid @RequestBody JournalCorrectionActionRequest request,
+            @AuthenticationPrincipal FgcUserDetails principal) {
+        return ApiResponse.success(journalCorrectionService.reverseAndRepost(new JournalRepostCommand(
+                journalId, request.reason(), request.evidenceRef(), principal.getUserId(), request.journalDate(), request.description(),
+                request.lines().stream().map(line -> new JournalRepostLineCommand(line.originalLineNo(), line.accountCode(),
+                        line.debitAmount(), line.creditAmount(), line.lineDescription())).toList())));
     }
 
     /** IF-API-36A 원분개 정정 예외를 생성하거나 기존 업무건을 반환한다. */

@@ -1,32 +1,28 @@
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { SaveGuide } from '../assistant/guide/save-guide'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { FormEvent } from 'react'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
 import { StatusBadge } from '../../components/StatusBadge'
-import { date, dateTime, errorText, rateText } from '../../lib/format'
-import { monthText } from '../../lib/screenText'
+import { date, errorText, rateText } from '../../lib/format'
 import { toast } from '../../stores/toasts'
-import { usePermission } from '../auth/useAuth'
+import { useAuth, usePermission } from '../auth/useAuth'
 import { Link } from 'react-router'
-import { applyActionToCache, postAction } from './api'
-import type { ExceptionCase } from './api'
-import { JournalCorrectionModal } from './JournalCorrectionModal'
-import { availableActions, isActionable, JOURNAL_CORRECTION_TYPE, severityTone, statusTone, typeTone } from './rules'
+import { applyActionToCache, exceptionOptionsQueryOptions, postAction } from './api'
+import type { ActionInput, ExceptionCase } from './api'
+import { availableActions, isActionable, severityTone, statusTone, typeTone } from './rules'
 import { sourceReference } from './labels'
+import { JournalCorrectionModal } from './JournalCorrectionModal'
 import { decisionReasonText } from '../arbitrage/utils'
 
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 
-function Detail({ item }: { item: ExceptionCase }) {
+export function ExceptionDetail({ item }: { item: ExceptionCase }) {
   const reference = sourceReference(item.sourceEntityType, item.contractNo)
-  const runText = (runId?: number | null) => {
-    const run = item.occurrences?.find((occurrence) => occurrence.validationRunId === runId)
-    return run ? `${monthText(run.validationMonth)} ${run.runNo}차 실행` : '-'
-  }
   return (
     <dl className="exception-detail-grid">
       <div>
@@ -71,26 +67,6 @@ function Detail({ item }: { item: ExceptionCase }) {
         <dt>검증월</dt>
         <dd className="tabular-nums">{item.validationMonth ? date(item.validationMonth).slice(0, 7) : '-'}</dd>
       </div>
-      <div>
-        <dt>최초 검출 실행</dt>
-        <dd className="tabular-nums">{runText(item.firstDetectedRunId)}</dd>
-      </div>
-      <div>
-        <dt>최근 검출 실행</dt>
-        <dd className="tabular-nums">{runText(item.lastDetectedRunId)}</dd>
-      </div>
-      <div>
-        <dt>검출 횟수</dt>
-        <dd className="tabular-nums">{item.detectionCount}회</dd>
-      </div>
-      <div>
-        <dt>최초 검출</dt>
-        <dd className="tabular-nums">{dateTime(item.firstDetectedAt)}</dd>
-      </div>
-      <div>
-        <dt>최근 검출</dt>
-        <dd className="tabular-nums">{dateTime(item.lastDetectedAt)}</dd>
-      </div>
       <div className="exception-detail-wide">
         <dt>제목</dt>
         <dd>{rateText(dash(item.title))}</dd>
@@ -132,9 +108,12 @@ function Detail({ item }: { item: ExceptionCase }) {
   )
 }
 
-function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () => void }) {
+function ActionForm({ item, helpContainer }: { item: ExceptionCase; helpContainer: HTMLElement | null }) {
   const client = useQueryClient()
+  const { user } = useAuth()
+  const options = useQuery(exceptionOptionsQueryOptions())
   const [actionType, setActionType] = useState('')
+  const [assigneeId, setAssigneeId] = useState('')
   const [reason, setReason] = useState('')
   const [evidenceRef, setEvidenceRef] = useState('')
   const [error, setError] = useState('')
@@ -143,21 +122,26 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
   const saved = useSyncExternalStore(saveGuide.subscribe, saveGuide.getSnapshot).savedId !== null
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
-  const actions = availableActions(item.status, item.type)
-  const valid = actions.some(action => action.type === actionType) && Boolean(reason.trim()) && reason.trim().length <= 1000
-  const context = JSON.stringify([item.exceptionCaseId, item.status, actionType, reason, evidenceRef])
+  const actions = availableActions(item.status, item.type).filter(action => action.type === 'ASSIGN' ||
+    ((action.type === 'START_REVIEW' || action.type === 'REOPEN') &&
+      (!item.assigneeLoginId || item.assigneeLoginId === user?.loginId) &&
+      (item.status !== 'IN_REVIEW' || !item.assigneeLoginId)))
+  const assignableUsers = (options.data?.assignableUsers ?? []).filter(assignee => assignee.loginId !== user?.loginId)
+  const selectedAssignee = assignableUsers.find(assignee => String(assignee.userId) === assigneeId)
+  const valid = actions.some(action => action.type === actionType) && Boolean(reason.trim()) &&
+    (actionType !== 'ASSIGN' || Boolean(selectedAssignee))
+  const context = JSON.stringify([item.exceptionCaseId, item.status, actionType, assigneeId, reason, evidenceRef])
   useEffect(() => { saveGuide.update(context, valid) }, [saveGuide, context, valid])
-  const clearUnsaved = useUnsavedWork(Boolean(actionType || reason || evidenceRef), JSON.stringify([actionType, reason, evidenceRef]), `exception:${item.exceptionCaseId}:`)
+  const clearUnsaved = useUnsavedWork(Boolean(actionType || reason || evidenceRef), JSON.stringify([actionType, assigneeId, reason, evidenceRef]), `exception:${item.exceptionCaseId}:`)
   const mutation = useMutation({
     mutationKey: ['exception', 'write', item.exceptionCaseId],
-    mutationFn: () => { saveGuide.begin(); return postAction(item.exceptionCaseId!, { actionType, reason, evidenceRef }) },
+    mutationFn: (input: ActionInput & { assigneeLoginId?: string }) => { saveGuide.begin(); return postAction(item.exceptionCaseId!, input) },
     meta: { errorToast: false },
-    onSuccess: async (action) => {
+    onSuccess: async (action, input) => {
       clearUnsaved()
-      let continueGuide: boolean
       try {
-        if (action.actionType !== actionType || action.fromStatus !== item.status || !['NEW', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].includes(action.toStatus ?? '') || !Number.isSafeInteger(action.actionSeq) || Number(action.actionSeq) <= 0) throw new Error('처리 결과를 확인하지 못했습니다. 처리 이력을 확인하세요.')
-        continueGuide = mounted.current ? await saveGuide.saved(Number(action.actionSeq)) : false
+        if (action.actionType !== input.actionType || action.fromStatus !== item.status || !['NEW', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].includes(action.toStatus ?? '') || !Number.isSafeInteger(action.actionSeq) || Number(action.actionSeq) <= 0) throw new Error('처리 결과를 확인하지 못했습니다. 처리 이력을 확인하세요.')
+        if (mounted.current) await saveGuide.saved(Number(action.actionSeq))
       } catch {
         // The POST already succeeded: never expose a retry for an unverified receipt.
         const message = '저장은 되었지만 결과를 표시하지 못했습니다. 다시 저장하지 말고 처리 이력을 확인한 뒤 화면을 다시 여세요.'
@@ -170,20 +154,16 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
         void client.invalidateQueries({ queryKey: ['exceptions', 'search'] })
         return
       }
-      applyActionToCache(client, item.exceptionCaseId!, action)
+      applyActionToCache(client, item.exceptionCaseId!, action, action.actionType === 'ASSIGN' ? {
+        assignedTo: input.assignedTo,
+        assigneeLoginId: input.assigneeLoginId,
+      } : {})
       if (!mounted.current) return
       setActionType('')
+      setAssigneeId('')
       setReason('')
       setEvidenceRef('')
-      toast('처리 내용이 저장되었습니다.', 'success')
-      // 원장 정정 예외는 검토 시작(재검토)에 성공한 직후 정정 모달을 바로 연다.
-      if (
-        continueGuide && item.type === JOURNAL_CORRECTION_TYPE &&
-        (action.actionType === 'START_REVIEW' || action.actionType === 'REOPEN') &&
-        action.toStatus === 'IN_REVIEW'
-      ) {
-        onStarted()
-      }
+      toast(action.actionType === 'ASSIGN' ? '선택한 담당자의 검토중으로 배정했습니다.' : '검토를 시작했습니다. 아래 예외 건 처리에서 원인을 수정하세요.', 'success')
     },
     onError: (caught) => {
       const message = errorText(caught as Error, '처리 내용을 저장하지 못했습니다.')
@@ -196,14 +176,17 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
     event.preventDefault()
     if (needsRefresh || mutation.isPending) return
     setError('')
-    if (valid) mutation.mutate()
+    if (valid) mutation.mutate({ actionType, reason, evidenceRef, assignedTo: selectedAssignee?.userId, assigneeLoginId: selectedAssignee?.loginId })
   }
   return (
     <form data-guide-feature="features.exception.action-panel.form" data-guide-scope="exception-action" className="exception-action-form" onSubmit={submit} aria-label="예외 처리">
-      <ScreenHelp screenId="EXCP-W01" variant="action" saveGuide={saveGuide} outcome="processing" />
+      {helpContainer && createPortal(<ScreenHelp screenId="EXCP-W01" variant="action" saveGuide={saveGuide} outcome="processing" />, helpContainer)}
       <fieldset data-guide-target="exception.actionInput" disabled={mutation.isPending || needsRefresh} style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 'var(--space-3)' }}>
       <Field label="조치" required>
-        <select data-guide-feature="features.exception.action-panel.select" className="select-control" value={actionType} onChange={(event) => setActionType(event.target.value)}>
+        <select data-guide-feature="features.exception.action-panel.select" className="select-control" value={actionType} onChange={(event) => {
+          setActionType(event.target.value)
+          setAssigneeId('')
+        }}>
           <option value="">조치를 선택하세요</option>
           {actions.map((action) => (
             <option key={action.type} value={action.type}>
@@ -212,15 +195,20 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
           ))}
         </select>
       </Field>
-      <Field label="처리 사유" required>
-        <textarea data-guide-feature="features.exception.action-panel.textarea"
-          className="textarea-control"
-          maxLength={1000}
-          placeholder="판단 근거와 처리 내용을 입력하세요."
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-        />
-      </Field>
+      {actionType === 'ASSIGN' && <Field label="배정 담당자" required
+        error={options.isError ? '담당자를 불러오지 못했습니다. 화면을 다시 열어 주세요.' : undefined}
+        helper={options.isPending ? '담당자를 불러오는 중입니다.' : undefined}>
+        <select data-guide-feature="features.exception.action-panel.assignee" className="select-control" value={assigneeId} onChange={event => setAssigneeId(event.target.value)}>
+          <option value="">담당자를 선택하세요</option>
+          {assignableUsers.map(assignee => <option key={assignee.userId} value={assignee.userId}>
+            {assignee.loginId}
+          </option>)}
+        </select>
+      </Field>}
+      {actionType && <Field label="처리 사유" required>
+        <textarea data-guide-feature="features.exception.action-panel.reason" className="textarea-control" rows={2}
+          maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} />
+      </Field>}
       <Field label="증빙">
         <input data-guide-feature="features.exception.action-panel.input"
           type="text"
@@ -248,29 +236,21 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
   )
 }
 
-export function ActionPanel({ item }: { item: ExceptionCase }) {
+export function ActionPanel({ item, helpContainer }: { item: ExceptionCase; helpContainer: HTMLElement | null }) {
   const canHandle = usePermission('canHandleException')
-  const [correctionOpen, setCorrectionOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const deletedRejectedPayment = item.status === 'REJECTED' && item.sourceDeleted === true
   const actionable = isActionable(item.status) && !deletedRejectedPayment
-  const isCorrection = item.type === JOURNAL_CORRECTION_TYPE
   return (
     <>
-      <Detail item={item} />
-      {actionable && canHandle && <ActionForm item={item} onStarted={() => setCorrectionOpen(true)} />}
-      {isCorrection && canHandle && item.status !== 'NEW' && (
-        <Button data-guide-feature="features.exception.action-panel.button-2" variant="secondary" className="journal-correction-open" onClick={() => setCorrectionOpen(true)}>
-          <span className="material-symbols-rounded" aria-hidden="true">
-            receipt_long
-          </span>
-          <span>{item.status === 'IN_REVIEW' ? '원장 정정 계속' : '원장 정정 확인'}</span>
-        </Button>
-      )}
-      {isCorrection && canHandle && (
-        <JournalCorrectionModal item={item} open={correctionOpen} onClose={() => setCorrectionOpen(false)} />
-      )}
+      {actionable && canHandle && <ActionForm item={item} helpContainer={helpContainer} />}
+      {(!actionable || !canHandle) && helpContainer && createPortal(<ScreenHelp screenId="EXCP-W01" variant={canHandle ? 'action' : 'reader'} />, helpContainer)}
       {actionable && !canHandle && <p className="text-secondary exception-action-notice">조회 전용 권한입니다.</p>}
       {!actionable && <p className="text-secondary exception-action-notice">종결된 예외입니다.</p>}
+      {canHandle && item.type === 'JOURNAL_CORRECTION_REQUIRED' && item.status === 'RESOLVED' && <>
+        <Button data-guide-feature="features.exception.action-panel.journal-history" variant="secondary" onClick={() => setHistoryOpen(true)}>원장 정정 확인</Button>
+        <JournalCorrectionModal item={item} open={historyOpen} onClose={() => setHistoryOpen(false)} />
+      </>}
     </>
   )
 }

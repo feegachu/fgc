@@ -402,7 +402,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                               THEN '' ELSE CONCAT(':', detected.detected_reason) END),
                   detected.detected_type,
                   detected.detected_reason,
-                  CASE detected.result_status WHEN 'CANDIDATE' THEN 'HIGH' ELSE 'WARNING' END,
+                  'WARNING',
                   detected.validation_run_id, detected.contract_id, NULL, NULL,
                   'ARBITRAGE_CHECK', CAST(detected.arbitrage_check_id AS varchar),
                   CASE

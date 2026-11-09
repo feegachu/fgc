@@ -81,6 +81,10 @@ public class ClawbackNoticeDocumentRepository {
     }
 
     public NoticeHeader findHeader(long caseId, long policyVersionId) {
+        return findHeader(caseId, policyVersionId, null);
+    }
+
+    public NoticeHeader findHeader(long caseId, long policyVersionId, Long originalPaymentId) {
         return jdbc.queryForObject("""
                 SELECT ic.contract_no, i.insurer_name, p.product_name, a.agent_code, a.agent_name,
                        se.new_status, se.effective_at, pv.policy_code, pv.policy_name, pv.version_no,
@@ -90,7 +94,8 @@ public class ClawbackNoticeDocumentRepository {
                   JOIN fgc.insurer i ON i.insurer_id = ic.insurer_id
                   JOIN fgc.product_offering po ON po.product_offering_id = ic.product_offering_id
                   JOIN fgc.product p ON p.product_id = po.product_id
-                  JOIN fgc.agent a ON a.agent_id = ic.agent_id
+                  JOIN fgc.agent a ON a.agent_id = COALESCE((SELECT recipient_agent_id FROM fgc.commission_transaction
+                      WHERE commission_transaction_id = ?), ic.agent_id)
                   LEFT JOIN LATERAL (
                     WITH RECURSIVE ancestors AS (
                       SELECT organization_id,parent_id,organization_name,organization_type,ARRAY[organization_id] AS path
@@ -110,7 +115,16 @@ public class ClawbackNoticeDocumentRepository {
                  WHERE cc.clawback_case_id = ?
                 """, (rs, n) -> new NoticeHeader(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
                 rs.getString(5), rs.getString(6), rs.getObject(7, OffsetDateTime.class), rs.getString(8),
-                rs.getString(9), rs.getInt(10), rs.getString(11), rs.getString(12), rs.getString(13)), policyVersionId, caseId);
+                rs.getString(9), rs.getInt(10), rs.getString(11), rs.getString(12), rs.getString(13)), originalPaymentId, policyVersionId, caseId);
+    }
+
+    public void savePaymentScope(long documentId, long originalPaymentId) {
+        jdbc.update("INSERT INTO fgc.clawback_notice_payment_scope VALUES (?, ?)", documentId, originalPaymentId);
+    }
+
+    public Long findPaymentScope(long documentId) {
+        return jdbc.query("SELECT original_payment_id FROM fgc.clawback_notice_payment_scope WHERE generated_document_id=?",
+                (rs, n) -> rs.getLong(1), documentId).stream().findFirst().orElse(null);
     }
 
     public Map<Long, String> findItemNames() {

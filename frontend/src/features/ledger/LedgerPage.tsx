@@ -5,9 +5,10 @@ import { invalidateJournalCorrectionQueries } from './correction-cache'
 import { useRef, useState } from 'react'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useOutletContext } from 'react-router'
+import { useOutletContext } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { LedgerExplorer } from './LedgerExplorer'
+import { JournalRepostModal } from './JournalRepostModal'
 import { LedgerOverview } from './LedgerOverview'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
@@ -26,9 +27,8 @@ import { sortBinding } from '../../lib/tableSort'
 import { ApiError } from '../../lib/api/errors'
 import { date, errorText, int, internalErrorText, isNegative, won } from '../../lib/format'
 import { toast } from '../../stores/toasts'
-import { useWorkspaceStore, withMonth } from '../../stores/workspace'
+import { useWorkspaceStore } from '../../stores/workspace'
 import {
-  correctionTarget,
   criteriaFromParams,
   effectiveCriteria,
   FILTER_KEYS,
@@ -37,7 +37,6 @@ import {
   LEDGER_SORT_KEYS,
   monthRange,
   positiveId,
-  requestCorrection,
   reverseJournal,
 } from './api'
 import type { Journal, JournalCriteria, JournalDetail, JournalLine } from './api'
@@ -299,7 +298,6 @@ function LegacyLedgerPage() {
           action={action}
           detail={detail.data}
           allowed={canReverse && !!eligible}
-          month={month}
           onClose={() => setAction(null)}
         />
       )}
@@ -409,17 +407,20 @@ export function DetailSummary({ detail }: { detail: JournalDetail }) {
   )
 }
 
-export function JournalActionModal({
-  action,
+export function JournalActionModal(props: {
+  action: 'reverse' | 'correction'; detail: JournalDetail; allowed: boolean; onClose: () => void; onReposted?: () => void; reconciliationSummary?: string
+}) {
+  return props.action === 'correction' ? <JournalRepostModal detail={props.detail} allowed={props.allowed} onClose={props.onClose} onComplete={props.onReposted} reconciliationSummary={props.reconciliationSummary} />
+    : <ReverseJournalModal {...props} />
+}
+
+function ReverseJournalModal({
   detail,
   allowed,
-  month,
   onClose,
 }: {
-  action: 'reverse' | 'correction'
   detail: JournalDetail
   allowed: boolean
-  month: string | null
   onClose: () => void
 }) {
   const [reason, setReason] = useState('')
@@ -428,30 +429,18 @@ export function JournalActionModal({
   const [reasonError, setReasonError] = useState(false)
   const reasonRef = useRef<HTMLTextAreaElement>(null)
   const client = useQueryClient()
-  const navigate = useNavigate()
   const mutation = useMutation({
     mutationFn: async () => {
       const body = { reason: reason.trim(), evidenceRef: evidence.trim() || undefined }
       if (!allowed || detail.journalHeaderId == null) throw new Error('처리 권한을 확인할 수 없습니다.')
-      if (action === 'reverse') return reverseJournal(detail.journalHeaderId, body)
-      const result = await requestCorrection(detail.journalHeaderId, body)
-      const target = correctionTarget(result.redirectUrl)
-      if (!target)
-        throw new Error('원장 정정 예외는 생성됐지만 이동할 주소가 올바르지 않습니다. 예외함에서 직접 확인하세요.')
-      return { target }
+      return reverseJournal(detail.journalHeaderId, body)
     },
     meta: { errorToast: false },
-    onSuccess: async (result) => {
+    onSuccess: async () => {
       clearUnsaved()
-      if ('target' in result) {
-        void client.invalidateQueries({ queryKey: ['exceptions'] })
-        onClose()
-        navigate(month ? withMonth(result.target, month) : result.target)
-      } else {
-        toast('역분개를 생성했습니다.', 'success')
-        await invalidateJournalCorrectionQueries(client)
-        onClose()
-      }
+      toast('역분개를 생성했습니다.', 'success')
+      await invalidateJournalCorrectionQueries(client)
+      onClose()
     },
   })
   function submit() {
@@ -465,11 +454,10 @@ export function JournalActionModal({
   const close = () => {
     if (!mutation.isPending) onClose()
   }
-  const isReverse = action === 'reverse'
   return (
     <Modal
       open
-      title={isReverse ? '원분개 역분개' : '역분개 + 재기표 요청'}
+      title="원분개 역분개"
       onClose={close}
       closeOnEscape={!mutation.isPending}
       initialFocusRef={reasonRef}
@@ -479,7 +467,7 @@ export function JournalActionModal({
             취소
           </Button>
           <Button data-guide-feature="features.ledger.ledger-page.button-4" loading={mutation.isPending} disabled={!allowed} onClick={submit}>
-            {isReverse ? '역분개 생성' : '예외함에서 정정 계속'}
+            역분개 생성
           </Button>
         </>
       }
@@ -488,17 +476,15 @@ export function JournalActionModal({
         {detail.journalNo}, {detail.journalTypeLabel}
       </p>
       <p className="guidance guidance-neutral ledger-action-guidance">
-        {isReverse
-          ? '원분개를 수정하거나 삭제하지 않고 반대 차변/대변의 새 분개를 만듭니다. 처리 후 되돌리려면 별도 정정 절차가 필요합니다.'
-          : '원분개를 바로 바꾸지 않고 원장 정정 예외를 만든 뒤 예외함에서 올바른 신규 분개를 입력합니다.'}
+        원분개를 수정하거나 삭제하지 않고 반대 차변/대변의 새 분개를 만듭니다.
       </p>
       <Failure error={mutation.error} />
       <Field
-        label={isReverse ? '역분개 사유' : '정정 요청 사유'}
+        label="역분개 사유"
         required
-        error={reasonError ? (isReverse ? '역분개 사유를 입력하세요.' : '정정 요청 사유를 입력하세요.') : undefined}
+        error={reasonError ? '역분개 사유를 입력하세요.' : undefined}
       >
-        <textarea data-guide-feature="features.ledger.ledger-page.textarea"
+        <textarea data-guide-feature="features.ledger.ledger-page.textarea" className="textarea-control"
           ref={reasonRef}
           rows={5}
           maxLength={1000}

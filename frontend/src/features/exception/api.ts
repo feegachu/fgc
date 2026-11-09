@@ -100,12 +100,18 @@ export interface ActionInput {
   actionType: string
   reason: string
   evidenceRef: string
+  assignedTo?: number
 }
 
 export async function postAction(exceptionCaseId: number, input: ActionInput): Promise<ExceptionAction> {
   const { data } = await apiClient.request<ExceptionAction>(`/api/v1/exceptions/${exceptionCaseId}/actions`, {
     method: 'POST',
-    body: { actionType: input.actionType, reason: input.reason.trim(), evidenceRef: input.evidenceRef.trim() || null },
+    body: {
+      actionType: input.actionType,
+      reason: input.reason.trim(),
+      evidenceRef: input.evidenceRef.trim() || null,
+      ...(input.actionType === 'ASSIGN' ? { assignedTo: input.assignedTo } : {}),
+    },
   })
   if (!data) throw new Error('처리 결과를 확인할 수 없습니다.')
   return data
@@ -144,7 +150,7 @@ export function applyActionToCache(
               ...item,
               status: action.toStatus,
               statusLabel: action.toStatusLabel,
-              ...(action.actionType === 'ASSIGN'
+              ...(['ASSIGN', 'START_REVIEW', 'REOPEN'].includes(action.actionType ?? '')
                 ? { assignedTo: action.actionBy, assigneeLoginId: action.actionByLoginId }
                 : {}),
               ...extra,
@@ -155,4 +161,6 @@ export function applyActionToCache(
     }
   })
   void client.invalidateQueries({ queryKey: ['exceptions', 'search'], refetchType: 'none' })
+  if (action.fromStatus !== action.toStatus) void client.invalidateQueries({ queryKey: ['exceptions', 'counts'] })
+  if (action.actionType === 'ASSIGN') void client.invalidateQueries({ queryKey: ['exceptions', 'options'] })
 }

@@ -55,4 +55,12 @@ public class PaymentJournalCorrectionRepository {
                 """).setParameter("groupKey", groupKey).setParameter("oldId", oldId)
                 .setParameter("newId", newId).executeUpdate();
     }
+
+    public void correctPaymentDate(Long paymentId, java.time.LocalDate date) {
+        entityManager.createNativeQuery("""
+                UPDATE fgc.commission_transaction SET paid_on = CASE WHEN paid_on IS NULL THEN NULL ELSE CAST(:date AS date) END
+                WHERE commission_transaction_id = :id
+                """).setParameter("id", paymentId).setParameter("date", date).executeUpdate();
+        entityManager.clear();
+    }
 }
