@@ -102,27 +102,17 @@ test('원천 지급 정정 → 재검증·재대사 → 역할 인계 후 최종
   const journal = await api(page, `/journals/${jid}`)
   await expect(page.getByRole('region', { name: '분개 상세' })).toContainText(journal.journalNo)
   await page.getByRole('button', { name: '역분개 + 재기표', exact: true }).click()
-  await page.getByRole('textbox', { name: '정정 요청 사유', exact: true }).fill('예상 지급 대비 과소 지급 원천 정정')
-  await page.getByRole('button', { name: '예외함에서 정정 계속', exact: true }).click()
-  await page.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
-  await page.getByLabel('처리 사유').fill('원분개와 지급 예정 금액 확인')
-  await page.getByRole('button', { name: '처리 저장', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '원분개 역분개, 신규 재기표' })
+  const dialog = page.getByRole('dialog', { name: '역분개 + 재기표', exact: true })
   await expect(dialog).toBeVisible()
-  await dialog
-    .getByRole('group', { name: '1번 줄', exact: true })
-    .getByLabel('차변', { exact: false })
-    .fill(String(amount))
-  await dialog
-    .getByRole('group', { name: '2번 줄', exact: true })
-    .getByLabel('대변', { exact: false })
-    .fill(String(amount))
-  await dialog.getByLabel('정정 사유', { exact: false }).fill('스케줄 원천 금액과 일치하도록 지급 금액 정정')
-  const corrected = page.waitForResponse(
-    (r) => r.url().endsWith('/journal-correction') && r.request().method() === 'POST',
-  )
-  await dialog.getByRole('button', { name: '정정 실행', exact: true }).click()
+  const originalRows = dialog.getByRole('table', { name: '원분개 · 역분개 · 신규 재기표' }).locator('tbody').first()
+  await expect(originalRows.getByText(journal.journalNo, { exact: true })).toBeVisible()
+  await dialog.getByRole('spinbutton', { name: '1행 차변', exact: true }).fill(String(amount))
+  await dialog.getByRole('spinbutton', { name: '2행 대변', exact: true }).fill(String(amount))
+  await dialog.getByRole('textbox', { name: '사유', exact: true }).fill('스케줄 원천 금액과 일치하도록 지급 금액 정정')
+  const corrected = responseFor(page, `/journals/${jid}/reverse-and-repost`)
+  await dialog.getByRole('button', { name: '등록', exact: true }).click()
   const correction = await successful(corrected)
+  await expect(dialog).toBeHidden()
   const replacement = Number(
     sql(`SELECT replacement_payment_id FROM fgc.payment_journal_correction WHERE original_payment_id=${pid}`),
   )
@@ -134,7 +124,6 @@ test('원천 지급 정정 → 재검증·재대사 → 역할 인계 후 최종
     ),
   )
   expect((await api(page, `/reconciliations/${revised}/results?page=1&size=100`)).summary.exceptionCount).toBe(0)
-  if (await dialog.isVisible()) await dialog.getByRole('button', { name: '닫기', exact: true }).click()
   await page.goto('/validation-runs?month=2026-07')
   const recreated = responseFor(page, '/validation-runs')
   await page.getByRole('button', { name: '실행 생성', exact: true }).click()

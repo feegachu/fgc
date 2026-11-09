@@ -1,6 +1,8 @@
 package com.susukkang.fgc.exceptioncase.service;
 
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.cap.dto.CapExceptionResolveCommand;
+import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.clawback.service.ClawbackCandidateQueryService;
 import com.susukkang.fgc.common.code.*;
 import com.susukkang.fgc.common.exception.*;
@@ -40,6 +42,7 @@ public class ExceptionPaymentCorrectionService {
     private final JournalPersistenceService journalPersistence;
     private final JournalHeaderRepository journalHeaders;
     private final com.susukkang.fgc.cap.service.CapCheckService capChecks;
+    private final CapExceptionService capExceptions;
 
     @Transactional
     public ExceptionPaymentContext context(Long id, Long actor) {
@@ -187,6 +190,13 @@ public class ExceptionPaymentCorrectionService {
                 .before(old).after(Map.of("paymentId", corrected.paymentId(), "actionType", type.name()))
                 .reason(reason).build());
         boolean resolved = cases.findByIdForUpdate(id).status() == ExceptionStatus.RESOLVED;
+        if (resolved && "CAP_VIOLATION".equals(source.type())) {
+            var warnings = repository.newWarningsForCorrectedViolation(id, corrected.paymentId(), corrected.capCheckIds());
+            for (Long warningId : warnings) {
+                capExceptions.resolve(new CapExceptionResolveCommand(warningId, ExceptionActionType.CORRECT,
+                        "위반 예외 " + id + "번 정정 후 한도 주의 판정 확인", "EXCP-" + id, actor));
+            }
+        }
         var history = queries.findActionsByCaseIds(List.of(id));
         var latest = history.stream().max(Comparator.comparingInt(ExceptionActionRow::actionSeq))
                 .map(ExceptionActionResponse::from).orElse(null);

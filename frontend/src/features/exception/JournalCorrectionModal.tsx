@@ -391,7 +391,7 @@ function CorrectionBody({
                   </Link>
                 </div>
               ) : item.status === 'REJECTED' ? (
-                <p>예외 아님/반려로 종결되어 역분개와 신규 재기표는 실행되지 않았습니다.</p>
+                <p>반려로 종결되어 역분개와 신규 재기표는 실행되지 않았습니다.</p>
               ) : item.status === 'RESOLVED' ? (
                 <p>정정이 완료된 예외입니다. 원분개의 정정 내역과 연결 분개를 확인하세요.</p>
               ) : (

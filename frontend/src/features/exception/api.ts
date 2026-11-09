@@ -161,5 +161,6 @@ export function applyActionToCache(
     }
   })
   void client.invalidateQueries({ queryKey: ['exceptions', 'search'], refetchType: 'none' })
+  if (action.fromStatus !== action.toStatus) void client.invalidateQueries({ queryKey: ['exceptions', 'counts'] })
   if (action.actionType === 'ASSIGN') void client.invalidateQueries({ queryKey: ['exceptions', 'options'] })
 }

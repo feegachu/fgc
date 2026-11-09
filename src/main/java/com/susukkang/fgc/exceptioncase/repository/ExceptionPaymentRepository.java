@@ -89,6 +89,28 @@ public class ExceptionPaymentRepository {
         return new Source(id, (String) r[0], number(r[1]), (String) r[2], (String) r[3], number(r[4]));
     }
 
+    public List<Long> newWarningsForCorrectedViolation(Long exceptionId, Long paymentId, List<Long> capCheckIds) {
+        if (capCheckIds.isEmpty()) return List.of();
+        return em.createNativeQuery("""
+                SELECT warning.exception_case_id
+                FROM fgc.exception_case violation
+                JOIN fgc.cap_check original ON original.cap_check_id = violation.cap_check_id
+                    OR (violation.cap_check_id IS NULL AND violation.source_entity_type = 'CAP_CHECK'
+                        AND original.cap_check_id::text = violation.source_entity_id)
+                JOIN fgc.cap_check recheck ON recheck.contract_id = original.contract_id
+                    AND recheck.payment_stage = original.payment_stage
+                    AND recheck.cap_rule_set_id = original.cap_rule_set_id
+                JOIN fgc.exception_case warning ON warning.cap_check_id = recheck.cap_check_id
+                WHERE violation.exception_case_id = :exceptionId AND original.result_status = 'VIOLATION'
+                  AND recheck.cap_check_id IN (:capCheckIds) AND recheck.result_status = 'WARNING'
+                  AND warning.exception_type = 'CAP_WARNING' AND warning.status = 'NEW'
+                  AND warning.source_entity_type = 'COMMISSION_TRANSACTION' AND warning.source_entity_id = :paymentId
+                ORDER BY warning.exception_case_id
+                """, Long.class)
+                .setParameter("exceptionId", exceptionId).setParameter("paymentId", paymentId.toString())
+                .setParameter("capCheckIds", capCheckIds).getResultList();
+    }
+
     public List<Long> paymentIds(Long id) {
         return em.createNativeQuery("""
                 WITH e AS (SELECT * FROM fgc.exception_case WHERE exception_case_id = :id),

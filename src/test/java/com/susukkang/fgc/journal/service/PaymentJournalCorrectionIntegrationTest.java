@@ -183,6 +183,37 @@ class PaymentJournalCorrectionIntegrationTest {
 
     @Test
     @WithMockUser(roles = "SETTLEMENT")
+    void reducingAViolationToTheLimitKeepsTheWarningResultAndReducesTheOpenExceptionCount() {
+        Fixture fixture = fixture();
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=? WHERE contract_id=?", TEST_MONTH, contractId);
+        var draft = payments.create(paymentBody(payments.get(fixture.payment()), "1000000000", TEST_MONTH));
+        assertThatThrownBy(() -> payments.confirm(draft.paymentId(), "CAP-BOUNDARY-" + draft.paymentId()))
+                .isInstanceOf(com.susukkang.fgc.transaction.service.CommissionPaymentConfirmationRejectedException.class);
+        Long exception = id("""
+                SELECT exception_case_id FROM fgc.exception_case
+                WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND exception_type='CAP_VIOLATION'
+                """, draft.paymentId().toString());
+        startException(exception);
+        long openBefore = exceptionActions.counts("OPEN", null).total();
+        var cap = exceptionPayments.preview(exception, new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                draft.paymentId(), null, paymentBody(draft, "1", TEST_MONTH)), 1L).capPreview().getFirst();
+        String correctedAmount = Long.toString(cap.limitAmount() - cap.existingIncludedAmount());
+        var result = exceptionPayments.correct(exception, new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                draft.paymentId(), payments.get(draft.paymentId()).updatedAt(), paymentBody(draft, correctedAmount, TEST_MONTH)), 1L, "admin");
+
+        assertThat(result.resolved()).isTrue();
+        assertThat(status(exception)).isEqualTo("RESOLVED");
+        Long warning = id("""
+                SELECT warning.exception_case_id FROM fgc.exception_case warning JOIN fgc.cap_check check_result USING (cap_check_id)
+                WHERE warning.source_entity_type='COMMISSION_TRANSACTION' AND warning.source_entity_id=?
+                  AND warning.exception_type='CAP_WARNING' AND check_result.result_status='WARNING' AND check_result.usage_pct=100
+                """, result.payment().paymentId().toString());
+        assertThat(status(warning)).isEqualTo("RESOLVED");
+        assertThat(exceptionActions.counts("OPEN", null).total()).isEqualTo(openBefore - 1);
+    }
+
+    @Test
+    @WithMockUser(roles = "SETTLEMENT")
     void sourceCorrectionRejectsAnotherReviewerAndSelfAssignment() {
         Fixture f = fixture();
         assertThatThrownBy(() -> exceptionActions.userAction(f.exception(),

@@ -40,7 +40,7 @@ export function typeBadgeTone(type = ''): StatusTone {
 export function statusTone(status?: string): StatusTone {
   if (status === 'NEW') return 'error'
   if (status === 'IN_REVIEW') return 'info'
-  if (status === 'RESOLVED') return 'success'
+  if (status === 'RESOLVED' || status === 'REJECTED') return 'success'
   return 'review'
 }
 
@@ -50,7 +50,7 @@ export const statusOptions = [
   { value: 'NEW', label: '신규' },
   { value: 'IN_REVIEW', label: '검토중' },
   { value: 'RESOLVED', label: '해결' },
-  { value: 'REJECTED', label: '예외 아님/반려' },
+  { value: 'REJECTED', label: '반려' },
 ]
 
 export const JOURNAL_CORRECTION_TYPE = 'JOURNAL_CORRECTION_REQUIRED'

@@ -224,6 +224,7 @@ describe('EXCP-W01 예외함', () => {
         {
           ...baseCase,
           status: 'REJECTED',
+          statusLabel: '반려',
           sourceEntityType: 'COMMISSION_TRANSACTION',
           sourceEntityId: '41',
           sourceLink: null,
@@ -231,7 +232,9 @@ describe('EXCP-W01 예외함', () => {
         },
       ])
     renderPage('/app/exceptions?status=REJECTED')
-    await userEvent.setup().click(within(await table()).getAllByRole('row')[1])
+    const rejectedRow = within(await table()).getAllByRole('row')[1]
+    expect(within(rejectedRow).getByText('반려', { exact: true })).toHaveClass('status-badge-success')
+    await userEvent.setup().click(rejectedRow)
     expect(screen.queryByRole('option', { name: '재검토 시작' })).not.toBeInTheDocument()
     expect(document.querySelector('a[href*="transactions/new?id=41"]')).toBeNull()
     expect(screen.getAllByText('지급 건')).not.toHaveLength(0)
