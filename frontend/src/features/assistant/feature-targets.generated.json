@@ -2130,6 +2130,11 @@
     "element": "Link"
   },
   {
+    "id": "features.exception.action-panel.reason",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "textarea"
+  },
+  {
     "id": "features.exception.action-panel.select",
     "file": "features/exception/ActionPanel.tsx",
     "element": "select"

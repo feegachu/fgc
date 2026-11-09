@@ -98,7 +98,7 @@ export const journalDetailQueryOptions = (journalId: string) =>
 
 export interface ActionInput {
   actionType: string
-  reason?: string
+  reason: string
   evidenceRef: string
   assignedTo?: number
 }
@@ -108,7 +108,7 @@ export async function postAction(exceptionCaseId: number, input: ActionInput): P
     method: 'POST',
     body: {
       actionType: input.actionType,
-      reason: input.reason?.trim() || `${({ ASSIGN: '담당 배정', START_REVIEW: '검토 시작', REOPEN: '재검토 시작' } as Record<string, string>)[input.actionType] ?? '예외 조치'} 처리`,
+      reason: input.reason.trim(),
       evidenceRef: input.evidenceRef.trim() || null,
       ...(input.actionType === 'ASSIGN' ? { assignedTo: input.assignedTo } : {}),
     },

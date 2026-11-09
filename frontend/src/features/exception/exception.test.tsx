@@ -484,9 +484,9 @@ describe('EXCP-W01 예외함', () => {
     expect(document.querySelector('#root script, main script, [onerror]')).toBeNull()
   })
 
-  it('본인 배정은 제외하고 사유 입력 없이 직접 검토를 시작한다', async () => {
+  it('본인 배정은 제외하고 사유를 남겨 직접 검토를 시작한다', async () => {
     postResponse = (_path, body) => {
-      expect(body).toEqual({ actionType: 'START_REVIEW', reason: '검토 시작 처리', evidenceRef: null })
+      expect(body).toEqual({ actionType: 'START_REVIEW', reason: '지급 근거 확인', evidenceRef: null })
       return { actionSeq: 1, fromStatus: 'NEW', toStatus: 'IN_REVIEW', toStatusLabel: '검토중',
         actionType: 'START_REVIEW', actionTypeLabel: '검토 시작', actionBy: 7, actionByLoginId: 'settle01' }
     }
@@ -500,6 +500,8 @@ describe('EXCP-W01 예외함', () => {
     expect(assignee).toHaveValue('')
     expect(screen.getByRole('button', { name: '처리 저장' })).toBeDisabled()
     await actions.selectOptions(screen.getByLabelText(/조치/), 'START_REVIEW')
+    expect(screen.getByRole('button', { name: '처리 저장' })).toBeDisabled()
+    await actions.type(screen.getByLabelText(/처리 사유/), '지급 근거 확인')
     await actions.click(screen.getByRole('button', { name: '처리 저장' }))
     expect(await screen.findByText('1. 검토 시작')).toBeInTheDocument()
     expect(within(screen.getByRole('table', { name: '예외 목록' })).getByText('settle01')).toBeInTheDocument()
@@ -510,13 +512,14 @@ describe('EXCP-W01 예외함', () => {
 
   it('다른 담당자에게 배정하면 해당 사람의 검토중이 되고 내 원인 수정은 비활성화된다', async () => {
     postResponse = (_path, body) => {
-      expect(body).toEqual({ actionType: 'ASSIGN', assignedTo: 8, reason: '담당 배정 처리', evidenceRef: null })
+      expect(body).toEqual({ actionType: 'ASSIGN', assignedTo: 8, reason: '계약 담당자에게 배정', evidenceRef: null })
       return { actionSeq: 1, fromStatus: 'NEW', toStatus: 'IN_REVIEW', toStatusLabel: '검토중',
         actionType: 'ASSIGN', actionTypeLabel: '담당 배정', actionBy: 7, actionByLoginId: 'settle01' }
     }
     const { actions } = renderPage('/app/exceptions?selected=11')
     await actions.selectOptions(await screen.findByLabelText(/조치/), 'ASSIGN')
     await actions.selectOptions(screen.getByLabelText(/배정 담당자/), '8')
+    await actions.type(screen.getByLabelText(/처리 사유/), '계약 담당자에게 배정')
     await actions.click(screen.getByRole('button', { name: '처리 저장' }))
     expect(await screen.findByText('1. 담당 배정')).toBeInTheDocument()
     const row = within(screen.getByRole('table', { name: '예외 목록' })).getAllByRole('row')[1]
@@ -538,6 +541,7 @@ describe('EXCP-W01 예외함', () => {
     const { actions } = renderPage()
     await actions.click(within(await table()).getByRole('button', { name: '11' }))
     await actions.selectOptions(await screen.findByLabelText(/조치/), 'START_REVIEW')
+    await actions.type(screen.getByLabelText(/처리 사유/), '지급 내역 확인')
     await actions.type(screen.getByLabelText(/증빙/), '검토')
     await actions.click(screen.getByRole('button', { name: '처리 저장' }))
     expect(await screen.findByText(/처리할 수 없습니다/, { selector: '.exception-action-error' })).toBeInTheDocument()
@@ -980,6 +984,7 @@ it('action help requires a real action sequence and preserves input for a failed
   await actions.click(actionHelp())
   expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
   await actions.selectOptions(form.getByLabelText(/조치/), 'START_REVIEW')
+  await actions.type(form.getByLabelText(/처리 사유/), '지급 내역 확인')
   await actions.type(form.getByLabelText(/증빙/), '원천 확인')
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
   await actions.click(screen.getByRole('button', { name: '다음' }))
@@ -1018,6 +1023,7 @@ it.each(['status', 'sequence', 'pending refresh'])('committed action with %s mis
   await actions.click(within(await table()).getByRole('button', { name: '11' }))
   const form = await screen.findByRole('form', { name: '예외 처리' })
   await actions.selectOptions(within(form).getByLabelText(/조치/), 'START_REVIEW')
+  await actions.type(within(form).getByLabelText(/처리 사유/), '지급 내역 확인')
   await actions.type(within(form).getByLabelText(/증빙/), '원천 확인')
   const reads = searchPaths().length
   await actions.click(within(form).getByRole('button', { name: '처리 저장' }))
@@ -1077,6 +1083,7 @@ it.each([[false, 1], [true, 1], [false, 0]] as const)('updates or refreshes a co
   await actions.click(within(await table()).getByRole('button', { name: '11' }))
   const form = within(await screen.findByRole('form', { name: '예외 처리' }))
   await actions.selectOptions(form.getByLabelText(/조치/), 'START_REVIEW')
+  await actions.type(form.getByLabelText(/처리 사유/), '지급 내역 확인')
   await actions.type(form.getByLabelText(/증빙/), '원천 확인')
   if (guided) {
     await actions.click(actionHelp())

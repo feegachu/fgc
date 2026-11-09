@@ -231,7 +231,6 @@ public class ExceptionCaseService {
             if (target.assignedTo() != null && !target.assignedTo().equals(actor)) throw notAllowed(target, type);
         } else if (type == ExceptionActionType.COMMENT || type == ExceptionActionType.REJECT) {
             requireReviewer(target, actor);
-            if (request.reason() == null || request.reason().isBlank()) throw invalidField("reason");
             if (type == ExceptionActionType.REJECT && exceptionCaseQueryRepository.requiresRejectionEvidence(id)
                     && (request.evidenceRef() == null || request.evidenceRef().isBlank())) throw invalidField("evidenceRef");
             if (type == ExceptionActionType.REJECT && exceptionCaseQueryRepository.requiresAdministratorReview(id)) {
@@ -326,8 +325,8 @@ public class ExceptionCaseService {
     private ExceptionActionResponse actionInternal(Long exceptionCaseId, ExceptionActionRequest request,
             Long actionUserId, String actionUserLoginId, boolean journalCorrectionExecuted, boolean keepInReview) {
 
-        String reason = request.reason() == null || request.reason().isBlank()
-                ? request.actionType().label() + " 처리" : request.reason();
+        if (request.reason() == null || request.reason().isBlank()) throw new FgcBusinessException(FgcErrorCode.EXCP_001);
+        String reason = request.reason().trim();
 
         // 1. 동시에 같은 예외를 처리하지 못하도록 행 잠금
         ExceptionCaseActionTarget target =

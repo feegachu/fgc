@@ -114,6 +114,7 @@ function ActionForm({ item, helpContainer }: { item: ExceptionCase; helpContaine
   const options = useQuery(exceptionOptionsQueryOptions())
   const [actionType, setActionType] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
+  const [reason, setReason] = useState('')
   const [evidenceRef, setEvidenceRef] = useState('')
   const [error, setError] = useState('')
   const [needsRefresh, setNeedsRefresh] = useState(false)
@@ -127,11 +128,11 @@ function ActionForm({ item, helpContainer }: { item: ExceptionCase; helpContaine
       (item.status !== 'IN_REVIEW' || !item.assigneeLoginId)))
   const assignableUsers = (options.data?.assignableUsers ?? []).filter(assignee => assignee.loginId !== user?.loginId)
   const selectedAssignee = assignableUsers.find(assignee => String(assignee.userId) === assigneeId)
-  const valid = actions.some(action => action.type === actionType) &&
+  const valid = actions.some(action => action.type === actionType) && Boolean(reason.trim()) &&
     (actionType !== 'ASSIGN' || Boolean(selectedAssignee))
-  const context = JSON.stringify([item.exceptionCaseId, item.status, actionType, assigneeId, evidenceRef])
+  const context = JSON.stringify([item.exceptionCaseId, item.status, actionType, assigneeId, reason, evidenceRef])
   useEffect(() => { saveGuide.update(context, valid) }, [saveGuide, context, valid])
-  const clearUnsaved = useUnsavedWork(Boolean(actionType || evidenceRef), JSON.stringify([actionType, assigneeId, evidenceRef]), `exception:${item.exceptionCaseId}:`)
+  const clearUnsaved = useUnsavedWork(Boolean(actionType || reason || evidenceRef), JSON.stringify([actionType, assigneeId, reason, evidenceRef]), `exception:${item.exceptionCaseId}:`)
   const mutation = useMutation({
     mutationKey: ['exception', 'write', item.exceptionCaseId],
     mutationFn: (input: ActionInput & { assigneeLoginId?: string }) => { saveGuide.begin(); return postAction(item.exceptionCaseId!, input) },
@@ -160,6 +161,7 @@ function ActionForm({ item, helpContainer }: { item: ExceptionCase; helpContaine
       if (!mounted.current) return
       setActionType('')
       setAssigneeId('')
+      setReason('')
       setEvidenceRef('')
       toast(action.actionType === 'ASSIGN' ? '선택한 담당자의 검토중으로 배정했습니다.' : '검토를 시작했습니다. 아래 예외 건 처리에서 원인을 수정하세요.', 'success')
     },
@@ -174,7 +176,7 @@ function ActionForm({ item, helpContainer }: { item: ExceptionCase; helpContaine
     event.preventDefault()
     if (needsRefresh || mutation.isPending) return
     setError('')
-    if (valid) mutation.mutate({ actionType, evidenceRef, assignedTo: selectedAssignee?.userId, assigneeLoginId: selectedAssignee?.loginId })
+    if (valid) mutation.mutate({ actionType, reason, evidenceRef, assignedTo: selectedAssignee?.userId, assigneeLoginId: selectedAssignee?.loginId })
   }
   return (
     <form data-guide-feature="features.exception.action-panel.form" data-guide-scope="exception-action" className="exception-action-form" onSubmit={submit} aria-label="예외 처리">
@@ -202,6 +204,10 @@ function ActionForm({ item, helpContainer }: { item: ExceptionCase; helpContaine
             {assignee.loginId}
           </option>)}
         </select>
+      </Field>}
+      {actionType && <Field label="처리 사유" required>
+        <textarea data-guide-feature="features.exception.action-panel.reason" className="textarea-control" rows={2}
+          maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} />
       </Field>}
       <Field label="증빙">
         <input data-guide-feature="features.exception.action-panel.input"

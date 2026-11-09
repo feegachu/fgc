@@ -112,6 +112,8 @@ test(`예외 담당자를 ${assignee.loginId}에게 배정하고 본인 배정�
   await expect(save).toBeDisabled()
   if (assignee.id === 7) await page.getByLabel('조치').selectOption('START_REVIEW')
   else await page.getByLabel('배정 담당자').selectOption(String(assignee.id))
+  const reason = assignee.id === 7 ? '지급 원천 검토를 시작합니다.' : '계약 담당자에게 검토를 요청합니다.'
+  await page.getByLabel('처리 사유').fill(reason)
   await save.click()
   await expect(page.getByText(assignee.id === 7 ? '1. 검토 시작' : '1. 담당 배정')).toBeVisible()
   await expect(page.getByRole('table', { name: '예외 목록' }).getByText(assignee.loginId)).toBeVisible()
@@ -123,7 +125,7 @@ test(`예외 담당자를 ${assignee.loginId}에게 배정하고 본인 배정�
     await expect(dialog.getByRole('tooltip')).toContainText('settle02 담당자가 검토중')
   }
   expect(posts).toHaveLength(1)
-  expect(posts[0].reason).toBe(assignee.id === 7 ? '검토 시작 처리' : '담당 배정 처리')
+  expect(posts[0].reason).toBe(reason)
   await dialog.screenshot({ path: testInfo.outputPath('exception-detail.png') })
   if (assignee.id === 7) {
     await page.route('**/api/v1/contracts/3', route => route.fulfill({ json: envelope({

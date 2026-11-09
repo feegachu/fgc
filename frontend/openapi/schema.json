@@ -6027,7 +6027,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "actionType" ],
+        "required" : [ "actionType", "reason" ],
         "type" : "object"
       },
       "ExceptionActionResponse" : {

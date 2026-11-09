@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 설명 : IF-API-36·36A 원장 역분개 및 정정 예외 생성 API
+ * 설명 : IF-API-36·36A·36B·36C 원장 역분개, 재기표, 번호 미리보기 및 기존 정정 예외 API
  *
  * @author yslee
  * @since 2026-08-20

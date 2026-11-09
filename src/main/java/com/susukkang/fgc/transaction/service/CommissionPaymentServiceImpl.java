@@ -976,7 +976,6 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 agentId,
                 settlementMonth,
                 request.attributionDate(),
-                dueDate,
                 paymentStage,
                 request.attributionMethod()
         );
@@ -1126,7 +1125,6 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long agentId,
             LocalDate settlementMonth,
             LocalDate attributionDate,
-            LocalDate dueDate,
             PaymentStage paymentStage,
             AttributionMethod attributionMethod
     ) {
@@ -1163,13 +1161,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             requireContract(sourceContractId, "contractId");
         }
 
-        // 이연분도 원래 모집월의 신계약·배부 근거를 유지한다. 실제 귀속일을 13차월 이후
-        // 지급예정일로 옮긴 경우에만 모집월 밖의 귀속을 허용한다.
-        boolean deferredSettlementSupport = dueDate != null && dueDate.equals(attributionDate)
-                && !dueDate.isBefore(target.contractDate().plusMonths(12));
+        // REG-20: 지급일을 이연해도 정착지원금 귀속은 원래 모집월에 남는다.
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 && (!YearMonth.from(target.contractDate()).equals(YearMonth.from(settlementMonth))
-                || (!YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)) && !deferredSettlementSupport))) {
+                || !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)))) {
             invalid("attributionDate", "정착지원금은 모집월(정산월)의 신계약에 실제 귀속해야 합니다.");
         }
 
@@ -1481,6 +1476,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     FgcErrorCode.CAP_002,
                     Map.of()
             ));
+        }
+        if (data.attributionMethod() == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
+                && data.contractDate() != null && data.attributionDate() != null
+                && !YearMonth.from(data.contractDate()).equals(YearMonth.from(data.attributionDate()))) {
+            failures.add(new GateFailure(data, ExceptionType.CAP_REVIEW_REQUIRED, "HIGH",
+                    "정착지원금 귀속 검토 필요", "정착지원금의 귀속일을 실제 모집월로 되돌린 뒤 산입 여부를 확인하세요.",
+                    FgcErrorCode.CAP_002, Map.of()));
         }
         if (!nonContractNewcomer
                 && data.contractDate() != null

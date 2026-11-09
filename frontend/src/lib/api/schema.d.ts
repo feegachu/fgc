@@ -4516,7 +4516,7 @@ export interface components {
             /** Format: int64 */
             assignedTo?: number;
             evidenceRef?: string;
-            reason?: string;
+            reason: string;
         };
         ExceptionActionResponse: {
             /** Format: date-time */

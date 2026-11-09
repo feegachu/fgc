@@ -373,16 +373,15 @@ class ExceptionCaseActionServiceIntegrationTest {
     }
 
     @Test
-    void 처리사유_입력없이_검토를_시작하면_내역을_자동기록한다() {
+    void 처리사유_입력없이_검토를_시작할_수_없다() {
         Long id = insertNewCase();
         Long actor = firstUserId();
-        var result = exceptionCaseService.userAction(
+        assertThatThrownBy(() -> exceptionCaseService.userAction(
                 id,
                 new ExceptionActionRequest(ExceptionActionType.START_REVIEW, " ", "DOC-001"),
-                actor, loginIdOf(actor));
-        assertThat(result.reason()).isEqualTo("검토 시작 처리");
-        assertThat(result.toStatus()).isEqualTo(ExceptionStatus.IN_REVIEW);
-        assertThat(jdbcTemplate.queryForObject("SELECT assigned_to FROM fgc.exception_case WHERE exception_case_id = ?", Long.class, id)).isEqualTo(actor);
+                actor, loginIdOf(actor))).isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.EXCP_001));
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id = ?", String.class, id)).isEqualTo("NEW");
     }
 
     /**

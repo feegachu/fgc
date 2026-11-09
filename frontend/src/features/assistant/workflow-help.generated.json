@@ -8059,6 +8059,20 @@
         "next": []
       },
       {
+        "stepId": "help.40613ceec5182539cbd9a5393cf8254a",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.action-panel.reason",
+        "title": "예외, 처리 사유",
+        "instruction": "‘처리 사유’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.425772faedcb0d32d0e81fc0b871d586",
         "screenId": "EXCP-W01",
         "targetId": "features.exception.exception-page.button",
@@ -12653,6 +12667,20 @@
         "targetId": "features.ledger.ledger-page.button",
         "title": "예외, 역분개",
         "instruction": "‘역분개’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.40613ceec5182539cbd9a5393cf8254a",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.action-panel.reason",
+        "title": "예외, 처리 사유",
+        "instruction": "‘처리 사유’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",

@@ -9,6 +9,15 @@ import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
 import com.susukkang.fgc.clawback.service.ClawbackCandidateQueryService;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.code.ExceptionActionType;
+import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionRecoveryRecheckRequest;
+import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
+import com.susukkang.fgc.exceptioncase.service.ExceptionPaymentCorrectionService;
+import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
+import com.susukkang.fgc.reconciliation.service.ReconciliationExceptionService;
+import com.susukkang.fgc.reconciliation.service.ReconciliationExecutionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -45,12 +55,71 @@ class ClawbackCalculationIntegrationTest {
     @Autowired private ClawbackCandidateCaptureService capture;
     @Autowired private ClawbackCandidateQueryService query;
     @Autowired private ClawbackCalculationService calculation;
+    @Autowired private ExceptionCaseService exceptions;
+    @Autowired private ExceptionPaymentCorrectionService corrections;
+    @Autowired private ReconciliationExceptionService detection;
+    @Autowired private ReconciliationExecutionService reconciliation;
     private long contractId;
     private long agentId;
     private long settlementUser;
     private long baseItem;
     private long incentiveItem;
     private long maintenanceItem;
+
+    @Test
+    void reconcilesConfirmedRecoveryByRecipientAndDetectsACancelledDeductionAgain() {
+        long policy = policy(new Object[]{baseItem, 0, 11, "100"}, new Object[]{incentiveItem, 0, 11, "50"});
+        long otherAgent = jdbc.queryForObject("SELECT min(agent_id) FROM fgc.agent WHERE agent_id<>?", Long.class, agentId);
+        long first = payment(baseItem, "24000", "CONFIRMED");
+        long second = payment(incentiveItem, "18000", "CONFIRMED", otherAgent, "PAYMENT", key(), null);
+        long candidate = lapsedCandidate("2026-03-20T00:00:00+09:00");
+        jdbc.update("UPDATE fgc.insurance_contract SET current_status='LAPSED' WHERE contract_id=?", contractId);
+        var calculationResult = calculation.calculate(candidate, request(query.detail(candidate).candidate().sourceVersion(), policy),
+                key(), settlementUser);
+        long run = runReconciliation();
+        long firstCase = reviewRecovery(run, first);
+        long secondCase = reviewRecovery(run, second);
+        long fullDeduction = deduction(first, candidate, agentId, "24000", calculationResult.calculationVersion());
+        long halfDeduction = deduction(second, candidate, otherAgent, "9000", calculationResult.calculationVersion());
+        var firstRequest = new ExceptionRecoveryRecheckRequest(candidate, first, fullDeduction);
+        var firstResult = corrections.reconcileRecovery(firstCase, firstRequest, settlementUser, "settlement");
+        assertThat(firstResult.resolved()).isTrue();
+        assertThat(corrections.reconcileRecovery(firstCase, firstRequest, settlementUser, "settlement")).isEqualTo(firstResult);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id=? AND action_type='RECONCILE_AGAIN'",
+                Long.class, firstCase)).isEqualTo(1);
+        assertThat(caseStatus(secondCase)).isEqualTo("IN_REVIEW");
+        assertThat(latestResult(first)).containsEntry("result_type", "MATCHED").containsEntry("primary_reason_code", "RECOVERY_CONFIRMED");
+        assertThat((BigDecimal) latestResult(second).get("actual_total_amount")).isEqualByComparingTo("18000");
+        assertThatThrownBy(() -> corrections.reconcileRecovery(secondCase, new ExceptionRecoveryRecheckRequest(candidate, second, fullDeduction),
+                settlementUser, "settlement")).isInstanceOf(FgcBusinessException.class);
+
+        var secondResult = corrections.reconcileRecovery(secondCase, new ExceptionRecoveryRecheckRequest(candidate, second, halfDeduction),
+                settlementUser, "settlement");
+        assertThat(secondResult.resolved()).isTrue();
+        assertThat(latestResult(second)).containsEntry("result_type", "INVALID_CONTRACT_PAYMENT");
+        assertThat((BigDecimal) latestResult(second).get("actual_total_amount")).isEqualByComparingTo("9000");
+        assertThat(jdbc.queryForObject("SELECT amount FROM fgc.commission_transaction WHERE commission_transaction_id=?",
+                BigDecimal.class, second)).isEqualByComparingTo("18000");
+
+        long revisedPolicy = policy(new Object[]{baseItem, 0, 11, "100"}, new Object[]{incentiveItem, 0, 11, "50"});
+        var revised = calculation.calculate(candidate, request(query.detail(candidate).candidate().sourceVersion(), revisedPolicy),
+                key(), settlementUser);
+        assertThat(revised.calculationVersion()).isEqualTo(calculationResult.calculationVersion() + 1);
+        assertThat(corrections.reconcileRecovery(firstCase, firstRequest, settlementUser, "settlement")).isEqualTo(firstResult);
+        assertThat(jdbc.queryForObject("""
+                SELECT c.version_no FROM fgc.exception_payment_recovery r JOIN fgc.clawback_calculation c USING (clawback_calculation_id)
+                WHERE r.original_payment_id=?
+                """, Integer.class, first)).isEqualTo(calculationResult.calculationVersion());
+
+        jdbc.update("UPDATE fgc.commission_transaction SET status='CANCELLED' WHERE commission_transaction_id=?", fullDeduction);
+        long newRun = runReconciliation();
+        assertThat(caseStatus(firstCase)).isEqualTo("NEW");
+        assertThat(caseStatus(secondCase)).isEqualTo("RESOLVED");
+        assertThat(latestResult(first)).containsEntry("result_type", "INVALID_CONTRACT_PAYMENT");
+        assertThat((BigDecimal) latestResult(first).get("actual_total_amount")).isEqualByComparingTo("24000");
+        assertThat(jdbc.queryForObject("SELECT fgc.reconciliation_recovery_complete(?)", Boolean.class, resultFor(newRun, first))).isFalse();
+        assertThat(jdbc.queryForObject("SELECT fgc.reconciliation_recovery_complete(?)", Boolean.class, resultFor(newRun, second))).isTrue();
+    }
 
     @BeforeEach
     void independentContract() {
@@ -385,19 +454,78 @@ class ClawbackCalculationIntegrationTest {
     }
 
     private long payment(long item, String amount, String status) {
+        return payment(item, amount, status, agentId, "PAYMENT", key(), null);
+    }
+
+    private long payment(long item, String amount, String status, long recipient, String cashflow, String businessKey, String evidence) {
         long tx = jdbc.queryForObject("""
                 INSERT INTO fgc.commission_transaction(payment_stage,source_type,source_business_key,insurer_id,
-                    recipient_agent_id,commission_item_id,settlement_month,paid_on,amount,cashflow_type,installment_no)
-                SELECT 'GA_TO_FC','GA_MANUAL_PAYMENT',?,insurer_id,?,?,DATE '2026-03-01',DATE '2026-03-01',?,'PAYMENT',1
+                    recipient_agent_id,commission_item_id,settlement_month,paid_on,amount,cashflow_type,installment_no,source_contract_id,evidence_ref)
+                SELECT 'GA_TO_FC','GA_MANUAL_PAYMENT',?,insurer_id,?,?,DATE '2026-03-01',DATE '2026-03-01',?,?,1,contract_id,?
                   FROM fgc.insurance_contract WHERE contract_id=? RETURNING commission_transaction_id
-                """, Long.class, UUID.randomUUID().toString(), agentId, item, new BigDecimal(amount), contractId);
+                """, Long.class, businessKey, recipient, item, new BigDecimal(amount), cashflow, evidence, contractId);
         jdbc.update("""
                 INSERT INTO fgc.transaction_attribution(commission_transaction_id,contract_id,agent_id,
                     attribution_date,attribution_month,attributed_amount,inclusion_status_snapshot,attribution_method)
                 VALUES (?,?,?,DATE '2026-03-01',DATE '2026-03-01',?,'INCLUDED','DIRECT')
-                """, tx, contractId, agentId, new BigDecimal(amount));
+                """, tx, contractId, recipient, new BigDecimal(amount));
         if (!status.equals("DRAFT")) jdbc.update("UPDATE fgc.commission_transaction SET status=? WHERE commission_transaction_id=?", status, tx);
         return tx;
+    }
+
+    private long deduction(long original, long candidate, long recipient, String amount, int version) {
+        return payment(item("CLAWBACK"), amount, "CONFIRMED", recipient, "DEDUCTION", "CLAWBACK-RECOVERY:" + original + ":" + candidate,
+                "환수 계산 v" + version + " · 원지급 " + original);
+    }
+
+    private long runReconciliation() {
+        var month = LocalDate.of(2026, 3, 1);
+        long insurer = jdbc.queryForObject("SELECT insurer_id FROM fgc.insurance_contract WHERE contract_id=?", Long.class, contractId);
+        long validation = jdbc.queryForObject("""
+                INSERT INTO fgc.validation_run(validation_month,run_no,status)
+                SELECT ?,COALESCE(max(run_no),0)+1,'CREATED' FROM fgc.validation_run WHERE validation_month=?
+                RETURNING validation_run_id
+                """, Long.class, month, month);
+        long run = jdbc.queryForObject("""
+                INSERT INTO fgc.reconciliation_run(settlement_month,payment_stage,insurer_id,validation_run_id)
+                VALUES (?,'GA_TO_FC',?,?) RETURNING reconciliation_run_id
+                """, Long.class, month, insurer, validation);
+        jdbc.update("UPDATE fgc.reconciliation_run SET status='RUNNING',started_at=clock_timestamp() WHERE reconciliation_run_id=?", run);
+        reconciliation.executeInTransaction(new ReconciliationExecutionRequest(run, validation, month, PaymentStage.GA_TO_FC, insurer, settlementUser));
+        detection.bulkCreate(run);
+        jdbc.update("UPDATE fgc.validation_run SET status='RUNNING' WHERE validation_run_id=?", validation);
+        jdbc.update("UPDATE fgc.validation_run SET status='COMPLETED',current_step=8 WHERE validation_run_id=?", validation);
+        return run;
+    }
+
+    private long reviewRecovery(long run, long original) {
+        long result = resultFor(run, original);
+        long id = jdbc.queryForObject("""
+                SELECT exception_case_id FROM fgc.exception_case
+                WHERE source_entity_type='RECONCILIATION_RESULT' AND source_entity_id=? AND exception_type='RECONCILIATION_MISMATCH'
+                """, Long.class, Long.toString(result));
+        exceptions.userAction(id, new ExceptionActionRequest(ExceptionActionType.START_REVIEW, "환수 차감 확인", null),
+                settlementUser, "settlement");
+        return id;
+    }
+
+    private long resultFor(long run, long original) {
+        return jdbc.queryForObject("""
+                SELECT r.reconciliation_result_id FROM fgc.reconciliation_result r JOIN fgc.reconciliation_match m USING (reconciliation_result_id)
+                WHERE r.reconciliation_run_id=? AND m.transaction_attribution_id=?
+                """, Long.class, run, attribution(original));
+    }
+
+    private Map<String, Object> latestResult(long original) {
+        return jdbc.queryForMap("""
+                SELECT r.result_type, r.actual_total_amount, r.primary_reason_code
+                FROM fgc.reconciliation_result r JOIN fgc.reconciliation_match m USING (reconciliation_result_id)
+                WHERE m.transaction_attribution_id=? ORDER BY r.reconciliation_result_id DESC LIMIT 1
+                """, attribution(original));
+    }
+
+    private String caseStatus(long id) {
+        return jdbc.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, id);
     }
 
     private long attribution(long transaction) {

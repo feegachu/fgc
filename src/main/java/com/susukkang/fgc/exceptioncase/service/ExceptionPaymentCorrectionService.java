@@ -168,11 +168,16 @@ public class ExceptionPaymentCorrectionService {
         if ("DEFER".equals(request.plannedAction())) {
             var a = body.attributions().getFirst();
             var date = request.deferredPaymentDate();
+            boolean settlementSupport = a.attributionMethod() == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY;
             deferred = payments.create(new CommissionPaymentCreateRequest("GA_MANUAL_PAYMENT", "EXCP:" + id + ":DEFER:" + old.paymentId(),
                     body.contractId(), body.agentId(), body.commissionItemId(), request.deferredAmount(),
-                    a.attributionMethod() == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY ? body.settlementMonth() : date.withDayOfMonth(1), body.cashflowType(),
-                    date, body.paymentStage(), null, List.of(new CommissionPaymentAttributionRequest(a.contractId(), date, request.deferredAmount(),
-                    a.inclusionDecisionStatus(), a.exclusionType(), a.inclusionDecisionReason(), a.allocationBasis(), a.evidenceRef(), a.attributionMethod())),
+                    settlementSupport ? body.settlementMonth() : date.withDayOfMonth(1), body.cashflowType(),
+                    date, body.paymentStage(), null, List.of(new CommissionPaymentAttributionRequest(a.contractId(),
+                    settlementSupport ? a.attributionDate() : date, request.deferredAmount(),
+                    settlementSupport ? InclusionDecisionStatus.REVIEW_REQUIRED : a.inclusionDecisionStatus(),
+                    settlementSupport ? ExclusionType.NONE : a.exclusionType(),
+                    settlementSupport ? "정착지원금 지급일 이연 · 모집월 귀속과 한도 산입 재검토" : a.inclusionDecisionReason(),
+                    a.allocationBasis(), a.evidenceRef(), a.attributionMethod())),
                     body.evidenceRef(), "예외 " + id + "의 초과분 이연 · 원 지급 " + old.paymentId()));
             reason += " · 초과분 " + request.deferredAmount() + "원 → " + date + " 지급 초안 " + deferred.paymentId();
             audit.record(AuditLogService.AuditEvent.builder().actionCode("EXCEPTION_PAYMENT_DEFERRED").entityType("EXCEPTION_CASE")
@@ -192,9 +197,11 @@ public class ExceptionPaymentCorrectionService {
         boolean resolved = cases.findByIdForUpdate(id).status() == ExceptionStatus.RESOLVED;
         if (resolved && "CAP_VIOLATION".equals(source.type())) {
             var warnings = repository.newWarningsForCorrectedViolation(id, corrected.paymentId(), corrected.capCheckIds());
-            for (Long warningId : warnings) {
-                capExceptions.resolve(new CapExceptionResolveCommand(warningId, ExceptionActionType.CORRECT,
-                        "위반 예외 " + id + "번 정정 후 한도 주의 판정 확인", "EXCP-" + id, actor));
+            for (var warning : warnings) {
+                capExceptions.resolve(new CapExceptionResolveCommand(warning.exceptionId(), ExceptionActionType.CORRECT,
+                        "위반 예외 " + id + "번 정정 후 한도 주의 · 잔여 "
+                                + warning.remainingAmount().stripTrailingZeros().toPlainString() + "원 · 추가 지급 전 사전검증",
+                        "EXCP-" + id, actor));
             }
         }
         var history = queries.findActionsByCaseIds(List.of(id));
@@ -255,8 +262,15 @@ public class ExceptionPaymentCorrectionService {
         for (Long paymentId : List.of(request.originalPaymentId(), request.deductionPaymentId()).stream().sorted().toList()) {
             if (!paymentWrites.lockPayment(paymentId)) throw invalid("deductionPaymentId");
         }
-        requireTarget(cases.findByIdForUpdate(id), actor);
+        var target = cases.findByIdForUpdate(id);
         if (!source.equals(repository.source(id))) throw invalid("exceptionCaseId");
+        if (target != null && actor.equals(target.assignedTo())
+                && (target.status() == ExceptionStatus.IN_REVIEW || target.status() == ExceptionStatus.RESOLVED)
+                && repository.hasConfirmedRecovery(source, request.originalPaymentId(), request.deductionPaymentId(), request.candidateId())) {
+            var previous = recoveryAction(id, request.originalPaymentId());
+            if (previous.isPresent()) return recoveryResponse(previous.get());
+        }
+        requireTarget(target, actor);
         var original = payments.get(request.originalPaymentId());
         var deduction = payments.get(request.deductionPaymentId());
         var detail = clawbacks.detail(request.candidateId());
@@ -292,8 +306,21 @@ public class ExceptionPaymentCorrectionService {
         reconciliation.refresh(runs, "EXCP-RECOVERY-" + id, actor, reason);
         boolean resolved = repository.recoveryComplete(source) && repository.remainingIssues(source).isEmpty();
         var actionRequest = new ExceptionActionRequest(ExceptionActionType.RECONCILE_AGAIN, reason, evidence);
-        var action = resolved ? exceptions.action(id, actionRequest, actor, login)
+        var recorded = resolved ? exceptions.action(id, actionRequest, actor, login)
                 : exceptions.recordPendingPaymentCorrection(id, actionRequest, actor, login);
+        return recoveryResponse(recoveryAction(id, original.paymentId()).orElse(recorded));
+    }
+
+    private Optional<ExceptionActionResponse> recoveryAction(Long id, Long originalPaymentId) {
+        String reasonPrefix = "원지급 " + originalPaymentId + "번의 환수 차감 ";
+        return queries.findActionsByCaseIds(List.of(id)).stream()
+                .filter(row -> ExceptionActionType.RECONCILE_AGAIN.name().equals(row.actionType())
+                        && row.reason() != null && row.reason().startsWith(reasonPrefix))
+                .max(Comparator.comparingInt(ExceptionActionRow::actionSeq)).map(ExceptionActionResponse::from);
+    }
+
+    private ExceptionSourceRecheckResponse recoveryResponse(ExceptionActionResponse action) {
+        boolean resolved = action.toStatus() == ExceptionStatus.RESOLVED;
         return new ExceptionSourceRecheckResponse(null, resolved, resolved ? "환수 차감 확정을 확인해 재대사하고 예외를 해결했습니다."
                 : "환수 차감을 반영했습니다. 같은 예외에 남은 지급 건을 확인하세요.", action);
     }

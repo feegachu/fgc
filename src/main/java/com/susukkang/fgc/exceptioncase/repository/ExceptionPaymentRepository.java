@@ -89,10 +89,12 @@ public class ExceptionPaymentRepository {
         return new Source(id, (String) r[0], number(r[1]), (String) r[2], (String) r[3], number(r[4]));
     }
 
-    public List<Long> newWarningsForCorrectedViolation(Long exceptionId, Long paymentId, List<Long> capCheckIds) {
+    public record CorrectedViolationWarning(Long exceptionId, BigDecimal remainingAmount) {}
+
+    public List<CorrectedViolationWarning> newWarningsForCorrectedViolation(Long exceptionId, Long paymentId, List<Long> capCheckIds) {
         if (capCheckIds.isEmpty()) return List.of();
         return em.createNativeQuery("""
-                SELECT warning.exception_case_id
+                SELECT warning.exception_case_id, recheck.remaining_amount
                 FROM fgc.exception_case violation
                 JOIN fgc.cap_check original ON original.cap_check_id = violation.cap_check_id
                     OR (violation.cap_check_id IS NULL AND violation.source_entity_type = 'CAP_CHECK'
@@ -106,7 +108,7 @@ public class ExceptionPaymentRepository {
                   AND warning.exception_type = 'CAP_WARNING' AND warning.status = 'NEW'
                   AND warning.source_entity_type = 'COMMISSION_TRANSACTION' AND warning.source_entity_id = :paymentId
                 ORDER BY warning.exception_case_id
-                """, Long.class)
+                """, CorrectedViolationWarning.class)
                 .setParameter("exceptionId", exceptionId).setParameter("paymentId", paymentId.toString())
                 .setParameter("capCheckIds", capCheckIds).getResultList();
     }
@@ -285,6 +287,21 @@ public class ExceptionPaymentRepository {
                     AND c.candidate_id=:candidate AND c.version_no=:version)
                 """).setParameter("original", originalPayment).setParameter("contract", source.contractId()).setParameter("deduction", deductionPayment)
                 .setParameter("candidate", candidate).setParameter("version", version).getSingleResult());
+    }
+
+    public boolean hasConfirmedRecovery(Source source, Long originalPayment, Long deductionPayment, Long candidate) {
+        return Boolean.TRUE.equals(em.createNativeQuery("""
+                SELECT EXISTS (
+                    SELECT 1 FROM fgc.exception_payment_recovery recovery
+                    JOIN fgc.clawback_calculation calculation USING (clawback_calculation_id)
+                    JOIN fgc.commission_transaction deduction
+                        ON deduction.commission_transaction_id = recovery.deduction_payment_id
+                    WHERE recovery.exception_case_id = :exceptionId AND recovery.original_payment_id = :original
+                      AND recovery.deduction_payment_id = :deduction AND deduction.status = 'CONFIRMED'
+                      AND calculation.candidate_id = :candidate
+                )
+                """).setParameter("exceptionId", source.id()).setParameter("original", originalPayment)
+                .setParameter("deduction", deductionPayment).setParameter("candidate", candidate).getSingleResult());
     }
 
     public boolean recoveryComplete(Source source) {

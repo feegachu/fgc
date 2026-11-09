@@ -479,6 +479,7 @@
     "features.exception.action-panel.button": "CAN_HANDLE_EXCEPTION",
     "features.exception.action-panel.form": "CAN_HANDLE_EXCEPTION",
     "features.exception.action-panel.input": "CAN_HANDLE_EXCEPTION",
+    "features.exception.action-panel.reason": "CAN_HANDLE_EXCEPTION",
     "features.exception.action-panel.journal-history": "CAN_HANDLE_EXCEPTION",
     "features.exception.action-panel.link": "CAN_HANDLE_EXCEPTION",
     "features.exception.action-panel.link-2": "CAN_HANDLE_EXCEPTION",

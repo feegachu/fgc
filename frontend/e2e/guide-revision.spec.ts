@@ -161,6 +161,7 @@ test('예외 상세 모달에서 처리하고 닫으면 목록 조건을 유지�
   await expect(dialog.getByText('검출 이력', { exact: true })).toBeVisible()
   await expect(dialog.getByText('처리 이력', { exact: true })).toBeVisible()
   await dialog.getByLabel('조치', { exact: false }).selectOption('START_REVIEW')
+  await dialog.getByLabel('처리 사유').fill('원천 자료를 검토합니다.')
   await dialog.getByLabel('증빙', { exact: true }).fill('E2E-검토-근거')
   await dialog.getByRole('button', { name: '닫기', exact: true }).click()
   const confirm = page.getByRole('dialog', { name: '작성 중인 내용을 닫을까요?' })

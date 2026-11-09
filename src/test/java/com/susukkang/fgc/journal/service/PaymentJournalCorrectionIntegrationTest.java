@@ -254,7 +254,11 @@ class PaymentJournalCorrectionIntegrationTest {
         assertThat(result.deferredPayment().scheduledPaymentDate()).isEqualTo(TEST_MONTH.plusMonths(12));
         if (settlementSupport) {
             assertThat(result.deferredPayment().settlementMonth()).isEqualTo(TEST_MONTH);
-            assertThat(result.deferredPayment().attributions().getFirst().attributionMethod()).isEqualTo(AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY);
+            var deferredAttribution = result.deferredPayment().attributions().getFirst();
+            assertThat(deferredAttribution.attributionMethod()).isEqualTo(AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY);
+            assertThat(deferredAttribution.attributionDate()).isEqualTo(TEST_MONTH);
+            assertThat(deferredAttribution.inclusionDecisionStatus()).isEqualTo(InclusionDecisionStatus.REVIEW_REQUIRED);
+            assertThat(payments.precheck(result.deferredPayment().paymentId()).confirmable()).isFalse();
         }
     }
 
@@ -285,7 +289,7 @@ class PaymentJournalCorrectionIntegrationTest {
 
     private void startException(Long id) {
         exceptionActions.userAction(id, new com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest(
-                ExceptionActionType.START_REVIEW, null, null), 1L, "admin");
+                ExceptionActionType.START_REVIEW, "지급 원천과 검출 근거 검토", null), 1L, "admin");
     }
 
     @org.junit.jupiter.params.ParameterizedTest
