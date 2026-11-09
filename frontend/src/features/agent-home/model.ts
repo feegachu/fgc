@@ -3,16 +3,33 @@ import type { AgentHome, HomeParams } from './api'
 export type Period = 6 | 12 | 'all'
 export type InsurerKind = 'all' | 'LIFE' | 'NON_LIFE'
 
-// 그래프 색은 개편 전(#739)의 채도 낮은 팔레트다(#839). 다섯째는 분류 밖(기타)용 회색이다.
-export const CATEGORY_COLORS = ['#9a82b5', '#a493b8', '#86a89c', '#c9ae8f', '#94a3b8']
-export const INSURER_COLORS = ['#7f9fba', '#84ada3', '#caae7e', '#c492a0', '#a0b388', '#c99d88', '#8bb0bc', '#bbb589']
+const CATEGORY_COLORS = new Map([
+  ['HEALTH_PROTECTION', '#884ea3'],
+  ['TERM_PROTECTION', '#d9abe4'],
+  ['LONG_TERM_NONLIFE', '#b478d1'],
+  ['SAVINGS', '#ca8ee8'],
+])
+
+// 시연 보험사의 색은 데이터베이스 ID와 조회 순서에 관계없이 이름으로 고정한다.
+const INSURER_COLORS = new Map([
+  ['미래가상생명', '#e77ecc'],
+  ['한빛가상생명', '#c8718f'],
+  ['새봄가상생명', '#ace88e'],
+  ['온누리가상생명', '#8ebff8'],
+  ['안전가상손해보험', '#62a7f5'],
+  ['믿음가상손해보험', '#8dc76f'],
+  ['다온가상손해보험', '#f7adc4'],
+  ['푸른가상생명', '#488cd8'],
+  ['하늘가상생명', '#6ea750'],
+])
+const INSURER_PALETTE = [...INSURER_COLORS.values()]
 
 /** 계약 상태 4종의 순서와 색. 청약, 부활 등은 가까운 상태로 묶는다. */
 export const STATUS_DEFS = [
-  { key: 'ACTIVE', label: '정상', color: '#78a98a' },
-  { key: 'UNPAID', label: '미납', color: '#d1ad74' },
-  { key: 'LAPSED', label: '실효', color: '#c98a8a' },
-  { key: 'END', label: '해지/종료', color: '#b8c0cc' },
+  { key: 'ACTIVE', label: '정상', color: '#83de8c' },
+  { key: 'UNPAID', label: '미납', color: '#e7c857' },
+  { key: 'LAPSED', label: '실효', color: '#ec7bb3' },
+  { key: 'END', label: '해지/종료', color: '#a4b4d2' },
 ] as const
 /** 서버 상태 코드를 목업의 4종으로 묶는다. 상태 이력이 없어 서버가 UNKNOWN 으로 센 계약은 끝(해지·종료)에 섞지 않고 따로 둔다. */
 export const STATUS_GROUP: Record<string, (typeof STATUS_DEFS)[number]['key']> = {
@@ -69,11 +86,16 @@ export interface Slice {
   insurerId: number
 }
 export function insurerSlices(home: AgentHome | undefined): Slice[] {
-  return (home?.portfolio?.insurers ?? []).map((insurer, index) => ({
+  const insurers = home?.portfolio?.insurers ?? []
+  const used = new Set(insurers.map((insurer) => INSURER_COLORS.get(insurer.name ?? '')))
+  const available = INSURER_PALETTE.filter((color) => !used.has(color))
+  const fallback = available.length > 0 ? available : INSURER_PALETTE
+  let index = 0
+  return insurers.map((insurer) => ({
     name: insurer.name ?? '-',
     value: insurer.contractCount ?? 0,
     premium: insurer.monthlyEquivalentFirstPremiumSum ?? 0,
-    color: INSURER_COLORS[index % INSURER_COLORS.length],
+    color: INSURER_COLORS.get(insurer.name ?? '') ?? fallback[index++ % fallback.length],
     insurerId: insurer.insurerId ?? 0,
   }))
 }
@@ -89,11 +111,11 @@ export function trendSeries(home: AgentHome | undefined) {
 export function categoryCounts(home: AgentHome | undefined) {
   const list = home?.portfolio?.categories ?? []
   const total = home?.portfolio?.contractCount || 1
-  return list.map((c, i) => ({
+  return list.map((c) => ({
     name: c.label ?? c.code ?? '-',
     count: c.count ?? 0,
     pct: oneDecimal(((c.count ?? 0) / total) * 100),
-    color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+    color: CATEGORY_COLORS.get(c.code ?? '') ?? '#94a3b8',
   }))
 }
 

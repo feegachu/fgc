@@ -51,6 +51,29 @@
   --color-action-primary-down: #ebdfff;
   --color-action-subtle: color-mix(in srgb, #7500ff 8%, white);
 }
+.app-shell.is-agent .app-main {
+  background: #f7f2ff;
+}
+.app-shell.is-agent :is(.contract-list-page, .ast-page) {
+  background: #f6f2fe;
+}
+.app-shell.is-agent :is(.contract-table, .ast-table, .transaction-list-table) thead th {
+  background: #e9ebf6;
+}
+.app-shell.is-agent .month-selector {
+  --color-action-primary: var(--color-text-link);
+  --color-action-subtle: var(--color-status-info-bg);
+  --color-border-focus: #7f57ac;
+  --shadow-focus: 0 0 0 3px rgb(81 58 149 / 16%);
+}
+.app-shell.is-agent .month-selector-cell.is-selected:not(:disabled) {
+  border-color: var(--color-border-focus);
+  color: var(--color-text-link);
+  background: var(--color-blue-100);
+}
+.app-shell.is-agent .month-selector-scope {
+  border-color: var(--color-blue-100);
+}
 .app-shell.is-agent .app-sidebar {
   color: #21174b;
   background: color-mix(in srgb, color-mix(in srgb, #f4eeff 30%, white) 70%, transparent);
