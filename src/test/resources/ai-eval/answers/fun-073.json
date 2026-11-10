@@ -173,6 +173,15 @@
     { "id": "P-S5", "feature": "FUN-073", "type": "근거 없음", "ref": "근거 없는 ANSWER_ONLY", "role": "SETTLEMENT", "screenId": "TRAN-W02", "question": "초안 저장 방법을 알려줘",
       "saved": { "GuideSelection": { "workflowIds": ["payment.draft"], "outOfScope": false },
                  "ModelAnswer": { "decision": "ANSWER_ONLY", "message": "저장 버튼을 직접 누르세요.", "evidenceChunkIds": [] } },
+      "expect": { "sources": ["FIXED"], "fallbackReasons": ["INVALID_AI_OUTPUT"] } },
+
+    { "id": "P-U1", "feature": "FUN-073", "type": "숫자 용어", "ref": "2026-11-10 실측: 질문 속 승인 용어를 답이 되받음", "role": "SETTLEMENT", "screenId": "EXCP-W01", "question": "1,200% 위반 예외는 어떻게 처리하나요?",
+      "saved": { "GuideSelection": { "workflowIds": ["exception.resolve"], "outOfScope": false },
+                 "ModelAnswer": { "decision": "ANSWER_ONLY", "message": "1,200% 위반 예외는 예외 대상을 검색해 선택한 뒤 검출 이력과 근거를 확인하고 처리 결과를 입력하세요.", "evidenceChunkIds": ["exception.resolve:overview"] } },
+      "expect": { "decisions": ["ANSWER_ONLY"], "sources": ["AI"], "workflows": ["exception."], "aiAnyOf": ["1,200% 위반 예외"] } },
+    { "id": "P-U2", "feature": "FUN-073", "type": "숫자 용어", "ref": "승인 용어를 되받아도 다른 숫자는 거절", "role": "SETTLEMENT", "screenId": "EXCP-W01", "question": "1,200% 위반 예외는 어떻게 처리하나요?",
+      "saved": { "GuideSelection": { "workflowIds": ["exception.resolve"], "outOfScope": false },
+                 "ModelAnswer": { "decision": "ANSWER_ONLY", "message": "1,200% 위반 예외는 사용률 1,350%를 확인한 뒤 처리하세요.", "evidenceChunkIds": ["exception.resolve:overview"] } },
       "expect": { "sources": ["FIXED"], "fallbackReasons": ["INVALID_AI_OUTPUT"] } }
   ]
 }
