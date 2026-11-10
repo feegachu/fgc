@@ -465,18 +465,28 @@ class PicoAskServiceTest {
         assertThat(service.ask(new PicoAskRequest("그건 어디서 처리해요?","EXCP-W01",List.of(),"r1","1.0",earlier)).source()).isEqualTo(Source.AI);
         assertThat(service.ask(new PicoAskRequest("그건 어디서 처리해요?","EXCP-W01",List.of(),"r1","1.0",List.of())).fallbackReason()).isEqualTo("INVALID_AI_OUTPUT");
     }
+    /** #953 리뷰: 앞선 AI 답이 화면 이름으로 쓴 1,200%는 사용자가 쓴 용어가 아니다. 다음 답이 그 숫자로 판단 문장을 만들면 그대로 거절한다. */
+    @Test void termThatOnlyAnEarlierAnswerUsedIsNotTheUsersTerm() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("exception.resolve"), false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("1,200%를 넘으면 확정할 수 없습니다.","exception.resolve:overview"));
+        var earlier = List.of(new PicoAskRequest.Turn(PicoAskRequest.Role.USER,"한도 검증 결과는 어디서 보나요?"),
+                new PicoAskRequest.Turn(PicoAskRequest.Role.ASSISTANT,"'1,200% 한도 검증' 화면에서 확인하세요."));
+        assertThat(service.ask(new PicoAskRequest("거기서 뭘 봐요?","EXCP-W01",List.of(),"r1","1.0",earlier)).fallbackReason()).isEqualTo("INVALID_AI_OUTPUT");
+    }
     /** 2026-11-10 실측(SRC-090): '11월 월 통합검증은 어떻게 확정하나요?'의 답이 화면 요소 이름 '확정 전 8단계 점검'을 옮겨 거절됐다. 평가 결과서 9-1절 '1,200% 위반 지표'와 같은 원인이다. */
     @Test void approvedScreenElementNameWithDigitsMayBeQuotedAsWritten() {
         assertThat(catalog.numericLabels()).contains("확정 전 8단계 점검", "1,200% 위반", "1,200% 주의", "1,200% 사전검증", "1,200% 한도 규칙")
                 .doesNotContain("1,200% 한도 검증", "1,200%");
         when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("exception.resolve"), false));
-        for (var message : List.of("'확정 전 8단계 점검'에서 남은 조건을 확인하세요.", "대시보드에서 1,200% 위반 지표를 확인하세요.", "‘1,200% 사전검증’ 결과를 확인한 뒤 진행하세요.")) {
+        for (var message : List.of("'확정 전 8단계 점검'에서 남은 조건을 확인하세요.", "확정 전 8단계 점검에서 남은 조건을 확인하세요.", "대시보드에서 1,200% 위반 지표를 확인하세요.",
+                "‘1,200% 사전검증’ 결과를 확인한 뒤 진행하세요.", "‘1,200% 주의’와 ‘1,200% 위반’ 위치는 업무 대시보드에서 확인할 수 있습니다.")) {
             when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"exception.resolve:overview"));
             assertThat(service.ask(request("다음에 무엇을 확인하나요")).source()).as(message).isEqualTo(Source.AI);
         }
         // 이름을 그대로 쓴 때만이다. 이름의 일부, 바꾼 숫자, 이름 옆의 다른 숫자는 그대로 거절한다.
+        // 비율이 든 이름은 따옴표로 감쌌거나 뒤에 화면 요소를 가리키는 말이 올 때만 이름이다. 판단 문장 속에서는 숫자 검사를 그대로 받는다(#833, #953 리뷰).
         for (var message : List.of("전체 8단계 안내입니다.", "확정 전 9단계 점검을 확인하세요.", "1,200% 위반은 3건입니다.", "1,200% 위반율은 1,350%입니다.",
-                "11,200% 위반 지표를 확인하세요.", "1,200% 한도입니다.")) {
+                "11,200% 위반 지표를 확인하세요.", "1,200% 한도입니다.", "1,200% 한도 규칙에 따라 초과분은 확정할 수 없습니다.", "1,200% 위반이면 지급을 멈추세요.")) {
             when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"exception.resolve:overview"));
             assertThat(service.ask(request("다음에 무엇을 확인하나요")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
         }

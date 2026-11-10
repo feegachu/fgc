@@ -48,6 +48,8 @@ public class PicoAskService {
     private static final Pattern STEP_COUNT = Pattern.compile("(?<![\\p{N}.,+\\-])([1-9]\\d{0,2})\\s*단계");
     /** An approved title names a screen only when "화면" or "메뉴" follows it, optionally after a closing quote (#833). */
     private static final String SCREEN_WORD = "['‘’\"“”]?(?=\\s*(?:화면|메뉴))";
+    /** Words the guides use after the name of a screen element: "1,200% 위반 지표", "'1,200% 주의' 위치". */
+    private static final String ELEMENT_WORD = "(?=\\s*(?:지표|위치|항목|버튼|카드|탭|영역|링크|칸))";
     /** 줄 앞이나 문장 안의 '1. ', '2) ' 순번. 실제 답은 한 줄에 이어 쓰는 경우가 많다(TER-011 실측). 1부터 이어질 때만 지운다. */
     private static final Pattern LIST_MARKER = Pattern.compile("(?<!\\S)([1-9]\\d?)[.)][\\t ]+");
     /** 화면 소제목의 ①②③은 영역 번호지만 답에 옮기면 숫자 검사에 걸린다(TER-011 P-N5). 검사를 풀지 않고 모델이 받는 근거에서만 뺀다. */
@@ -120,9 +122,16 @@ public class PicoAskService {
         return picked.stream().limit(2).toList();
     }
 
+    /**
+     * A registered element name copied as written. One that carries a rate ("1,200% 위반") is a name only inside quotes or before a word for a
+     * screen element ("1,200% 위반 지표"): in a judgement sentence such as "1,200% 위반이면 지급을 멈추세요" its digits stay a generated number (#833).
+     */
     private static String labelsMasked(String text, List<String> labels) {
-        for (var label : labels)
-            text = Pattern.compile("(?<![\\p{N}.,])" + Pattern.quote(label) + "(?!\\p{N})", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(text).replaceAll(" ");
+        for (var label : labels) {
+            String name = "(?<![\\p{N}.,])" + Pattern.quote(label);
+            String named = label.contains("%") ? "['‘’\"“”]" + name + "['‘’\"“”]|" + name + ELEMENT_WORD : name + "(?!\\p{N})";
+            text = Pattern.compile(named, Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(text).replaceAll(" ");
+        }
         return text;
     }
 
@@ -188,8 +197,9 @@ public class PicoAskService {
         try {
             var history = history(request);
             String question = boundedText(request.question(), 2000);
+            // Only what the user wrote counts: a term in an earlier answer is the model's own (#833).
             var userTerms = catalog.numericTerms().stream().filter(term -> question.contains(term)
-                    || history.stream().anyMatch(turn -> turn.get("text").contains(term))).toList();
+                    || history.stream().anyMatch(turn -> PicoAskRequest.Role.USER.name().equals(turn.get("role")) && turn.get("text").contains(term))).toList();
             var input = new LinkedHashMap<String, Object>();
             input.put("question", question);
             input.put("conversation", history);
