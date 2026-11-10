@@ -306,6 +306,38 @@ class PicoAskServiceTest {
         assertThat(reply.fallbackReason()).isEqualTo("OUT_OF_SCOPE");
         verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
     }
+    /** 2026-11-10 실측(SRC-090): 같은 입력에 선택 모델이 '1,200% 한도 검증 화면은 어디에 있나요?'를 24회 중 7회 범위 밖으로 골랐다. */
+    @Test void questionPointingAtAScreenByItsApprovedTitleIsAnsweredFromThatScreensGuide() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of(), true));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("업무 대시보드에서 한도 검증 목록으로 이동하세요.","cap.review:overview"));
+        var reply = service.ask(new PicoAskRequest("1,200% 한도 검증 화면은 어디에 있나요?","DASH-W01",List.of(),"r1","1.0",List.of()));
+        assertThat(reply.source()).isEqualTo(Source.AI);
+        assertThat(reply.fallbackReason()).isNull();
+        assertThat(reply.evidenceRefs()).extracting(PicoAskResponse.Evidence::workflowId).containsExactly("cap.review");
+        var prompts = ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        verify(gateway).call(prompts.capture(),eq(PicoAskService.ModelAnswer.class));
+        // 가리킨 화면만 다루는 안내와 지금 있는 화면의 안내를 근거로 준다. 여러 화면을 도는 안내는 넣지 않는다.
+        assertThat(prompts.getValue().data()).contains("cap.review:overview", "dashboard.review:overview").doesNotContain("settlement.journey");
+    }
+    @Test void quotedScreenTitleWithMenuIsAlsoAScreenReferenceWhenTheModelFindsTheQuestionAmbiguous() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of(), false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("예외 대상을 검색한 뒤 검출 이력과 근거를 확인하세요.","exception.resolve:overview"));
+        var reply = service.ask(request("‘예외’ 메뉴에서는 무엇을 하나요?"));
+        assertThat(reply.source()).isEqualTo(Source.AI);
+        assertThat(reply.evidenceRefs()).extracting(PicoAskResponse.Evidence::workflowId).containsExactly("exception.resolve");
+    }
+    @Test void emptySelectionStaysFixedUnlessTheQuestionPointsAtAScreenTheRoleCanUse() {
+        // 화면 이름 뒤에 '화면'이나 '메뉴'가 있어야 화면을 가리킨 것이다(#833과 같은 기준). 평가 사례 P-A2 '감사로그 전체 내역을 보여줘'는 그대로 범위 밖이다.
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of(), true));
+        for (var question : List.of("감사로그 전체 내역을 보여줘", "1,200% 한도 검증이 뭐예요?", "한도 검증 화면은 어디에 있나요?", "화면 메뉴 색을 바꿔줘"))
+            assertThat(service.ask(request(question)).fallbackReason()).as(question).isEqualTo("OUT_OF_SCOPE");
+        // 안내가 등록되지 않은 화면은 고를 근거가 없다.
+        assertThat(service.ask(request("포트폴리오 화면은 어디에 있나요?")).fallbackReason()).isEqualTo("OUT_OF_SCOPE");
+        // 그 화면의 안내를 볼 수 없는 역할에는 근거를 주지 않는다.
+        role("AGENT");
+        assertThat(service.ask(request("1,200% 한도 검증 화면은 어디에 있나요?")).source()).isEqualTo(Source.FIXED);
+        verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
+    }
     @Test void ambiguousInScopeQuestionIsAskedBackWithoutSecondModelCall() {
         // FGC-FUN-073: 범위 안이지만 대상이 모호하면 '범위 밖'이 아니라 다시 묻는다.
         when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of(), false));
@@ -391,6 +423,95 @@ class PicoAskServiceTest {
                 "1,200% 한도 검증 화면에서 사용률 1,350%를 확인하세요.", "1,200% 한도입니다.", "1,200% 한도 검증의 2단계를 보세요.")) {
             when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
             assertThat(service.ask(request("한도 결과는 어디서 보나요")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
+        }
+    }
+    /** 2026-11-10 실측(SRC-090): 질문의 '1,200%'를 가리면 선택 단계가 범위 밖으로 답하고, 답은 '% 위반 예외는'으로 시작했다. */
+    @Test void approvedNumericTermInTheQuestionReachesBothModelCallsAsWritten() {
+        assertThat(catalog.numericTerms()).containsExactly("1,200%");
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("exception.resolve"), false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("예외 대상을 검색한 뒤 검출 이력과 근거를 확인하세요.","exception.resolve:overview"));
+        var reply = service.ask(new PicoAskRequest("1200% 위반 예외는 어떻게 처리하나요? 사용률 1,350%는요?","EXCP-W01",List.of(),"r1","1.0",List.of()));
+        assertThat(reply.source()).isEqualTo(Source.AI);
+        var prompts=ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        verify(gateway,times(2)).call(prompts.capture(),any());
+        assertThat(prompts.getAllValues()).allSatisfy(prompt ->
+            assertThat(prompt.data()).contains("1,200% 위반 예외는 어떻게 처리하나요?").doesNotContain("1,350","[수치 제거]%"));
+    }
+    @Test void answerMayRepeatAnApprovedTermThatTheUserWrote() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("exception.resolve"), false));
+        for (var message : List.of("1,200% 위반 예외는 예외 대상을 검색한 뒤 검출 이력과 근거를 확인해 처리하세요.",
+                "'1,200% 위반' 예외를 목록에서 선택하세요.", "1,200% 한도 검증 결과는 계약 상세에서 확인하세요.", "1200% 위반 예외는 목록에서 선택하세요.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"exception.resolve:overview"));
+            var reply = service.ask(new PicoAskRequest("1,200% 위반 예외는 어떻게 처리하나요?","EXCP-W01",List.of(),"r1","1.0",List.of()));
+            assertThat(reply.source()).as(message).isEqualTo(Source.AI);
+            assertThat(reply.message()).isEqualTo(message);
+        }
+    }
+    @Test void repeatingTheUsersTermDoesNotAdmitAnyOtherNumber() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("exception.resolve"), false));
+        for (var message : List.of("1,200% 위반 예외는 사용률 1,350%를 확인하세요.", "1,200% 위반 예외는 3건입니다.", "11,200% 위반 예외를 확인하세요.",
+                "1,200.5% 위반 예외를 확인하세요.", "1,200%5 위반 예외를 확인하세요.", "천이백 퍼센트 위반 예외를 확인하세요.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"exception.resolve:overview"));
+            var reply = service.ask(new PicoAskRequest("1,200% 위반 예외는 어떻게 처리하나요?","EXCP-W01",List.of(),"r1","1.0",List.of()));
+            assertThat(reply.fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
+        }
+    }
+    /** 사용자가 앞 대화에서 쓴 용어도 되받을 수 있다. 대화 어디에도 없으면 모델이 꺼낸 숫자이므로 그대로 거절한다(#833 리뷰 유지). */
+    @Test void termFromAnEarlierTurnMayBeRepeatedButAModelIntroducedTermIsStillRejected() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("exception.resolve"), false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("1,200% 룰 위반 예외는 예외 목록에서 선택한 뒤 근거를 확인하세요.","exception.resolve:overview"));
+        var earlier = List.of(new PicoAskRequest.Turn(PicoAskRequest.Role.USER,"1,200% 위반 예외가 뭐예요?"),
+                new PicoAskRequest.Turn(PicoAskRequest.Role.ASSISTANT,"예외함에서 유형을 확인할 수 있습니다."));
+        assertThat(service.ask(new PicoAskRequest("그건 어디서 처리해요?","EXCP-W01",List.of(),"r1","1.0",earlier)).source()).isEqualTo(Source.AI);
+        assertThat(service.ask(new PicoAskRequest("그건 어디서 처리해요?","EXCP-W01",List.of(),"r1","1.0",List.of())).fallbackReason()).isEqualTo("INVALID_AI_OUTPUT");
+    }
+    /** #953 리뷰: 앞선 AI 답이 화면 이름으로 쓴 1,200%는 사용자가 쓴 용어가 아니다. 다음 답이 그 숫자로 판단 문장을 만들면 그대로 거절한다. */
+    @Test void termThatOnlyAnEarlierAnswerUsedIsNotTheUsersTerm() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("exception.resolve"), false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("1,200%를 넘으면 확정할 수 없습니다.","exception.resolve:overview"));
+        var earlier = List.of(new PicoAskRequest.Turn(PicoAskRequest.Role.USER,"한도 검증 결과는 어디서 보나요?"),
+                new PicoAskRequest.Turn(PicoAskRequest.Role.ASSISTANT,"'1,200% 한도 검증' 화면에서 확인하세요."));
+        assertThat(service.ask(new PicoAskRequest("거기서 뭘 봐요?","EXCP-W01",List.of(),"r1","1.0",earlier)).fallbackReason()).isEqualTo("INVALID_AI_OUTPUT");
+    }
+    /** 2026-11-10 실측(SRC-090): '11월 월 통합검증은 어떻게 확정하나요?'의 답이 화면 요소 이름 '확정 전 8단계 점검'을 옮겨 거절됐다. 평가 결과서 9-1절 '1,200% 위반 지표'와 같은 원인이다. */
+    @Test void approvedScreenElementNameWithDigitsMayBeQuotedAsWritten() {
+        assertThat(catalog.numericLabels()).contains("확정 전 8단계 점검", "1,200% 위반", "1,200% 주의", "1,200% 사전검증", "1,200% 한도 규칙")
+                .doesNotContain("1,200% 한도 검증", "1,200%");
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("exception.resolve"), false));
+        for (var message : List.of("'확정 전 8단계 점검'에서 남은 조건을 확인하세요.", "확정 전 8단계 점검에서 남은 조건을 확인하세요.", "대시보드에서 1,200% 위반 지표를 확인하세요.",
+                "‘1,200% 사전검증’ 결과를 확인한 뒤 진행하세요.", "‘1,200% 주의’와 ‘1,200% 위반’ 위치는 업무 대시보드에서 확인할 수 있습니다.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"exception.resolve:overview"));
+            assertThat(service.ask(request("다음에 무엇을 확인하나요")).source()).as(message).isEqualTo(Source.AI);
+        }
+        // 이름을 그대로 쓴 때만이다. 이름의 일부, 바꾼 숫자, 이름 옆의 다른 숫자는 그대로 거절한다.
+        // 비율이 든 이름은 따옴표로 감쌌거나 뒤에 화면 요소를 가리키는 말이 올 때만 이름이다. 판단 문장 속에서는 숫자 검사를 그대로 받는다(#833, #953 리뷰).
+        for (var message : List.of("전체 8단계 안내입니다.", "확정 전 9단계 점검을 확인하세요.", "1,200% 위반은 3건입니다.", "1,200% 위반율은 1,350%입니다.",
+                "11,200% 위반 지표를 확인하세요.", "1,200% 한도입니다.", "1,200% 한도 규칙에 따라 초과분은 확정할 수 없습니다.", "1,200% 위반이면 지급을 멈추세요.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"exception.resolve:overview"));
+            assertThat(service.ask(request("다음에 무엇을 확인하나요")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
+        }
+    }
+    /** 2026-11-10 실측(SRC-090): '계약은 어떻게 등록하나요?'의 답이 '1단계: ... 6단계: ...'로 순번을 달아 거절됐다. 평가 결과서 9-1절 순번 표기와 같은 원인이다. */
+    @Test void stepOrdinalsRunningFromOneAreStructureNotGeneratedNumbers() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("contract.register"), false));
+        var guide = catalog.definitions().stream().filter(g -> g.workflowId().equals("contract.register")).findFirst().orElseThrow();
+        int steps = catalog.allowedSteps(guide, List.of("SETTLEMENT")).size();
+        assertThat(steps).isGreaterThanOrEqualTo(3);
+        var everyStep = new StringBuilder("보험계약 등록은 다음 단계로 진행됩니다.");
+        for (int step = 1; step <= steps; step++) everyStep.append(' ').append(step).append("단계: 화면의 항목을 확인합니다.");
+        for (var message : List.of(everyStep.toString(), "1단계: 보험회사를 선택합니다. 2단계: 계약일을 입력합니다. 3단계: 상품 버전을 선택합니다.",
+                "전체 " + steps + "단계입니다. 1단계에서는 보험회사를 선택하고 2단계에서는 계약일을 입력하세요.", everyStep + " 이렇게 모두 " + steps + "단계입니다.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"contract.register:overview"));
+            var reply = service.ask(request("계약은 어떻게 등록하나요?"));
+            assertThat(reply.source()).as(message).isEqualTo(Source.AI);
+            assertThat(reply.message()).isEqualTo(message);
+        }
+        // 1부터 빠짐없이 이어질 때만이다. 건너뛴 순번, 1이 아닌 시작, 하나뿐인 순번, 등록 단계 수를 넘는 순번, 되풀이한 순번, 옆의 다른 숫자는 거절한다.
+        for (var message : List.of("1단계: 보험회사를 선택합니다. 3단계: 상품 버전을 선택합니다.", "2단계: 계약일을 입력합니다. 3단계: 상품 버전을 선택합니다.",
+                "1단계: 보험회사를 선택합니다.", everyStep + " " + (steps + 1) + "단계: 한 번 더 확인합니다.",
+                "1단계: 보험회사를 선택합니다. 2단계: 수수료 50000원을 입력합니다.", "1단계: 보험회사를 선택합니다. 2단계: 계약일을 입력합니다. 다시 2단계로 돌아갑니다.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"contract.register:overview"));
+            assertThat(service.ask(request("계약은 어떻게 등록하나요?")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
         }
     }
     @Test void normalProcessAndSupportWordsAreNotFinancialQuantities() {

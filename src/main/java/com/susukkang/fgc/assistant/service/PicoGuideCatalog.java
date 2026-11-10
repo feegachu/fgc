@@ -20,7 +20,11 @@ public class PicoGuideCatalog {
     private static final Set<String> ROLES = Set.of("SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE", "AGENT");
     private final List<Definition> definitions;
     private final Set<String> screenIds;
+    private final Map<String, String> screenTitles;
     private final List<String> numericScreenTitles;
+    private static final java.util.regex.Pattern NUMERIC_TERM = java.util.regex.Pattern.compile("[0-9][0-9,]*%");
+    private final List<String> numericTerms;
+    private final List<String> numericLabels;
     private final Set<String> paymentWorkflowIds;
     private final Map<String, List<Step>> help;
     public record HelpDefinition(String workflowId, List<Step> steps) {}
@@ -29,14 +33,19 @@ public class PicoGuideCatalog {
             List<Map<String,Object>> screens = mapper.readValue(stream,new TypeReference<>(){});
             var ids = new HashSet<String>();
             var numeric = new ArrayList<String>();
+            var titles = new LinkedHashMap<String, String>();
             for (var screen : screens) {
                 ids.add((String) screen.get("id"));
-                if (screen.get("title") instanceof String title && title.codePoints().anyMatch(Character::isDigit))
-                    numeric.add(Normalizer.normalize(title, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT));
+                if (!(screen.get("title") instanceof String title)) continue;
+                String name = Normalizer.normalize(title, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
+                titles.put(name, (String) screen.get("id"));
+                if (title.codePoints().anyMatch(Character::isDigit)) numeric.add(name);
             }
             ids.add("CMN-C04");
             screenIds = Set.copyOf(ids);
+            screenTitles = Collections.unmodifiableMap(titles);
             numericScreenTitles = List.copyOf(numeric);
+            numericTerms = numeric.stream().flatMap(title -> NUMERIC_TERM.matcher(title).results().map(java.util.regex.MatchResult::group)).distinct().toList();
         }
         Set<String> featureIds;
         try(var stream=new ClassPathResource("ai/pico/feature-targets.generated.json").getInputStream()) {
@@ -65,6 +74,17 @@ public class PicoGuideCatalog {
                 map.put(location.workflowId(), List.copyOf(location.steps()));
             }
             help = Map.copyOf(map);
+            // A help title reads "<screen>, <element name>". Only the element name counts, and a screen title keeps its own rule.
+            var labels = new TreeSet<String>(Comparator.comparingInt(String::length).reversed().thenComparing(Comparator.naturalOrder()));
+            for (var steps : map.values()) for (var step : steps) {
+                int cut = step.title() == null ? -1 : step.title().indexOf(", ");
+                if (cut < 0) continue;
+                for (String part : step.title().substring(cut + 2).split(" / ")) {
+                    String label = Normalizer.normalize(part.strip(), Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
+                    if (part.chars().anyMatch(code -> code >= '0' && code <= '9') && !numericScreenTitles.contains(label)) labels.add(label);
+                }
+            }
+            numericLabels = List.copyOf(labels);
         }
         if (loaded.isEmpty() || loaded.stream().map(Definition::workflowId).distinct().count()!=loaded.size()) throw new IllegalStateException("Invalid guide registry");
         for (var guide:definitions) {
@@ -90,8 +110,14 @@ public class PicoGuideCatalog {
     public List<Definition> definitions() { return definitions; }
     public List<Definition> paymentDefinitions() { return definitions.stream().filter(guide -> paymentWorkflowIds.contains(guide.workflowId())).toList(); }
     public boolean supportsScreen(String screenId) { return screenIds.contains(screenId); }
+    /** Approved screen titles, NFKC lower case, with the screen each one names. */
+    public Map<String, String> screenTitles() { return screenTitles; }
     /** Approved screen titles that contain digits, such as "1,200% 한도 검증". Naming the screen is not a generated number. */
     public List<String> numericScreenTitles() { return numericScreenTitles; }
+    /** The number inside those titles, such as "1,200%". It is business vocabulary: a question keeps it and an answer may repeat it back. */
+    public List<String> numericTerms() { return numericTerms; }
+    /** Registered screen element names that contain digits, such as "확정 전 8단계 점검", longest first. Quoting one as written is not a generated number. */
+    public List<String> numericLabels() { return numericLabels; }
     /** Corpus-derived n-grams rank source labels; no fixed vocabulary or question dispatch. */
     private static Set<String> grams(String text) {
         String normalized = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFKC).toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]", "");
