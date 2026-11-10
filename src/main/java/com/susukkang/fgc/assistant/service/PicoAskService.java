@@ -46,6 +46,8 @@ public class PicoAskService {
     /** Numeral words are short, so the regex only sees this many trailing letters and long runs stay linear. */
     private static final int NUMERAL_TAIL = 32;
     private static final Pattern STEP_COUNT = Pattern.compile("(?<![\\p{N}.,+\\-])([1-9]\\d{0,2})\\s*단계");
+    /** An approved title names a screen only when "화면" or "메뉴" follows it, optionally after a closing quote (#833). */
+    private static final String SCREEN_WORD = "['‘’\"“”]?(?=\\s*(?:화면|메뉴))";
     /** 줄 앞이나 문장 안의 '1. ', '2) ' 순번. 실제 답은 한 줄에 이어 쓰는 경우가 많다(TER-011 실측). 1부터 이어질 때만 지운다. */
     private static final Pattern LIST_MARKER = Pattern.compile("(?<!\\S)([1-9]\\d?)[.)][\\t ]+");
     /** 화면 소제목의 ①②③은 영역 번호지만 답에 옮기면 숫자 검사에 걸린다(TER-011 P-N5). 검사를 풀지 않고 모델이 받는 근거에서만 뺀다. */
@@ -53,17 +55,22 @@ public class PicoAskService {
 
     private enum OutputRejection { INVALID_FIELDS, GENERATED_NUMBER, GENERATED_AMOUNT, UNSAFE_TEXT, INVALID_EVIDENCE }
 
-    private static OutputRejection unsafeOutput(String message, Collection<Integer> approvedStepCounts, List<String> approvedNames) {
+    private static OutputRejection unsafeOutput(String message, Collection<Integer> approvedStepCounts, List<String> approvedNames, List<String> approvedLabels, List<String> userTerms) {
         // An approved screen title is masked only where it names a screen to open (SRC-075). In a limit or rate
         // sentence such as "1,200% 한도 검증을 한도로 적용" its digits still count as a generated number.
-        String text = screenReferencesMasked(message, approvedNames);
-        String normalized = screenReferencesMasked(Normalizer.normalize(text, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT), approvedNames);
+        // approvedLabels are registered screen element names quoted as written, and userTerms are approved terms the user wrote.
+        // Neither is a number the model made up (SRC-090).
+        String text = termsMasked(labelsMasked(screenReferencesMasked(message, approvedNames), approvedLabels), userTerms);
+        String normalized = termsMasked(labelsMasked(screenReferencesMasked(Normalizer.normalize(text, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT), approvedNames), approvedLabels), userTerms);
         // Only ASCII stage counts from this role's selected guide are structural metadata.
         // Keep NFKC/unicode-number checks for everything left, including financial values.
+        var steps = new ArrayList<Integer>();
+        for (var scan = STEP_COUNT.matcher(text); scan.find(); ) steps.add(Integer.parseInt(scan.group(1)));
+        boolean numbered = numbered(steps, approvedStepCounts);
         var counts = STEP_COUNT.matcher(text);
         var remaining = new StringBuilder();
         while (counts.find()) counts.appendReplacement(remaining,
-                approvedStepCounts.contains(Integer.parseInt(counts.group(1))) ? "단계" : counts.group());
+                numbered || approvedStepCounts.contains(Integer.parseInt(counts.group(1))) ? "단계" : counts.group());
         counts.appendTail(remaining);
         if (remaining.codePoints().anyMatch(code -> Character.isDigit(code)
                 || Character.getType(code) == Character.LETTER_NUMBER || Character.getType(code) == Character.OTHER_NUMBER)
@@ -76,10 +83,51 @@ public class PicoAskService {
         return null;
     }
 
+    /**
+     * "1단계 ... 2단계 ..." running from one without a gap is numbering, like the list markers, not a count the model made up (SRC-090).
+     * At least two and no more than the largest registered count. A registered total such as "전체 6단계" may sit beside the run.
+     */
+    private static boolean numbered(List<Integer> steps, Collection<Integer> approvedStepCounts) {
+        int next = 1;
+        for (int step : steps) {
+            if (step == next) next++;
+            else if (!approvedStepCounts.contains(step)) return false;
+        }
+        return next > 2 && next - 1 <= approvedStepCounts.stream().mapToInt(Integer::intValue).max().orElse(0);
+    }
+
     /** An approved title counts as a name only when "화면" or "메뉴" follows it, optionally after a closing quote. */
     private static String screenReferencesMasked(String text, List<String> names) {
         for (var name : names)
-            text = Pattern.compile("['‘’\"“”]?" + Pattern.quote(name) + "['‘’\"“”]?(?=\\s*(?:화면|메뉴))").matcher(text).replaceAll(" ");
+            text = Pattern.compile("['‘’\"“”]?" + Pattern.quote(name) + SCREEN_WORD).matcher(text).replaceAll(" ");
+        return text;
+    }
+
+    /**
+     * A question that points at a screen by its approved title ("'1,200% 한도 검증' 화면") asks how to use FGC, whatever the selection model says:
+     * given the same input it called this one out of scope 7 times in 24 (SRC-090). Picks the guides that cover only that screen, then the current screen's.
+     */
+    private List<String> namedScreenGuides(String question, String currentScreen, List<PicoGuideCatalog.Definition> allowed, List<String> roles) {
+        String text = Normalizer.normalize(question, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
+        java.util.function.Function<String, List<String>> only = screen -> allowed.stream()
+                .filter(guide -> catalog.allowedSteps(guide, roles).stream().allMatch(step -> step.screenId().equals(screen)))
+                .map(PicoGuideCatalog.Definition::workflowId).toList();
+        var picked = new java.util.LinkedHashSet<String>();
+        catalog.screenTitles().forEach((title, screen) -> {
+            if (Pattern.compile(Pattern.quote(title) + SCREEN_WORD).matcher(text).find()) picked.addAll(only.apply(screen));
+        });
+        if (!picked.isEmpty()) picked.addAll(only.apply(currentScreen));
+        return picked.stream().limit(2).toList();
+    }
+
+    private static String labelsMasked(String text, List<String> labels) {
+        for (var label : labels)
+            text = Pattern.compile("(?<![\\p{N}.,])" + Pattern.quote(label) + "(?!\\p{N})", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(text).replaceAll(" ");
+        return text;
+    }
+
+    private static String termsMasked(String text, List<String> terms) {
+        for (var term : terms) text = PicoTextSanitizer.approvedTerm(term).matcher(text).replaceAll(" ");
         return text;
     }
 
@@ -139,8 +187,11 @@ public class PicoAskService {
         String paymentState = paymentSnapshot == null ? null : paymentSnapshot.status().name();
         try {
             var history = history(request);
+            String question = boundedText(request.question(), 2000);
+            var userTerms = catalog.numericTerms().stream().filter(term -> question.contains(term)
+                    || history.stream().anyMatch(turn -> turn.get("text").contains(term))).toList();
             var input = new LinkedHashMap<String, Object>();
-            input.put("question", boundedText(request.question(), 2000));
+            input.put("question", question);
             input.put("conversation", history);
             input.put("screenId", request.screenId());
             input.put("canProcess", canProcess);
@@ -165,15 +216,17 @@ public class PicoAskService {
                     || selection.workflowIds().stream().anyMatch(id -> id == null || !allowedIds.contains(id))
                     || (Boolean.TRUE.equals(selection.outOfScope()) && !selection.workflowIds().isEmpty()))
                 return fallback(request, "INVALID_AI_SELECTION");
+            var workflowIds = selection.workflowIds().isEmpty() ? namedScreenGuides(question, request.screenId(), allowed, authorities) : selection.workflowIds();
+            if (selection.workflowIds().isEmpty() && !workflowIds.isEmpty()) log.info("Pico selection was empty: answering from the named screen's guides");
             // FGC-FUN-073: 범위 밖 질문은 지원 범위를 안내하고, 범위 안이지만 모호한 질문은 다시 묻는다. 두 경우 모두 두 번째 호출을 하지 않는다.
-            if (selection.workflowIds().isEmpty()) return Boolean.TRUE.equals(selection.outOfScope())
+            if (workflowIds.isEmpty()) return Boolean.TRUE.equals(selection.outOfScope())
                     ? fixed(request, Decision.UNSUPPORTED,
                             "업무 비서는 FGC 화면 사용법과 정산 업무 절차를 안내합니다. 이 질문은 안내 범위 밖입니다.",
                             List.of(), "OUT_OF_SCOPE")
                     : fixed(request, Decision.ASK_CLARIFICATION,
                             "어떤 업무를 도와드릴지 조금 더 알려주세요. 하려는 작업이나 화면 이름을 함께 적어주시면 맞는 안내를 찾겠습니다.",
                             List.of(), "NEEDS_CLARIFICATION");
-            boolean asksPayment = selection.workflowIds().stream().anyMatch(id -> id.startsWith("payment."));
+            boolean asksPayment = workflowIds.stream().anyMatch(id -> id.startsWith("payment."));
             // Stored state stays in the program. Semantic selection may still answer unrelated workflow questions.
             if (paymentState != null && asksPayment && (!canProcess || !"DRAFT".equals(paymentState))) {
                 var changed = latestPaymentContextError(request, paymentSnapshot);
@@ -191,7 +244,7 @@ public class PicoAskService {
                         List.of(), confirmed ? "PAYMENT_ALREADY_CONFIRMED" : "PAYMENT_CANCELLED");
             }
             String helpQuery = (String) input.get("question") + " " + history.stream().map(turn -> turn.get("text")).collect(java.util.stream.Collectors.joining(" "));
-            chunks = new ArrayList<>(allowed.stream().filter(guide -> selection.workflowIds().contains(guide.workflowId()))
+            chunks = new ArrayList<>(allowed.stream().filter(guide -> workflowIds.contains(guide.workflowId()))
                     .flatMap(guide -> catalog.chunks(guide, helpQuery, authorities).stream())
                     .sorted(Comparator.comparingInt(chunk -> chunk.stepId() == null ? 0 : chunk.stepId().startsWith("help.") ? 1 : 2)).toList());
             // Selected workflows without registered evidence: fixed notice instead of a second, ungrounded model call.
@@ -220,7 +273,7 @@ public class PicoAskService {
                     + "사용자가 실제 화면에서 함께 진행하는 안내를 명시적으로 요청하면 START_GUIDE로 답하고 한 업무의 근거만 인용하세요. 방법·절차·위치를 설명해 달라는 질문만으로는 안내 시작 요청으로 간주하지 말고 ANSWER_ONLY로 답하세요. 업무를 특정할 수 없으면 ASK_CLARIFICATION입니다. 시작 단계·현재 저장/검증 상태는 서버가 결정하므로 추측하지 마세요. "
                     + "ANSWER_ONLY와 START_GUIDE에는 받은 evidence의 chunkId를 하나 이상 인용하세요. message는 질문에 맞는 두세 문장으로 작성하고 근거 ID·버전은 본문에 반복하지 마세요. 숫자는 guideStepCounts에 등록된 업무 단계 수만 N단계 형태로 사용할 수 있습니다. 다만 화면을 안내할 때는 화면 이름을 숫자까지 그대로 쓰세요(예: '1,200% 한도 검증' 화면). 숫자 대신 '수치' 같은 대체어나 숫자를 지웠다는 말은 쓰지 마세요. 금액·비율·횟수는 생성하지 마세요. 근거 ID는 evidenceChunkIds 배열에만 넣으세요. 초안 저장은 지급 확정과 구분하세요.",data,null,null),ModelAnswer.class);
             var output = normalizeList(rawOutput, chunks);
-            OutputRejection rejection = rejection(output, chunks);
+            OutputRejection rejection = rejection(output, chunks, userTerms);
             if (rejection != null) {
                 // Bounded enum only: never log the model message, question, IDs or credentials.
                 log.warn("Pico answer rejected: {}", rejection);
@@ -258,12 +311,12 @@ public class PicoAskService {
             throw new FgcBusinessException(FgcErrorCode.IMPL_GUIDE_VERSION_MISMATCH);
         return null;
     }
-    private OutputRejection rejection(ModelAnswer output, List<PicoGuideCatalog.Chunk> chunks) {
+    private OutputRejection rejection(ModelAnswer output, List<PicoGuideCatalog.Chunk> chunks, List<String> userTerms) {
         if (output == null || output.decision() == null || output.message() == null
                 || output.message().isBlank() || output.message().length() > 2000
                 || output.evidenceChunkIds() == null)
             return OutputRejection.INVALID_FIELDS;
-        OutputRejection unsafe = unsafeOutput(output.message(), approvedStepCounts(chunks).values(), catalog.numericScreenTitles());
+        OutputRejection unsafe = unsafeOutput(output.message(), approvedStepCounts(chunks).values(), catalog.numericScreenTitles(), catalog.numericLabels(), userTerms);
         if (unsafe != null) return unsafe;
         var allowed = chunks.stream().map(PicoGuideCatalog.Chunk::chunkId).toList();
         if ((output.decision() == Decision.ANSWER_ONLY || output.decision() == Decision.START_GUIDE) && output.evidenceChunkIds().isEmpty())
@@ -296,13 +349,13 @@ public class PicoAskService {
         if (count < 2 || count > maximum) return output;
         return new ModelAnswer(output.decision(), LIST_MARKER.matcher(output.message()).replaceAll(""), output.evidenceChunkIds());
     }
-    private static String boundedText(String text, int maximum) {
-        String value = PicoTextSanitizer.redact(text);
+    private String boundedText(String text, int maximum) {
+        String value = PicoTextSanitizer.redact(text, catalog.numericTerms());
         if (value.length() <= maximum) return value;
         int end = Character.isHighSurrogate(value.charAt(maximum - 1)) ? maximum - 1 : maximum;
         return value.substring(0, end);
     }
-    private static List<Map<String,String>> history(PicoAskRequest request) {
+    private List<Map<String,String>> history(PicoAskRequest request) {
         var turns = new ArrayList<Map<String,String>>();
         if (request.conversation() != null) for (var turn : request.conversation())
             turns.add(Map.of("role",turn.role().name(),"text",boundedText(turn.text(),800)));
