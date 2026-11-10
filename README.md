@@ -34,7 +34,7 @@
 
 지금 많은 곳에서 이 일을 엑셀로 합니다. 그래서 한도를 넘겨 준 뒤에야 알게 되고, 마감한 시트를 고치면 그때 왜 그렇게 계산했는지가 남지 않습니다.
 
-규칙은 더 촘촘해지는 중입니다. 2026년 7월에 1,200% 룰이 GA 소속 설계사에게까지 넓어졌고, 2027년에는 수수료를 4년에, 2029년에는 7년에 나눠 주게 됩니다. 계약 한 건의 지급 일정이 최대 84개월로 늘어납니다.
+규칙은 더 촘촘해지는 중입니다. 2026년 7월에 1,200% 룰이 GA 소속 설계사에게까지 넓어졌습니다. 2027년 1월 이후 판매를 시작하는 보장성 상품부터는 수수료를 먼저 주는 몫과 계약이 유지되는 동안 매달 주는 몫으로 나누고, 매달 주는 몫은 2027년과 2028년에는 최대 4년, 2029년부터는 최대 7년에 걸쳐 줍니다. 계약 한 건의 지급 일정이 최대 84개월까지 늘어납니다. 자세한 조건은 [규제조문표](docs/07_규제조문표_v0.2.1.md)의 REG-01~04와 REG-19에 있습니다.
 
 ## 그래서 FGC는 주기 전에 막습니다
 
@@ -91,7 +91,7 @@ flowchart LR
   <img src="docs/readme-pico.png" width="410" alt="업무 비서 피코 화면. 질문에 답하고 근거로 쓴 안내 항목을 함께 보여 준다">
 </p>
 
-상품 추천 AI는 같은 종류의 상품을 보험사별로 비교합니다. 순위와 금액은 서버가 규칙대로 계산하고, AI는 그 결과를 풀어서 설명만 합니다. 업무 비서 피코는 승인된 업무 안내서 안에서만 답하고, 근거로 쓴 항목을 함께 보여 줍니다. AI가 숫자를 지어내거나 "처리했습니다" 같은 말을 하면 서버가 그 답을 버립니다.
+상품 추천 AI는 같은 종류의 상품을 보험사별로 비교합니다. 순위와 금액은 서버가 규칙대로 계산하고, AI는 그 결과를 풀어서 설명만 합니다. 업무 비서 피코는 승인된 업무 안내서 안에서만 답하고, 근거로 쓴 항목을 함께 보여 줍니다. AI가 숫자를 지어내거나 "처리했습니다" 같은 말을 하면 서버 검사가 그 답을 버립니다. 이 검사는 숫자와 정해진 표현을 걸러내는 것이고, 답의 뜻이 맞는지까지 보장하지는 않습니다. 확인한 범위와 남은 빈틈은 [AI 평가 결과서](docs/FGC_AI_평가_결과서_v1_0.md) 9절에 있습니다.
 
 ## 숫자로 확인한 것
 
@@ -123,18 +123,24 @@ flowchart LR
 
 ## 직접 돌려 보기
 
-JDK 21, Node.js 22, Docker가 필요합니다.
+JDK 21, Node.js 22, Docker가 필요합니다. 터미널은 두 개를 씁니다.
+
+첫 번째 터미널에서 DB와 서버를 띄웁니다. 비밀번호 줄의 `바꿔_넣기` 자리에는 `docker-compose.yml`에 적힌 `POSTGRES_PASSWORD` 값을 넣습니다.
 
 ```bash
 docker compose up -d      # PostgreSQL 17을 5433 포트에 띄웁니다
 
 export SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/fgc?currentSchema=fgc'
 export SPRING_DATASOURCE_USERNAME=fgc
-export SPRING_DATASOURCE_PASSWORD='docker-compose.yml에 적힌 값'
+export SPRING_DATASOURCE_PASSWORD='바꿔_넣기'
 export SPRING_FLYWAY_LOCATIONS='classpath:db/migration,classpath:db/demo,classpath:db/demo-agent'
 ./gradlew bootRun         # 서버가 8081 포트에 뜨고, 표와 가상 데이터가 자동으로 들어갑니다
+```
 
-cd frontend && npm ci && npm run dev    # 화면. 터미널에 나온 주소를 브라우저로 엽니다
+서버는 켜 둔 채로 두 번째 터미널을 저장소 폴더에서 열어 화면을 띄웁니다.
+
+```bash
+cd frontend && npm ci && npm run dev    # 터미널에 나온 주소를 브라우저로 엽니다
 ```
 
 로그인 화면이 보이면 성공입니다. 계정은 `src/main/resources/db/demo/V3__seed_demo_data.sql` 머리 주석에 있습니다. `OPENAI_API_KEY`를 넣지 않으면 AI 기능만 꺼지고 나머지는 그대로 동작합니다.
