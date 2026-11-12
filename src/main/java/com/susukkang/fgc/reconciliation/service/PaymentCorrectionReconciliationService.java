@@ -7,6 +7,7 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
 import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
 import com.susukkang.fgc.journal.dto.JournalCorrectionHeaderRow;
+import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunInsertRow;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
@@ -31,6 +32,10 @@ public class PaymentCorrectionReconciliationService {
     private final ExceptionCaseService exceptions;
 
     public List<Long> lockAffectedRuns(JournalCorrectionHeaderRow original) {
+        return lockAffectedRuns(original, null);
+    }
+
+    public List<Long> lockAffectedRuns(JournalCorrectionHeaderRow original, CommissionPaymentCreateRequest replacement) {
         // 월 검증 확정과 동일한 부모 잠금을 사용하고 잠금 뒤 상태를 다시 판정한다.
         Long paymentId;
         try {
@@ -38,16 +43,21 @@ public class PaymentCorrectionReconciliationService {
         } catch (NumberFormatException ex) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_002, Map.of("field", "sourceEntityId"));
         }
-        List<?> validations = repository.lockValidations(original.getValidationRunId(), paymentId);
+        List<?> validations = replacement == null ? repository.lockValidations(original.getValidationRunId(), paymentId)
+                : repository.lockValidations(original.getValidationRunId(), paymentId, replacement.settlementMonth(),
+                        replacement.paymentStage().name(), replacement.contractId());
         for (Object row : validations) {
             Object[] v = (Object[]) row;
             boolean ownsOriginal = original.getValidationRunId() != null
                     && ((Number) v[0]).longValue() == original.getValidationRunId();
-            if ("FINALIZED".equals(v[1]) && (ownsOriginal || Boolean.TRUE.equals(v[2]))) {
+            if ("FINALIZED".equals(v[1]) && (ownsOriginal || Boolean.TRUE.equals(v[2])
+                    || (replacement != null && Boolean.TRUE.equals(v[3])))) {
                 throw new FgcBusinessException(FgcErrorCode.VRUN_003, Map.of("validationRunId", v[0]));
             }
         }
-        List<?> rows = repository.lockRuns(paymentId, original.getContractId());
+        List<?> rows = replacement == null ? repository.lockRuns(paymentId, original.getContractId())
+                : repository.lockRuns(paymentId, original.getContractId(), replacement.settlementMonth(),
+                        replacement.paymentStage().name(), replacement.contractId());
         return rows.stream().map(row -> {
             Object[] r = (Object[]) row;
             if (!"COMPLETED".equals(r[1])) throw new FgcBusinessException(FgcErrorCode.RECO_004, Map.of());

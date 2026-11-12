@@ -206,6 +206,23 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
     }
 
     @Test
+    void explicitMonitoringTypeStillSupportsNewAndInReviewFilters() {
+        for (var type : List.of(ExceptionType.CAP_WARNING, ExceptionType.ARBITRAGE_CANDIDATE)) {
+            jdbcTemplate.update("UPDATE fgc.exception_case SET exception_type=? WHERE contract_id=?", type.name(), contractId);
+            for (String status : List.of("NEW", "IN_REVIEW")) {
+                for (var criteria : List.of(
+                        ExceptionCaseSearchDTO.builder().contractNo(contractNo).type(type).build(),
+                        ExceptionCaseSearchDTO.builder().contractNo(contractNo).types(List.of(type)).build())) {
+                    var statuses = ExceptionStatus.dbStatuses(status);
+                    assertThat(repository.search(criteria, statuses, 0, 100)).hasSize(1);
+                    assertThat(repository.count(criteria, statuses)).isEqualTo(1);
+                    assertThat(repository.countByTypeAndSeverity(criteria, statuses)).hasSize(1);
+                }
+            }
+        }
+    }
+
+    @Test
     void 실제_상태코드_필터는_그_상태만_조회한다() {
         var rows = repository.search(ExceptionCaseSearchDTO.builder().contractNo(contractNo).build(),
                 ExceptionStatus.dbStatuses("RESOLVED"), 0, 100);

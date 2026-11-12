@@ -13,6 +13,7 @@
 외부 AI 호출은 하지 않는다. 계정 파일은 기존 로더와 같은 형식이다.
 """
 import copy
+import base64
 import datetime
 import random
 from collections import Counter
@@ -31,6 +32,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+import uuid
 
 from load_demo_months import Client, Loader, idem
 
@@ -61,6 +63,34 @@ def require(condition, message):
 
 def command(args, **kwargs):
     return subprocess.run(args, check=True, encoding='utf-8', **kwargs)
+
+
+def verify_api_database(db, *clients):
+    # 방금 API 로그인으로 생성한 무작위 세션 ID가 지정한 DB에 있는지 읽기만 한다.
+    # 같은 시드를 가진 다른 DB도 구별하며 토큰/비밀번호를 로그에 남기지 않는다.
+    for client in clients:
+        try:
+            payload = client.token.split('.')[1]
+            claims = json.loads(base64.urlsafe_b64decode(payload + '=' * (-len(payload) % 4)))
+            session_id = str(uuid.UUID(claims['sid']))
+        except (ValueError, KeyError, IndexError, TypeError) as error:
+            raise RuntimeError('API 로그인 세션을 확인할 수 없습니다. 업무 데이터는 변경하지 않습니다.') from error
+        require(client.login_id in ('settle01', 'gaadmin'), '시연 적재 계정만 확인할 수 있습니다')
+        exists = db.sql("SELECT EXISTS (SELECT 1 FROM fgc.auth_refresh_token t JOIN fgc.app_user u USING(user_id) "
+            f"WHERE t.session_id='{session_id}'::uuid AND u.login_id='{client.login_id}' "
+            "AND t.revoked_at IS NULL AND t.expires_at>clock_timestamp())")
+        require(exists == 't', 'API와 지정한 Docker DB가 다르거나 로그인 세션이 종료됐습니다. 업무 데이터는 변경하지 않습니다.')
+
+
+def stop_server(process):
+    if process is None or process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=30)
 
 
 class Database:
@@ -116,17 +146,20 @@ def start_server(db, port, output, build=True, jar=None):
             '--fgc.batch.daily-changed-contract.enabled=false', '--fgc.demo-month=2026-10'],
             cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, creationflags=flags,
             start_new_session=os.name != 'nt')
-    for _ in range(120):
-        require(process.poll() is None, f'서버 기동 실패: {log_path}')
-        try:
-            with urllib.request.urlopen(f'http://127.0.0.1:{port}/actuator/health', timeout=2) as response:
-                if response.status == 200:
-                    return process
-        except (urllib.error.URLError, TimeoutError):
-            pass
-        time.sleep(1)
-    process.terminate()
-    raise RuntimeError(f'서버 준비 시간 초과: {log_path}')
+    try:
+        for _ in range(120):
+            require(process.poll() is None, f'서버 기동 실패: {log_path}')
+            try:
+                with urllib.request.urlopen(f'http://127.0.0.1:{port}/actuator/health', timeout=2) as response:
+                    if response.status == 200:
+                        return process
+            except (urllib.error.URLError, TimeoutError):
+                pass
+            time.sleep(1)
+        raise RuntimeError(f'서버 준비 시간 초과: {log_path}')
+    except BaseException:
+        stop_server(process)
+        raise
 
 
 class OctoberDemo:
@@ -134,6 +167,7 @@ class OctoberDemo:
         self.db, self.base = db, base
         self.s = Client(base, 'settle01', accounts['settle01'])
         self.admin = Client(base, 'gaadmin', accounts['gaadmin'])
+        verify_api_database(db, self.s, self.admin)
         self.loader = Loader(self.s, self.admin)
         self.manifest = {'database': db.name, 'base': base, 'month': MONTH, 'contracts': {}, 'payments': {}, 'runs': {}}
 
@@ -702,13 +736,15 @@ def verify_saved_demo(args):
     path = Path(args.verify_manifest).resolve()
     manifest = json.loads(path.read_text(encoding='utf-8'))
     accounts = json.loads(Path(args.accounts).read_text(encoding='utf-8-sig'))[args.env]['accounts']
-    db = Database('fgc_october_filmverify_' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+    db = Database('fgc_october_filmverify_' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S') + '_' + uuid.uuid4().hex[:8])
     output = ROOT / 'output/october-demo' / db.name
     db.create()
-    command(['docker', 'cp', str(path.parent / 'filming-start.dump'), f'{db.container}:/tmp/{db.name}.dump'], capture_output=True)
-    command(['docker', 'exec', db.container, 'pg_restore', '-U', 'fgc', '-d', db.name, '--exit-on-error', f'/tmp/{db.name}.dump'], capture_output=True)
-    process = start_server(db, args.port, output, build=False, jar=args.jar)
+    process = None
     try:
+        with (path.parent / 'filming-start.dump').open('rb') as dump:
+            command(['docker', 'exec', '-i', db.container, 'pg_restore', '-U', 'fgc', '-d', db.name,
+                     '--exit-on-error'], stdin=dump, capture_output=True)
+        process = start_server(db, args.port, output, build=False, jar=args.jar)
         demo = OctoberDemo(db, f'http://127.0.0.1:{args.port}', accounts)
         if 'octoberWarning' in manifest:
             before = demo.s.ok('GET', '/api/v1/dashboard/summary?month=2026-10')
@@ -760,10 +796,11 @@ def verify_saved_demo(args):
         require(master_snapshot(db) == manifest['masterChecksums'], '마스터가 변경됐습니다')
         print(f'검증 완료: {output / "verification.json"}', flush=True)
     finally:
-        process.terminate()
-        process.wait(timeout=30)
-        require(db.name.startswith('fgc_october_filmverify_'), '검증용 복제 DB만 정리할 수 있습니다')
-        db.sql(f'DROP DATABASE {db.name} WITH (FORCE)', 'postgres')
+        try:
+            stop_server(process)
+        finally:
+            require(db.name.startswith('fgc_october_filmverify_'), '검증용 복제 DB만 정리할 수 있습니다')
+            db.sql(f'DROP DATABASE {db.name} WITH (FORCE)', 'postgres')
 
 
 def main():

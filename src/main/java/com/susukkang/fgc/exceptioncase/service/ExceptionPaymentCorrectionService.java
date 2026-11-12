@@ -101,9 +101,12 @@ public class ExceptionPaymentCorrectionService {
             header.setSourceEntityId(paymentId.toString());
             header.setContractId(hint.contractId());
             header.setValidationRunId(source.validationRunId());
-            var affectedRuns = reconciliation.lockAffectedRuns(header);
+            boolean capWithoutJournal = CAP_TYPES.contains(source.type()) && repository.postedJournal(paymentId) == null;
+            // 정정 전후 월·단계·보험회사 범위를 함께 정렬해서 잠그고 두 범위 모두 재대사한다.
+            var affectedRuns = capWithoutJournal ? reconciliation.lockAffectedRuns(header, request.payment())
+                    : reconciliation.lockAffectedRuns(header);
             // 지급 한도 예외는 검증 실행 ID가 없더라도 같은 지급의 월 대사에 영향을 준다.
-            if (CAP_TYPES.contains(source.type()) && repository.postedJournal(paymentId) == null) {
+            if (capWithoutJournal) {
                 runIds = affectedRuns;
             }
             if (!paymentWrites.lockPayment(paymentId)) throw invalid("paymentId");

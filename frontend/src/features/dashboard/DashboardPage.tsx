@@ -181,7 +181,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
         ) : openCounts.isPending ? (
           '불러오는 중'
         ) : (
-          '한도 위반 및 대사 불일치'
+          '한도 위반 및 대사 불일치 등'
         ),
         tone: 'warning',
         to: href('/exceptions', { status: OPEN_STATUS }),

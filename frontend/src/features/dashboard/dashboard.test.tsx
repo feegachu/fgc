@@ -310,7 +310,7 @@ describe('DASH-W01 업무 대시보드', () => {
     expect(within(kpis).queryByRole('link', { name: /미처리 예외/ })).not.toBeInTheDocument()
     expect(within(kpis).getByRole('region', { name: '미처리 예외' })).toHaveTextContent('불러오는 중')
     pending.resolve(envelope({ total: 0, bySeverity: [], byType: [] }))
-    expect(await within(kpis).findByRole('link', { name: '미처리 예외 0건' })).toHaveTextContent('한도 위반 및 대사 불일치')
+    expect(await within(kpis).findByRole('link', { name: '미처리 예외 0건' })).toHaveTextContent('한도 위반 및 대사 불일치 등')
   })
 
   it('미처리 건수 오류는 그 카드에만 재시도를 보이고 다른 지표는 유지한다', async () => {

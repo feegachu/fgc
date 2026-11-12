@@ -106,3 +106,7 @@ files/
 /output/october-demo/
 /output/ci-check-*/
 scripts/demo-data/__pycache__/
+/output/demo-control/
+/.fgc-demo.lock
+/files.before-*/
+/files.restore-*/

@@ -72,6 +72,12 @@ jobs:
         # v6는 캐시 컴포넌트의 별도 이용약관 검토가 필요해 Node 24 기반 최신 v5를 사용한다.
         uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
 
+      - name: Verify demo management scripts
+        if: needs.changes.outputs.run_checks == 'true'
+        run: |
+          bash -n scripts/demo-data/demo.sh
+          RUN_DEMO_DOCKER_TEST=1 python3 -B -m unittest discover -s scripts/demo-data -p 'test_*.py' -v
+
       - name: Build and test
         if: needs.changes.outputs.run_checks == 'true'
         run: ./gradlew build

@@ -30,6 +30,44 @@ class CapCheckQueryRepositoryIntegrationTest {
     @Autowired CapCheckQueryRepository capCheckQueryRepository;
     @Autowired com.susukkang.fgc.contract.repository.ContractQueryRepository contractQueryRepository;
     @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired com.susukkang.fgc.dashboard.repository.DashboardQueryRepository dashboardQueryRepository;
+
+    @ParameterizedTest
+    @ValueSource(strings = {"NEW", "IN_REVIEW"})
+    void openDraftViolationRemainsVisibleAfterLaterMonthlyNormalUntilResolved(String status) {
+        TestContract contract = insertTestContract();
+        LocalDate month = LocalDate.of(2035, 1, 1);
+        var checked = OffsetDateTime.parse("2035-01-31T10:00:00+09:00");
+        insertCapCheck(contract, PaymentStage.GA_TO_FC, month, "960000", "1012000", "0", "105.4", "VIOLATION", checked);
+        Long capId = jdbcTemplate.queryForObject("SELECT max(cap_check_id) FROM fgc.cap_check WHERE contract_id=?", Long.class, contract.contractId());
+        Long paymentId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.commission_transaction(payment_stage, source_type, source_business_key,
+                    recipient_agent_id, commission_item_id, settlement_month, amount, cashflow_type, status)
+                SELECT 'GA_TO_FC','GA_MANUAL_PAYMENT',?, ?, commission_item_id, ?,210000,'PAYMENT','DRAFT'
+                  FROM fgc.commission_item WHERE item_code='SETTLEMENT_SUPPORT'
+                RETURNING commission_transaction_id
+                """, Long.class, "IT-DRAFT-" + UUID.randomUUID(), contract.agentId(), month);
+        jdbcTemplate.update("UPDATE fgc.cap_check SET candidate_transaction_id=? WHERE cap_check_id=?", paymentId, capId);
+        jdbcTemplate.update("""
+                INSERT INTO fgc.exception_case(exception_key,exception_type,severity,status,source_entity_type,
+                    source_entity_id,title,contract_id,cap_check_id,validation_month)
+                VALUES (?,'CAP_VIOLATION','CRITICAL',?,'CAP_CHECK',?,'draft violation',?,?,?)
+                """, "IT-DRAFT-" + UUID.randomUUID(), status, capId.toString(), contract.contractId(), capId, month);
+        insertCapCheck(contract, PaymentStage.GA_TO_FC, month, "960000", "802000", "0", "83.5", "NORMAL", checked.plusMinutes(1));
+        assertThat(capCheckQueryRepository.search(month, "GA_TO_FC", "VIOLATION", null, null, contract.contractNo(), 0, 20))
+                .extracting(CapCheckListRow::getCapCheckId).containsExactly(capId);
+        assertThat(capCheckQueryRepository.count(month, "GA_TO_FC", "VIOLATION", null, null, contract.contractNo())).isEqualTo(1);
+        assertThat(stage(capCheckQueryRepository.summarizeByStage(month, null, null, contract.contractNo()), PaymentStage.GA_TO_FC).getViolationCount()).isEqualTo(1);
+        assertThat(dashboardQueryRepository.countCapViolation(month)).isEqualTo(1);
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status='RESOLVED' WHERE cap_check_id=?", capId);
+        assertThat(capCheckQueryRepository.count(month, "GA_TO_FC", "VIOLATION", null, null, contract.contractNo())).isZero();
+        assertThat(capCheckQueryRepository.count(month, "GA_TO_FC", "NORMAL", null, null, contract.contractNo())).isEqualTo(1);
+        assertThat(dashboardQueryRepository.countCapViolation(month)).isZero();
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status='NEW' WHERE cap_check_id=?", capId);
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET status='CANCELLED' WHERE commission_transaction_id=?", paymentId);
+        assertThat(capCheckQueryRepository.count(month, "GA_TO_FC", "VIOLATION", null, null, contract.contractNo())).isZero();
+        assertThat(dashboardQueryRepository.countCapViolation(month)).isZero();
+    }
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})

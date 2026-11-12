@@ -1361,6 +1361,25 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 10. 발표 회선에서 신한 주소의 `/cdn-cgi/trace`로 Cloudflare 거점(`colo`)을 보고, 빈 브라우저로 첫 화면 시간을 잰다. 2026-11-06 노트북 회선 측정: 이 주소는 `LAX`, 같은 회선의 cloudflare.com은 `ICN`이다. 로그인 화면 3.1~6.4초, 로그인 뒤 홈 약 3.5초, API 1건 0.4~1.1초. 앞단 없이 같은 구성을 재면 로그인 화면 0.8초, 홈 0.6초라 차이는 경로 비용이다. 코드로 줄일 수 있는 폭이 작으니 시연 PC는 시작 전에 한 번 열어 둔다(정적 파일은 그 뒤 브라우저 캐시). 성능시험 결과서의 값은 앞단을 포함하지 않는다.
 11. (#912 병합, 배포 뒤) 발표 PC에서 브라우저를 "시작할 때 이전 탭 계속" 설정으로 둔 채 로그인하고 브라우저를 닫은 뒤, 2분 뒤와 4분 뒤에 다시 연다. 2분 뒤는 로그인이 이어지고 4분 뒤는 자동 로그아웃 안내가 나와야 한다(#912, 화면을 모두 닫고 3분). 부스 노트북은 사람이 바뀔 때 로그아웃 버튼을 누른다.
 
+## 시연 데이터 한 줄 관리 (#954, 2026-11-12)
+
+별도 `fgc_demo` DB나 예전 74건 정리 스크립트 없이 `fgc` DB와 `load_filming_demo.py`를 사용한다. 실행 위치는 저장소 루트다. `reset`은 업무 데이터만 초기화하며 계정·정책·기준정보를 보존한다. 초기화·적재·복원 전에 DB와 PDF를 자동 백업한다. 새 빈 로컬 DB의 마이그레이션은 `load`의 임시 서버가 수행한다.
+
+| 작업 | 로컬 PowerShell | 신한 EC2 SSH 접속 후 Bash |
+|---|---|---|
+| 초기화와 적재를 한 번에 | `.\scripts\demo-data\demo.ps1 rebuild` | `bash scripts/demo-data/demo.sh rebuild` |
+| 초기화만 | `.\scripts\demo-data\demo.ps1 reset` | `bash scripts/demo-data/demo.sh reset` |
+| 적재만 | `.\scripts\demo-data\demo.ps1 load` | `bash scripts/demo-data/demo.sh load` |
+| 현재 상태 백업 | `.\scripts\demo-data\demo.ps1 backup` | `bash scripts/demo-data/demo.sh backup` |
+| 마지막 백업 복원 | `.\scripts\demo-data\demo.ps1 restore` | `bash scripts/demo-data/demo.sh restore` |
+
+- 로컬: Docker Desktop 실행, Java 21과 Python 준비. IntelliJ FgcApplication과 DB 콘솔 연결을 중지한 뒤 명령을 실행하고 완료 후 FgcApplication을 다시 실행한다. IntelliJ datasource는 `127.0.0.1:5433/fgc`다. 적재용 임시 서버는 스크립트가 켜고 끈다. PDF 위치를 바꿨다면 `--files "실제 FGC_STORAGE_ROOT"`를 모든 명령에 동일하게 추가한다.
+- EC2: 기존 신한 배포 상태(`~/fgc-stg/.env`, `release.env`, `compose.yaml`)와 동일 커밋의 API 이미지/소스가 필요하다. Git pull만으로 이미지가 갱신되지는 않는다. Docker Compose, Python 3가 필요하다. web/api 중지·재기동은 자동이며 배포와 데이터 작업이 동시에 실행되지 않도록 같은 배포 잠금을 사용한다. 시연 설정(기준월 10월, 일일 자동 배치 중지)은 `filming.override.yaml`에 저장하고 이후 신한 배포에도 반영한다.
+- 최초 적재에서 계정 파일이 없으면 settle01·gaadmin 비밀번호를 화면에 표시하지 않고 입력받는다. 로컬은 `~/.fgc-local-accounts.json`, EC2는 `~/.fgc-shinhan-accounts.json`을 사용하며 기존 파일도 그대로 사용한다. 계정 파일의 BOM은 허용한다.
+- 백업은 `~/fgc-demo-backups/local` 또는 `~/fgc-demo-backups/ec2`에 저장한다. 백업 디렉터리 전체(DB, PDF, 무결성 정보)를 보관한다. `restore --snapshot "백업 폴더 경로"`로 특정 백업을 선택한다. 자동 백업도 `latest`를 갱신하므로 오래 보존할 시연 시작 상태는 출력된 폴더 경로를 기록한다. 복원 후 로더를 다시 실행하지 않는다.
+- 복원은 무결성 확인 후 진행하며 EC2는 백업 당시 API 이미지가 같아야 한다. 로컬 백업을 공개 EC2에 복원하는 것은 차단한다. EC2 작업이 실패하면 web/api를 중지한 채로 남겨 두므로 원인을 확인하고 출력된 자동 백업 경로로 복원한다. 로컬 PDF 교체 전 폴더는 `files.before-*`로 보존한다.
+- 실제 EC2에서 실행 검증한 것으로 간주하지 않는다. 격리 PostgreSQL과 Docker 파일 볼륨으로 초기화·백업·복원 회귀시험을 제공한다. 소스/이미지 배포, 계정 비밀번호, 실제 SSH 주소는 기존 배포 담당자의 설정을 사용한다.
+
 ## 개정 이력
 
 | 판 | 날짜 | 내용 | 근거 |
