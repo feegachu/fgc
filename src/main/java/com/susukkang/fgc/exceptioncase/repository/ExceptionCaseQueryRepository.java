@@ -315,6 +315,10 @@ public class ExceptionCaseQueryRepository {
                     criteria.getTypes().stream().map(Enum::name).toList());
         }
         if (statuses != null && !statuses.isEmpty()) {
+            // 한도 주의·차익거래 후보는 모니터링 판정이다. 검출 이력은 전체 조회에 보존하되 미처리 업무에서 제외한다.
+            if (statuses.stream().allMatch(status -> status == ExceptionStatus.NEW || status == ExceptionStatus.IN_REVIEW)) {
+                where.append(" AND ec.exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING')");
+            }
             append(where, parameters, "ec.status IN (:statuses)", "statuses",
                     statuses.stream().map(Enum::name).toList());
         }

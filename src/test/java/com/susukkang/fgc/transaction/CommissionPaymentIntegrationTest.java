@@ -178,7 +178,7 @@ class CommissionPaymentIntegrationTest {
     }
 
     @Test
-    void deleteDraftPreservesRejectedCapEvidenceWithoutChangingCurrentContractVerdict() {
+    void deleteDraftResolvesDashboardViolationAndPreservesRejectedCapEvidence() {
         Long runId = checklistRun();
         long criticalBefore = validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedCriticalExceptionCount();
         long dashboardBefore = dashboardQueryRepository.countCapViolation(LocalDate.of(2026, 7, 1));
@@ -186,7 +186,8 @@ class CommissionPaymentIntegrationTest {
         var created = commissionPaymentService.create(request("IT-607-" + UUID.randomUUID(), new BigDecimal("1300000")));
         assertCapViolation(created.paymentId());
         assertThat(validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedCriticalExceptionCount()).isGreaterThan(criticalBefore);
-        assertThat(dashboardQueryRepository.countCapViolation(LocalDate.of(2026, 7, 1))).isEqualTo(dashboardBefore);
+        // 미처리 지급 초안의 위반도 대시보드에 보이며, 아래 삭제 후에는 원래 건수로 돌아간다.
+        assertThat(dashboardQueryRepository.countCapViolation(LocalDate.of(2026, 7, 1))).isEqualTo(dashboardBefore + 1);
         var before = capCheckQueryRepository.findLatestByContractAndStage(1L, "GA_TO_FC");
         Long capId = jdbcTemplate.queryForObject("SELECT max(cap_check_id) FROM fgc.cap_check WHERE candidate_transaction_id=?", Long.class, created.paymentId());
         Long exceptionCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_case WHERE cap_check_id=?", Long.class, capId);

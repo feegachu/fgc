@@ -89,7 +89,7 @@ test(`예외 담당자를 ${assignee.loginId}에게 배정하고 본인 배정�
   await page.goto('exceptions')
   await expect(page.getByRole('heading', { name: '예외함' })).toBeVisible()
   await expect(page.getByRole('link', { name: '1,200% 위반 1건' })).toBeVisible()
-  expect(new URL(searchUrls[0]).searchParams.get('status')).toBe('OPEN')
+  expect(new URL(searchUrls[0]).searchParams.get('status')).toBe('')
 
   await chooseDetailedHelp(page)
   await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }).first(), 3)

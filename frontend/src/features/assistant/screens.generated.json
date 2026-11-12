@@ -124,6 +124,7 @@
   },
   {
     "id": "ACQC-W01",
+    "enabled": false,
     "path": "/acquisition-cost-checks",
     "title": "계약체결비용 한도",
     "menu": "/acquisition-cost-checks",

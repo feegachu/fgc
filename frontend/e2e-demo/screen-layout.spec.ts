@@ -93,6 +93,11 @@ test('쪽 제목은 왼쪽 끝에, 도움말은 오른쪽 끝에 있고 격자�
     'audit-logs',
   ]) {
     await page.goto(`${route}?month=${month}`)
+    if (route === 'acquisition-cost-checks') {
+      // 사용자에게 숨긴 화면은 일반 업무 머리글 대신 접근 차단 화면을 표시한다.
+      await expect(page.getByRole('heading', { name: '권한 없음' })).toBeVisible()
+      continue
+    }
     await expect.poll(() => headerLayout(page, '.page-header', '.page-title'), { message: route }).toEqual(atEdges)
   }
 

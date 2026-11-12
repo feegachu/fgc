@@ -101,7 +101,11 @@ public class ExceptionPaymentCorrectionService {
             header.setSourceEntityId(paymentId.toString());
             header.setContractId(hint.contractId());
             header.setValidationRunId(source.validationRunId());
-            reconciliation.lockAffectedRuns(header);
+            var affectedRuns = reconciliation.lockAffectedRuns(header);
+            // 지급 한도 예외는 검증 실행 ID가 없더라도 같은 지급의 월 대사에 영향을 준다.
+            if (CAP_TYPES.contains(source.type()) && repository.postedJournal(paymentId) == null) {
+                runIds = affectedRuns;
+            }
             if (!paymentWrites.lockPayment(paymentId)) throw invalid("paymentId");
         }
         var target = cases.findByIdForUpdate(id);
@@ -159,7 +163,10 @@ public class ExceptionPaymentCorrectionService {
             }
             if (cap) exceptions.action(id, new ExceptionActionRequest(type, reason, body.evidenceRef()), actor, login);
             corrected = payments.confirmExceptionCorrection(corrected.paymentId(), "EXCP-" + id + "-" + corrected.paymentId());
-            if ("RECONCILIATION_MISMATCH".equals(source.type())) postActual(corrected, source, actor, reason);
+            if ("RECONCILIATION_MISMATCH".equals(source.type())
+                    || (cap && !runIds.isEmpty() && "PAYMENT".equals(corrected.cashflowType()))) {
+                postActual(corrected, source, actor, reason);
+            }
         }
         if (CAP_TYPES.contains(source.type()) && cases.findByIdForUpdate(id).status() == ExceptionStatus.IN_REVIEW) {
             exceptions.action(id, new ExceptionActionRequest(type, reason, body.evidenceRef()), actor, login);
@@ -185,7 +192,8 @@ public class ExceptionPaymentCorrectionService {
                     .reason(reason).build());
         }
         // 원장 정정이 이미 새 실행으로 교체한 대사는 중복 실행하지 않는다.
-        var active = new HashSet<>(repository.reconciliationRuns(source));
+        var active = new HashSet<>(CAP_TYPES.contains(source.type()) && journal == null
+                ? runIds : repository.reconciliationRuns(source));
         reconciliation.refresh(runIds.stream().filter(active::contains).toList(), "EXCP-" + id, actor, reason);
         if (cases.findByIdForUpdate(id).status() == ExceptionStatus.IN_REVIEW) {
             exceptions.recordPendingPaymentCorrection(id, new ExceptionActionRequest(type, reason, body.evidenceRef()), actor, login);

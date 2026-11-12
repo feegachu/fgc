@@ -127,6 +127,29 @@ class MonthRuns(unittest.TestCase):
         self.assertEqual([c[1] for c in server.calls if c[0] == 'POST'], ['/api/v1/validation-runs', '/api/v1/validation-runs/99/execute'])
 
 
+class DraftDeletion(unittest.TestCase):
+    def test_preserves_a_blocked_draft_with_business_history(self):
+        server = mock.Mock()
+        server.call.side_effect = [(201, {'data': {'commissionTransactionId': 241}}),
+                                   (409, {'error': {'code': 'FGC-TRAN-009'}})]
+        server.ok.return_value = {'confirmable': False}
+        loader = Loader(server, server)
+        row = {**line(), 'scheduleLineId': 547, 'commissionItemId': 1}
+        self.assertIsNone(loader.pay_line('GA_TO_FC', row, 1, '2026-11'))
+        self.assertEqual(server.call.call_args.args, ('DELETE', '/api/v1/transactions/241'))
+        server.ok.assert_called_once_with('POST', '/api/v1/transactions/241/precheck', {})
+        self.assertEqual(loader.counters['payments'], 1)
+
+    def test_unexpected_deletion_failure_still_stops_the_loader(self):
+        server = mock.Mock()
+        server.call.side_effect = [(201, {'data': {'commissionTransactionId': 241}}),
+                                   (500, {'error': {'code': 'OTHER'}})]
+        server.ok.return_value = {'confirmable': False}
+        row = {**line(), 'scheduleLineId': 547, 'commissionItemId': 1}
+        with self.assertRaises(SystemExit):
+            Loader(server, server).pay_line('GA_TO_FC', row, 1, '2026-11')
+
+
 class DemoTables(unittest.TestCase):
     def test_every_table_points_at_a_contract_the_loader_creates(self):
         named = {row[1] for row in EVENTS} | {row[2] for row in COMMON_COST + SETTLEMENT_SUPPORT}
@@ -149,6 +172,50 @@ class DemoTables(unittest.TestCase):
         self.assertIsNone(anomaly('FGC-FGL01-202609-0101', 'GA_TO_FC', line(due='2026-10-02')))
         self.assertEqual(anomaly('FGC-FGL02-202611-0114', 'INSURER_TO_GA', line()), 'KEEP_REJECTED')
         self.assertIsNone(anomaly('FGC-FGL01-202610-0106', 'GA_TO_FC', line()))
+
+
+from load_filming_demo import Database, OctoberDemo, start_server
+
+
+class Isolation(unittest.TestCase):
+    def test_rejects_main_database_and_sql_identifiers(self):
+        for name in ('fgc', 'fgc_demo', 'postgres', 'fgc_october_test; DROP DATABASE fgc', 'fgc_october_'):
+            with self.subTest(name=name), self.assertRaises(RuntimeError):
+                Database(name)
+
+    def test_existing_database_is_never_overwritten(self):
+        db = Database('fgc_october_existing')
+        with mock.patch.object(db, 'sql', return_value='1') as sql:
+            with self.assertRaises(RuntimeError):
+                db.create()
+        sql.assert_called_once()
+        self.assertNotIn('DROP', sql.call_args.args[0])
+
+    def test_main_server_port_is_rejected_before_startup(self):
+        with self.assertRaises(RuntimeError), mock.patch('subprocess.Popen') as process:
+            start_server(Database('fgc_october_test'), 8081, None)
+        process.assert_not_called()
+
+
+class Payments(unittest.TestCase):
+    def test_monthly_scenario_leaves_draft_without_attempting_confirmation(self):
+        demo = object.__new__(OctoberDemo)
+        demo.cap_detection = 'MONTHLY'
+        demo.s = mock.Mock()
+        demo.s.ok.return_value = {'commissionTransactionId': 7}
+        self.assertEqual(demo.pay({}, expect_cap=True), 7)
+        demo.s.call.assert_not_called()
+
+    def test_cap_scenario_must_be_blocked_by_the_real_cap_gate(self):
+        demo = object.__new__(OctoberDemo)
+        demo.s = mock.Mock()
+        demo.s.ok.return_value = {'commissionTransactionId': 7}
+        for result in [(200, {'data': {}}), (422, {'error': {'code': 'FGC-CAP-004'}})]:
+            demo.s.call.return_value = result
+            with self.assertRaises(RuntimeError):
+                demo.pay({}, expect_cap=True)
+        demo.s.call.return_value = (422, {'error': {'code': 'FGC-CAP-001'}})
+        self.assertEqual(demo.pay({}, expect_cap=True), 7)
 
 
 if __name__ == '__main__':

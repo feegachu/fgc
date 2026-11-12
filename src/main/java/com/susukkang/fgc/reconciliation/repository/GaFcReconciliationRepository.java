@@ -58,6 +58,7 @@ public class GaFcReconciliationRepository {
                 AND ct.settlement_month = :settlementMonth
                 AND ct.cashflow_type = 'PAYMENT'
                 AND ct.status = 'CONFIRMED'
+                AND ct.commission_item_id NOT IN """ + ReconciliationItemScope.EXCLUDED_ITEM_IDS + """
                 AND ta.attribution_scope = 'CONTRACT'
                 AND ta.attribution_month = :settlementMonth
                 AND c.insurer_id = :insurerId

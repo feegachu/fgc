@@ -184,6 +184,21 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
     }
 
     @Test
+    void monitoringCandidatesStayInHistoryButNotInOpenWorkOrDashboardTotal() {
+        long before = dashboardService.summarize(LocalDate.of(2026, 10, 1)).kpis().openException();
+        jdbcTemplate.update("UPDATE fgc.exception_case SET exception_type='ARBITRAGE_CANDIDATE',severity='WARNING' WHERE contract_id=?", contractId);
+        var criteria = ExceptionCaseSearchDTO.builder().contractNo(contractNo).build();
+        for (String status : List.of("OPEN", "NEW", "IN_REVIEW")) {
+            var statuses = ExceptionStatus.dbStatuses(status);
+            assertThat(repository.search(criteria, statuses, 0, 100)).isEmpty();
+            assertThat(repository.count(criteria, statuses)).isZero();
+            assertThat(repository.countByTypeAndSeverity(criteria, statuses)).isEmpty();
+        }
+        assertThat(repository.search(criteria, List.of(), 0, 100)).hasSize(3);
+        assertThat(dashboardService.summarize(LocalDate.of(2026, 10, 1)).kpis().openException()).isEqualTo(before - 2);
+    }
+
+    @Test
     void OPEN_필터는_신규와_검토중만_조회한다() {
         var rows = repository.search(ExceptionCaseSearchDTO.builder().contractNo(contractNo).build(),
                 ExceptionStatus.dbStatuses("OPEN"), 0, 100);

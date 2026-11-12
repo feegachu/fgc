@@ -183,7 +183,28 @@ class PaymentJournalCorrectionIntegrationTest {
 
     @Test
     @WithMockUser(roles = "SETTLEMENT")
-    void reducingAViolationToTheLimitKeepsTheWarningResultAndReducesTheOpenExceptionCount() {
+    void correctingCapDraftAfterMonthlyReconciliationPostsActualAndResolvesMissingPayment() {
+        Fixture f = fixture();
+        corrections.reverse(new ReverseJournalCommand(f.journal(), "기존 지급 취소", "CAP-MISSING", 1L));
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=? WHERE contract_id=?", TEST_MONTH, contractId);
+        var draft = payments.create(paymentBody(payments.get(f.payment()), "1000000000", TEST_MONTH));
+        assertThatThrownBy(() -> payments.confirm(draft.paymentId(), "CAP-MISSING-" + draft.paymentId()))
+                .isInstanceOf(com.susukkang.fgc.transaction.service.CommissionPaymentConfirmationRejectedException.class);
+        Long capException = id("SELECT exception_case_id FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND exception_type='CAP_VIOLATION'", draft.paymentId().toString());
+        startException(capException);
+        var result = exceptionPayments.correct(capException,
+                new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(draft.paymentId(),
+                        payments.get(draft.paymentId()).updatedAt(), paymentBody(draft, "100000", TEST_MONTH)), 1L, "admin");
+        assertThat(result.resolved()).isTrue();
+        assertThat(id("SELECT count(*) FROM fgc.journal_header WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND journal_type='CONFIRMED_FC_PAYOUT' AND status='POSTED'", draft.paymentId().toString())).isEqualTo(1);
+        Long latest = id("SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE validation_run_id=? AND NOT superseded_yn ORDER BY reconciliation_run_id DESC LIMIT 1", validationRunId);
+        assertThat(resultType(latest)).isEqualTo("MATCHED");
+        assertThat(id("SELECT count(*) FROM fgc.exception_case WHERE contract_id=? AND status IN ('NEW','IN_REVIEW')", contractId)).isZero();
+    }
+
+    @Test
+    @WithMockUser(roles = "SETTLEMENT")
+    void reducingAViolationToTheLimitResolvesCapExceptionsAndRefreshesReconciliation() {
         Fixture fixture = fixture();
         jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=? WHERE contract_id=?", TEST_MONTH, contractId);
         var draft = payments.create(paymentBody(payments.get(fixture.payment()), "1000000000", TEST_MONTH));
@@ -194,7 +215,7 @@ class PaymentJournalCorrectionIntegrationTest {
                 WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND exception_type='CAP_VIOLATION'
                 """, draft.paymentId().toString());
         startException(exception);
-        long openBefore = exceptionActions.counts("OPEN", null).total();
+        long openBefore = id("SELECT count(*) FROM fgc.exception_case WHERE contract_id=? AND exception_type IN ('CAP_VIOLATION','CAP_WARNING') AND status IN ('NEW','IN_REVIEW')", contractId);
         var cap = exceptionPayments.preview(exception, new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
                 draft.paymentId(), null, paymentBody(draft, "1", TEST_MONTH)), 1L).capPreview().getFirst();
         String correctedAmount = Long.toString(cap.limitAmount() - cap.existingIncludedAmount());
@@ -209,7 +230,10 @@ class PaymentJournalCorrectionIntegrationTest {
                   AND warning.exception_type='CAP_WARNING' AND check_result.result_status='WARNING' AND check_result.usage_pct=100
                 """, result.payment().paymentId().toString());
         assertThat(status(warning)).isEqualTo("RESOLVED");
-        assertThat(exceptionActions.counts("OPEN", null).total()).isEqualTo(openBefore - 1);
+        // 한도 정정으로 기존 지급에 추가 지급이 확정되므로 대사 예외는 별도로 재검출될 수 있다.
+        assertThat(id("SELECT count(*) FROM fgc.exception_case WHERE contract_id=? AND exception_type IN ('CAP_VIOLATION','CAP_WARNING') AND status IN ('NEW','IN_REVIEW')", contractId)).isEqualTo(openBefore - 1);
+        assertThat(id("SELECT count(*) FROM fgc.journal_header WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND journal_type='CONFIRMED_FC_PAYOUT' AND status='POSTED'", result.payment().paymentId().toString())).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT superseded_yn FROM fgc.reconciliation_run WHERE reconciliation_run_id=?", Boolean.class, fixture.run())).isTrue();
     }
 
     @Test

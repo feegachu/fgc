@@ -13,6 +13,11 @@ public class ClawbackCandidateCaptureService {
     private final ClawbackCandidateWriteRepository repository;
 
     @Transactional
+    public int captureMonthlyStatusEvents(long validationRunId) {
+        return repository.captureStatusEvents(repository.findMonthlyStatusEventIds(validationRunId));
+    }
+
+    @Transactional
     public int captureStatusEvents(List<Long> eventIds) {
         return repository.captureStatusEvents(List.copyOf(eventIds));
     }

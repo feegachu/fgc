@@ -249,6 +249,41 @@ class DashboardServiceIntegrationTest {
                 String.class, contract, stage)).isEqualTo(confirmed ? "VIOLATION" : "WARNING");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"NEW,NORMAL", "IN_REVIEW,WARNING", "NEW,VIOLATION"})
+    void unresolvedBlockedPaymentRemainsVisibleAfterMonthlyCheckAndDisappearsAfterResolution(String status, String latest) {
+        LocalDate month = LocalDate.of(2097, 3, 1);
+        Long contract = contractId("FGC-FGL01-202607-0001");
+        Long payment = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.commission_transaction(payment_stage,source_type,source_business_key,recipient_agent_id,
+                    commission_item_id,settlement_month,amount,cashflow_type,status)
+                VALUES('GA_TO_FC','GA_MANUAL_PAYMENT',?,(SELECT MIN(agent_id) FROM fgc.agent),
+                    (SELECT MIN(commission_item_id) FROM fgc.commission_item),?,0,'PAYMENT','DRAFT')
+                RETURNING commission_transaction_id
+                """, Long.class, "IT-DASH-BLOCKED-" + java.util.UUID.randomUUID(), month);
+        Long check = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.cap_check(contract_id,payment_stage,cap_rule_set_id,check_kind,as_of_date,
+                    base_premium_amount,limit_amount,included_amount,remaining_amount,result_status,
+                    checked_at,candidate_transaction_id)
+                VALUES(?,'GA_TO_FC',?,'PRE_CONFIRM',?,100,1200,1300,-100,'VIOLATION',
+                    TIMESTAMPTZ '2097-03-08 09:00:00+09',?) RETURNING cap_check_id
+                """, Long.class, contract, capRuleSetId("GA_TO_FC"), month.plusDays(7), payment);
+        Long exception = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.exception_case(exception_key,exception_type,severity,status,contract_id,
+                    source_entity_type,source_entity_id,cap_check_id,validation_month,title)
+                VALUES(?,'CAP_VIOLATION','CRITICAL',?,?,'COMMISSION_TRANSACTION',?,?,?,'차단된 지급')
+                RETURNING exception_case_id
+                """, Long.class, "IT-DASH-BLOCKED-" + payment, status, contract, payment.toString(), check, month);
+        insertCapCheck(contract, "GA_TO_FC", month.plusDays(30), latest,
+                OffsetDateTime.parse("2097-03-31T09:00:00+09:00"));
+        assertThat(dashboardService.summarize(month).kpis().capViolation()).isEqualTo(1);
+        assertThat(dashboardService.summarize(month).kpis().capWarning()).isZero();
+        assertThat(dashboardService.summarize(month.plusMonths(1)).kpis().capViolation()).isZero();
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status='RESOLVED' WHERE exception_case_id=?", exception);
+        assertThat(dashboardService.summarize(month).kpis().capViolation()).isEqualTo(latest.equals("VIOLATION") ? 1 : 0);
+        assertThat(dashboardService.summarize(month).kpis().capWarning()).isEqualTo(latest.equals("WARNING") ? 1 : 0);
+    }
+
     @Test
     void summarizeCountsOnlyLatestCapCheckPerContract() {
         Long id = contractId("FGC-FGL01-202607-0001");
@@ -373,6 +408,7 @@ class DashboardServiceIntegrationTest {
     void summarizeCountsOpenExceptionsRegardlessOfMonth() {
         long existingOpenCount = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM fgc.exception_case WHERE status IN ('NEW', 'IN_REVIEW')
+                  AND exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING', 'JOURNAL_CORRECTION_REQUIRED')
                 """, Long.class);
         OffsetDateTime old = OffsetDateTime.parse("2026-01-01T09:00:00+09:00");
         insertExceptionCase("DASH-TEST-EXC-NEW", "NEW", old);

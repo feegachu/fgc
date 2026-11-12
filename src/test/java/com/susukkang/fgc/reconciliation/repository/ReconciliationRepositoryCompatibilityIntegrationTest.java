@@ -8,6 +8,8 @@ import com.susukkang.fgc.transaction.performance.PaymentJdbcObservation;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -57,6 +59,42 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
     @BeforeEach
     void isolatedBaseline() {
         baseline = new JdbcBaseline(dataSource);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"GA_TO_FC,COMMON_COST", "GA_TO_FC,SETTLEMENT_SUPPORT",
+            "INSURER_TO_GA,COMMON_COST", "INSURER_TO_GA,SETTLEMENT_SUPPORT"})
+    void 별도_배부_비용은_예상과_실제_양쪽에서_제외하고_일반수수료는_유지한다(String stage, String itemCode) {
+        Long lineId = insertSchedule(stage);
+        insertPostedJournal("INSURER_TO_GA".equals(stage) ? "EXPECTED_INSURER_INCOME" : "EXPECTED_FC_PAYOUT",
+                "SCHEDULE_LINE", lineId);
+        insertActual(stage, itemCode);
+        Long insurerId = jdbc.queryForObject("SELECT insurer_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1", Long.class);
+        Long originalItem = jdbc.queryForObject("SELECT commission_item_id FROM fgc.schedule_line WHERE schedule_line_id=?", Long.class, lineId);
+        Long excludedItem = jdbc.queryForObject("SELECT commission_item_id FROM fgc.commission_item WHERE item_code=?", Long.class, itemCode);
+        jdbc.update("UPDATE fgc.schedule_line SET commission_item_id=? WHERE schedule_line_id=?", excludedItem, lineId);
+        if ("GA_TO_FC".equals(stage)) {
+            assertThat(fcSources.findExpectedSources(TEST_MONTH, insurerId)).isEmpty();
+            assertThat(fcSources.findActualSources(TEST_MONTH, insurerId)).isEmpty();
+        } else {
+            assertThat(insurerSources.findExpectedSources(TEST_MONTH, insurerId)).isEmpty();
+            assertThat(insurerSources.findActualSources(TEST_MONTH, insurerId)).isEmpty();
+        }
+        // 한도 산입에 사용하는 실제 지급과 귀속 원천은 삭제하거나 산입 제외로 바꾸지 않는다.
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fgc.commission_transaction ct JOIN fgc.transaction_attribution ta USING(commission_transaction_id)
+                WHERE ct.settlement_month=? AND ct.payment_stage=? AND ct.status='CONFIRMED'
+                  AND ta.inclusion_status_snapshot='INCLUDED'
+                """, Integer.class, TEST_MONTH, stage)).isPositive();
+        jdbc.update("UPDATE fgc.schedule_line SET commission_item_id=? WHERE schedule_line_id=?", originalItem, lineId);
+        insertActual(stage);
+        if ("GA_TO_FC".equals(stage)) {
+            assertThat(fcSources.findExpectedSources(TEST_MONTH, insurerId)).hasSize(1);
+            assertThat(fcSources.findActualSources(TEST_MONTH, insurerId)).hasSize(1);
+        } else {
+            assertThat(insurerSources.findExpectedSources(TEST_MONTH, insurerId)).hasSize(1);
+            assertThat(insurerSources.findActualSources(TEST_MONTH, insurerId)).hasSize(1);
+        }
     }
 
     @Test
@@ -170,10 +208,14 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
     }
 
     private void insertActual(String stage) {
+        insertActual(stage, "BASE_COMMISSION");
+    }
+
+    private void insertActual(String stage, String itemCode) {
         Long contractId = jdbc.queryForObject("SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1", Long.class);
         Long insurerId = jdbc.queryForObject("SELECT insurer_id FROM fgc.insurance_contract WHERE contract_id = ?", Long.class, contractId);
         Long agentId = jdbc.queryForObject("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", Long.class, contractId);
-        Long itemId = jdbc.queryForObject("SELECT commission_item_id FROM fgc.commission_item WHERE cashflow_type = 'PAYMENT' ORDER BY commission_item_id LIMIT 1", Long.class);
+        Long itemId = jdbc.queryForObject("SELECT commission_item_id FROM fgc.commission_item WHERE item_code = ?", Long.class, itemCode);
         Long transactionId = jdbc.queryForObject("""
                 INSERT INTO fgc.commission_transaction
                     (payment_stage, source_type, source_business_key, insurer_id, recipient_agent_id,

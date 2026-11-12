@@ -101,3 +101,8 @@ graphify-out/
 files/
 # PDF 렌더링 검수 산출물
 /output/pdf/
+
+# 로컬 시연 DB 백업과 검증 산출물
+/output/october-demo/
+/output/ci-check-*/
+scripts/demo-data/__pycache__/

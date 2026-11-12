@@ -123,6 +123,15 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
         to: href('/cap-checks', { status: 'VIOLATION' }),
       },
       {
+        id: 'recon',
+        color: 'error',
+        label: '대사 불일치',
+        value: data.reconMismatch,
+        footer: '허용오차 0원',
+        tone: 'error',
+        to: href('/reconciliations', { onlyMismatch: 'true' }),
+      },
+      {
         id: 'cap-warning',
         color: 'warning',
         label: '1,200% 주의',
@@ -141,20 +150,11 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
         to: href('/arbitrage-checks', { status: 'CANDIDATE' }),
       },
       {
-        id: 'recon',
-        color: 'info',
-        label: '대사 불일치',
-        value: data.reconMismatch,
-        footer: '허용오차 0원',
-        tone: 'risk',
-        to: href('/reconciliations', { onlyMismatch: 'true' }),
-      },
-      {
         id: 'journal',
         color: 'success',
         label: '원장 불균형',
         value: data.journalImbalance,
-        footer: revised ? '전체 기간, 확정 전 0건이어야 합니다' : '확정 전 0건이어야 합니다',
+        footer: '차변과 대변의 금액 불일치',
         tone: data.journalImbalance === 0 ? 'success' : 'error',
         to: href('/journals'),
       },
@@ -178,14 +178,10 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
             </button>
             <UpdatedAt at={openCounts.dataUpdatedAt} />
           </>
-        ) : openCounts.data?.total === 0 ? (
-          '미처리 예외가 없습니다'
         ) : openCounts.isPending ? (
           '불러오는 중'
-        ) : revised ? (
-          '전체 기간 · 신규 + 검토중'
         ) : (
-          '신규 + 검토중'
+          '한도 위반 및 대사 불일치'
         ),
         tone: 'warning',
         to: href('/exceptions', { status: OPEN_STATUS }),

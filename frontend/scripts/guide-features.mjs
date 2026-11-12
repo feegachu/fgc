@@ -64,7 +64,14 @@ function readScreens(node) {
     for (const element of node.initializer.elements) {
       if (!ts.isObjectLiteralExpression(element)) throw new Error('Screens must be statically registered')
       screens.push(Object.fromEntries(element.properties.map((prop) => {
-        if (!ts.isPropertyAssignment(prop) || !ts.isStringLiteral(prop.initializer)) throw new Error('Screen metadata must use string literals')
+        if (!ts.isPropertyAssignment(prop)) throw new Error('Screen metadata must use literal assignments')
+        if (prop.name.getText(screenSource) === 'enabled') {
+          if (![ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword].includes(prop.initializer.kind)) {
+            throw new Error('Screen enabled metadata must use boolean literals')
+          }
+          return ['enabled', prop.initializer.kind === ts.SyntaxKind.TrueKeyword]
+        }
+        if (!ts.isStringLiteral(prop.initializer)) throw new Error('Screen metadata must use string literals (enabled must be boolean)')
         return [prop.name.getText(screenSource), prop.initializer.text]
       })))
     }

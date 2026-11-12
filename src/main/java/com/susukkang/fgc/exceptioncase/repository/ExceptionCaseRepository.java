@@ -194,7 +194,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                                   @Param("reasonCode") String reasonCode,
                                   @Param("description") String description);
 
-    /** 월 검증 8단계: 이번 실행의 1,200% 한도 위반·검토필요 전부를 한 번에 탐지·기록한다. */
+    /** 월 검증 8단계: 이번 실행의 1,200% 한도 위반·주의·검토필요 전부를 한 번에 탐지·기록한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     @Query(value = """
             SELECT COUNT(*) FILTER (WHERE recorded.new_case)
@@ -204,6 +204,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
               CROSS JOIN LATERAL fgc.record_exception_detection(
                   CONCAT(
                       CASE cc.result_status
+                          WHEN 'WARNING' THEN 'CAP_WARNING'
                           WHEN 'VIOLATION' THEN 'CAP_VIOLATION'
                           WHEN 'REVIEW_REQUIRED' THEN 'CAP_REVIEW_REQUIRED'
                       END,
@@ -211,14 +212,17 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                       ':CONTRACT:', cc.contract_id, ':', cc.payment_stage, ':', cc.cap_rule_set_id
                   ),
                   CASE cc.result_status
+                      WHEN 'WARNING' THEN 'CAP_WARNING'
                       WHEN 'VIOLATION' THEN 'CAP_VIOLATION'
                       WHEN 'REVIEW_REQUIRED' THEN 'CAP_REVIEW_REQUIRED'
                   END,
                   CASE cc.result_status
+                      WHEN 'WARNING' THEN 'CAP_LIMIT_WARNING'
                       WHEN 'VIOLATION' THEN 'CAP_LIMIT_VIOLATION'
                       WHEN 'REVIEW_REQUIRED' THEN 'CAP_CALCULATION_REVIEW_REQUIRED'
                   END,
                   CASE cc.result_status
+                      WHEN 'WARNING' THEN 'WARNING'
                       WHEN 'VIOLATION' THEN 'CRITICAL'
                       WHEN 'REVIEW_REQUIRED' THEN 'WARNING'
                   END,
@@ -226,6 +230,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                   'CAP_CHECK', CAST(cc.cap_check_id AS varchar),
                   CONCAT(
                       CASE cc.result_status
+                          WHEN 'WARNING' THEN '1,200% 한도 주의'
                           WHEN 'VIOLATION' THEN '1,200% 한도 초과'
                           WHEN 'REVIEW_REQUIRED' THEN '1,200% 한도 검토 필요'
                       END,
@@ -253,7 +258,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                   )
               ) recorded
              WHERE cc.validation_run_id = :validationRunId
-               AND cc.result_status IN ('VIOLATION', 'REVIEW_REQUIRED')
+               AND cc.result_status IN ('VIOLATION', 'WARNING', 'REVIEW_REQUIRED')
             """, nativeQuery = true)
     long insertFromCapChecks(@Param("validationRunId") Long validationRunId);
 

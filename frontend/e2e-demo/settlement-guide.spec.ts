@@ -83,7 +83,7 @@ test('FUN-088 실제 서버: 대사 이력 수동 펼치기 → 분개 선택과
   await card.getByRole('button', { name: '다음', exact: true }).click()
   await page.locator('[data-guide-feature="navigation.menu.excp-w01"]').click()
   await expect(page).toHaveURL(/\/exceptions/)
-  await expect(card.getByRole('heading', { name: '유형별 미처리 현황' })).toBeVisible()
+  await expect(card.getByRole('heading', { name: '예외와 모니터링 현황' })).toBeVisible()
   expect(writes).toEqual([])
   await info.attach('reconciliation-ledger-exceptions', { body: await page.screenshot(), contentType: 'image/png' })
 })

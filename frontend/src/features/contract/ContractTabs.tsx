@@ -39,11 +39,13 @@ import { ContractStatusBadge, DataOriginBadge } from './badges'
 import { ContractStatusHistory } from './ContractStatusHistory'
 import { ContractFacts, QueryContent } from './detailParts'
 import { arbitrageStatusLabels, paymentCycleLabels } from './labels'
-import { contractTabs as tabs } from './detailState'
+import { contractTabs } from './detailState'
+import { screenFor } from '../../app/screens'
 import type { ContractTab } from './detailState'
 import { contractTabDescriptions, contractTabIcons } from './detailState'
 
 const RevisedDetail = createContext(false)
+const tabs = contractTabs.filter(([name]) => name !== 'acquisition' || screenFor('/acquisition-cost-checks')?.enabled !== false)
 
 const text = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 const stageLabel = (code?: string, label?: string) => responseLabel(label, PAYMENT_STAGE, code)
@@ -120,7 +122,8 @@ export function ContractTabs({
       root.removeEventListener('fgc-contract-tabs-stop', stop)
     }
   }, [revised])
-  const displayed = revised ? preview ?? active : active
+  const selected = revised ? preview ?? active : active
+  const displayed = tabs.some(([name]) => name === selected) ? selected : 'basic'
   useEffect(() => {
     if (!revised) return
     const button = tabButtons.current[tabs.findIndex(([name]) => name === displayed)]

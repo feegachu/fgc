@@ -226,7 +226,15 @@ class Loader:
             check = self.s.ok('POST', f'/api/v1/transactions/{payment}/precheck', {})
             if not check.get('confirmable'):
                 if not keep_rejected:
-                    self.s.ok('DELETE', f'/api/v1/transactions/{payment}')
+                    delete_status, delete_data = self.s.call('DELETE', f'/api/v1/transactions/{payment}')
+                    if delete_status == 409 and delete_data.get('error', {}).get('code') == 'FGC-TRAN-009':
+                        # 상태 보류 등 업무 이력이 연결된 초안은 서버의 삭제 제한을 지키고 남긴다.
+                        print(f'  업무 이력 연결 초안 보존 {key} (지급 ID {payment})')
+                        self.counters['skipped'] += 1
+                        return None
+                    if delete_status not in (200, 204):
+                        sys.exit(f'DELETE /api/v1/transactions/{payment} 실패: {delete_status} '
+                                 f'{json.dumps(delete_data, ensure_ascii=False)[:400]}')
                     self.counters['payments'] -= 1
                     self.counters['skipped'] += 1
                 return None

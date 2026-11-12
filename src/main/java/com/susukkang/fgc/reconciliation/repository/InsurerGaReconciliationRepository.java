@@ -91,6 +91,7 @@ public class InsurerGaReconciliationRepository {
                 AND ct.source_type IN ( 'INSURER_STATEMENT','GA_MANUAL_PAYMENT')
                 AND ct.cashflow_type = 'PAYMENT'
                 AND ct.status = 'CONFIRMED'
+                AND ct.commission_item_id NOT IN """ + ReconciliationItemScope.EXCLUDED_ITEM_IDS + """
                 AND ta.attribution_scope = 'CONTRACT'
                 ORDER BY ta.contract_id, ct.commission_item_id,
                 COALESCE(ct.due_date, ct.settlement_month),

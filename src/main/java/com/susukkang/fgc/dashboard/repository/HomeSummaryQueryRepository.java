@@ -56,6 +56,7 @@ public class HomeSummaryQueryRepository {
                   FROM fgc.exception_case ec
                   LEFT JOIN fgc.insurance_contract c ON c.contract_id = ec.contract_id
                  WHERE ec.status IN (:openStatuses) AND ec.created_at < :asOfEnd
+                   AND ec.exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING')
                  GROUP BY COALESCE(ec.agent_id, c.agent_id)
             ),
             latest_cap AS (
