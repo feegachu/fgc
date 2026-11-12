@@ -47,7 +47,14 @@ class ExceptionCaseRepositoryDetectionIntegrationTest {
         var criteria = com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO.builder()
                 .validationMonth(FIRST_MONTH).type(com.susukkang.fgc.common.code.ExceptionType.CAP_WARNING).build();
         assertThat(queryRepository.count(criteria, List.of())).isEqualTo(1);
-        assertThat(queryRepository.count(criteria, ExceptionStatus.dbStatuses("OPEN"))).isZero();
+        // 주의 유형을 명시한 조회는 신규 건을 보여 주지만, 유형 없는 미처리 업무에서는 제외한다.
+        assertThat(queryRepository.count(criteria, ExceptionStatus.dbStatuses("OPEN"))).isEqualTo(1);
+        assertThat(queryRepository.search(criteria, ExceptionStatus.dbStatuses("OPEN"), 0, 20))
+                .hasSize(1).allSatisfy(row -> assertThat(row.exceptionType()).isEqualTo("CAP_WARNING"));
+        var openWork = com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO.builder()
+                .validationMonth(FIRST_MONTH).build();
+        assertThat(queryRepository.count(openWork, ExceptionStatus.dbStatuses("OPEN"))).isZero();
+        assertThat(queryRepository.search(openWork, ExceptionStatus.dbStatuses("OPEN"), 0, 20)).isEmpty();
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fgc.exception_occurrence WHERE validation_run_id=?", Long.class, run))
                 .isEqualTo(1);
     }
