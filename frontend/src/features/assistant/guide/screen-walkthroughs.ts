@@ -244,7 +244,7 @@ export const screenWalkthroughs: Record<string, readonly ScreenHelpStep[]> = {
       '필요한 관련 화면을 열고 대상 계약과 조회 조건을 다시 확인합니다.')),
 
   'EXCP-W01': tour('예외 조회와 처리',
-    region('exception.summary', '[aria-label="유형별 미처리 요약"]', '유형별 미처리 현황',
+    region('exception.summary', '[aria-label="예외와 모니터링 요약"]', '예외와 모니터링 현황',
       '유형별로 남은 예외 건수를 확인하세요.', '조회 조건에서 확인할 유형과 상태를 고르세요.'),
     target('exception.filters', '예외 조회 조건',
       '유형·상태·계약번호로 범위를 좁히세요.', '조회를 누르고 목록에서 한 건을 선택하세요.'),

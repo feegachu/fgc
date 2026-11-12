@@ -55,6 +55,7 @@ public class BranchDashboardRepository {
                   LEFT JOIN fgc.agent a ON a.agent_id = ec.agent_id
                   LEFT JOIN org_branch ob ON ob.origin_id = a.organization_id
                  WHERE ec.status IN (:openStatuses)
+                   AND ec.exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING')
             )
             """;
 

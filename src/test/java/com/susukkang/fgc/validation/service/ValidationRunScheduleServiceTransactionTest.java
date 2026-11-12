@@ -1,6 +1,7 @@
 package com.susukkang.fgc.validation.service;
 
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
 import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -68,6 +69,8 @@ class ValidationRunScheduleServiceTransactionTest {
     private SchedulePreviewRepository previews;
     @MockitoBean
     private FeeRegimeSchedulePolicyService previewPolicies;
+    @MockitoBean
+    private ClawbackCandidateCaptureService clawbackCandidates;
 
     @Autowired
     private ScheduleRegenerationPort port;
@@ -92,6 +95,7 @@ class ValidationRunScheduleServiceTransactionTest {
         assertThat(result.skips()).singleElement()
                 .extracting(ContractSkip::reasonCode).isEqualTo("POLICY_MISSING");
         verify(query).executeUpdate();
+        verify(clawbackCandidates).captureMonthlyStatusEvents(118L);
         verify(connection).commit();
     }
 

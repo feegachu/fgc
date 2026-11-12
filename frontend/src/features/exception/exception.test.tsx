@@ -162,6 +162,7 @@ const accounts = [
 ]
 
 const clients: QueryClient[] = []
+let monitoringResponse = { capWarning: 0, arbitrageCandidate: 0 }
 let currentUser = user
 let searchResponse: (path: string) => unknown
 let postResponse: (path: string, body: unknown) => unknown
@@ -180,6 +181,7 @@ beforeEach(() => {
   useToastStore.setState({ messages: [] })
   sessionStorage.clear()
   currentUser = user
+  monitoringResponse = { capWarning: 0, arbitrageCandidate: 0 }
   searchResponse = () => search([baseCase])
   postResponse = () => {
     throw new Error('unexpected POST')
@@ -189,6 +191,7 @@ beforeEach(() => {
     init?: { method?: string; body?: unknown },
   ) => {
     if (init?.method === 'POST') return envelope(await postResponse(path, init.body))
+    if (path.startsWith('/api/v1/dashboard/summary')) return envelope(monitoringResponse)
     if (path.startsWith('/api/v1/exceptions/options')) return envelope(options)
     if (path.startsWith('/api/v1/exceptions?')) return envelope(await searchResponse(path))
     if (path.startsWith('/api/v1/journals/accounts')) return envelope(accounts)
@@ -241,7 +244,7 @@ describe('EXCP-W01 예외함', () => {
     expect(screen.queryByText(/COMMISSION_TRANSACTION/)).not.toBeInTheDocument()
   })
 
-  it('미처리 기본값으로 요약 카드와 목록을 보여 준다', async () => {
+  it('전체 기본값으로 요약 카드와 목록을 보여 준다', async () => {
     renderPage()
     const row = within(await table()).getAllByRole('row')[1]
     expect(within(row).getByText('1,200% 위반')).toBeInTheDocument()
@@ -253,8 +256,32 @@ describe('EXCP-W01 예외함', () => {
       'href',
       '/app/exceptions?type=CAP_VIOLATION&status=OPEN&month=2026-07',
     )
-    expect(searchPaths()[0]).toContain('status=OPEN')
+    expect(new URLSearchParams(searchPaths()[0].split('?')[1]).get('status')).toBe('')
+    expect(screen.getByLabelText('상태')).toHaveValue('ALL')
     expect(searchPaths()[0]).toContain('page=1')
+    const zero = screen.getByRole('link', { name: '정책 없음 0건' })
+    expect(zero).toHaveAttribute('href', '/app/exceptions?type=POLICY_MISSING&status=OPEN&month=2026-07')
+    expect(zero.querySelector('.kpi-value')).toHaveAttribute('data-zero', 'true')
+  })
+
+  it('주의·차익거래는 대시보드 판정 건수를 표시하고 해당 월 전체 목록으로 연결한다', async () => {
+    monitoringResponse = { capWarning: 1, arbitrageCandidate: 1 }
+    renderPage()
+    const warning = await screen.findByRole('link', { name: '1,200% 주의 1건' })
+    const arbitrage = await screen.findByRole('link', { name: '차익거래 검토대상 1건' })
+    expect(warning).toHaveAttribute('href', '/app/exceptions?type=CAP_WARNING&status=ALL&validationMonth=2026-07-01&month=2026-07')
+    expect(arbitrage).toHaveAttribute('href', '/app/exceptions?type=ARBITRAGE_CANDIDATE&status=ALL&validationMonth=2026-07-01&month=2026-07')
+    expect(warning).toHaveTextContent('사용률 경고 기준 이상')
+    expect(arbitrage).toHaveTextContent('위반 확정 아님')
+    expect(screen.getByLabelText('상태')).toHaveValue('ALL')
+  })
+
+  it('미처리 예외가 없어도 기본 7개 요약 카드를 0건으로 유지한다', async () => {
+    searchResponse = () => ({ ...search([]), summary: [] })
+    renderPage()
+    await screen.findByText('미처리 예외가 없습니다.')
+    const summary = screen.getByRole('region', { name: '예외와 모니터링 요약' })
+    expect(within(summary).getAllByRole('link', { name: /0건$/ })).toHaveLength(7)
   })
 
   it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건을 유지한다', async () => {
@@ -275,7 +302,7 @@ describe('EXCP-W01 예외함', () => {
     await waitFor(() => expect(lastQuery().get('sort')).toBe('detectionCount,asc'))
     expect(lastQuery().get('page')).toBe('1')
     expect(lastQuery().get('contractNo')).toBe('C-0001')
-    expect(lastQuery().get('status')).toBe('OPEN')
+    expect(lastQuery().get('status')).toBe('')
     expect(within(list).getByRole('columnheader', { name: /^검출/ })).toHaveAttribute('aria-sort', 'ascending')
     await actions.click(within(list).getByRole('button', { name: '검출' }))
     await waitFor(() => expect(router.state.location.search).toContain('sort=detectionCount%2Cdesc'))

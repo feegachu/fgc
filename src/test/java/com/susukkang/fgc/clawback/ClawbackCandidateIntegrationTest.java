@@ -110,6 +110,26 @@ class ClawbackCandidateIntegrationTest {
     }
 
     @Test
+    void monthlyCaptureUsesEffectiveMonthInSeoulAndIsIdempotentWithoutDailyProcessing() {
+        long september = event("TERMINATED", "2026-09-30T14:59:59Z");
+        long octoberStart = event("TERMINATED", "2026-09-30T15:00:00Z");
+        long octoberEnd = event("CANCELLED", "2026-10-31T14:59:59Z");
+        long november = event("LAPSED", "2026-10-31T15:00:00Z");
+        long active = event("ACTIVE", "2026-10-15T00:00:00+09:00");
+        long run = jdbc.queryForObject("""
+                INSERT INTO fgc.validation_run(validation_month, run_no, run_type, status)
+                SELECT DATE '2026-10-01', COALESCE(MAX(run_no),0)+1, 'MONTHLY', 'CREATED'
+                  FROM fgc.validation_run WHERE validation_month=DATE '2026-10-01'
+                RETURNING validation_run_id
+                """, Long.class);
+        assertThat(capture.captureMonthlyStatusEvents(run)).isEqualTo(2);
+        assertThat(capture.captureMonthlyStatusEvents(run)).isZero();
+        assertThat(jdbc.queryForList("SELECT status_event_id FROM fgc.clawback_candidate WHERE contract_id=? AND trigger_type='STATUS_EVENT'", Long.class, contractId))
+                .containsExactlyInAnyOrder(octoberStart, octoberEnd).doesNotContain(september, november, active);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.contract_status_event_processing WHERE contract_status_event_id IN (?,?)", Long.class, octoberStart, octoberEnd)).isZero();
+    }
+
+    @Test
     void arbitrageUsesActualAsOfDateAndPreservesCandidateAfterSourceBecomesClear() {
         long source = arbitrage("GA_TO_FC", "CANDIDATE");
         assertThat(capture.captureArbitrageResult(source)).isEqualTo(1);

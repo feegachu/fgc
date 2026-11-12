@@ -184,10 +184,42 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
     }
 
     @Test
+    void monitoringCandidatesStayInHistoryButNotInOpenWorkOrDashboardTotal() {
+        long before = dashboardService.summarize(LocalDate.of(2026, 10, 1)).kpis().openException();
+        jdbcTemplate.update("UPDATE fgc.exception_case SET exception_type='ARBITRAGE_CANDIDATE',severity='WARNING' WHERE contract_id=?", contractId);
+        var criteria = ExceptionCaseSearchDTO.builder().contractNo(contractNo).build();
+        for (String status : List.of("OPEN", "NEW", "IN_REVIEW")) {
+            var statuses = ExceptionStatus.dbStatuses(status);
+            assertThat(repository.search(criteria, statuses, 0, 100)).isEmpty();
+            assertThat(repository.count(criteria, statuses)).isZero();
+            assertThat(repository.countByTypeAndSeverity(criteria, statuses)).isEmpty();
+        }
+        assertThat(repository.search(criteria, List.of(), 0, 100)).hasSize(3);
+        assertThat(dashboardService.summarize(LocalDate.of(2026, 10, 1)).kpis().openException()).isEqualTo(before - 2);
+    }
+
+    @Test
     void OPEN_필터는_신규와_검토중만_조회한다() {
         var rows = repository.search(ExceptionCaseSearchDTO.builder().contractNo(contractNo).build(),
                 ExceptionStatus.dbStatuses("OPEN"), 0, 100);
         assertThat(myTitles(rows)).containsExactlyInAnyOrder("IT 신규-" + suffix, "IT 검토중-" + suffix);
+    }
+
+    @Test
+    void explicitMonitoringTypeStillSupportsNewAndInReviewFilters() {
+        for (var type : List.of(ExceptionType.CAP_WARNING, ExceptionType.ARBITRAGE_CANDIDATE)) {
+            jdbcTemplate.update("UPDATE fgc.exception_case SET exception_type=? WHERE contract_id=?", type.name(), contractId);
+            for (String status : List.of("NEW", "IN_REVIEW")) {
+                for (var criteria : List.of(
+                        ExceptionCaseSearchDTO.builder().contractNo(contractNo).type(type).build(),
+                        ExceptionCaseSearchDTO.builder().contractNo(contractNo).types(List.of(type)).build())) {
+                    var statuses = ExceptionStatus.dbStatuses(status);
+                    assertThat(repository.search(criteria, statuses, 0, 100)).hasSize(1);
+                    assertThat(repository.count(criteria, statuses)).isEqualTo(1);
+                    assertThat(repository.countByTypeAndSeverity(criteria, statuses)).hasSize(1);
+                }
+            }
+        }
     }
 
     @Test

@@ -120,11 +120,13 @@ public class CapCheckQueryRepository {
                                ROW_NUMBER() OVER (
                                    PARTITION BY cc.contract_id, cc.payment_stage,
                                                 date_trunc('month', cc.as_of_date)
-                                   ORDER BY cc.checked_at DESC, cc.cap_check_id DESC
+                                   ORDER BY CASE WHEN __openViolation__ THEN 0 ELSE 1 END,
+                                            cc.checked_at DESC, cc.cap_check_id DESC
                                ) AS latest_rank
                           FROM fgc.cap_check cc
                           JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
                         WHERE (
+                                __openViolation__ OR
                                 (cc.candidate_transaction_id IS NULL AND NOT jsonb_exists(cc.calculation_snapshot, 'deletedCandidateTransactionId'))
                                 OR EXISTS (
                                     SELECT 1
@@ -139,7 +141,7 @@ public class CapCheckQueryRepository {
                           FROM ranked_cap_check
                          WHERE latest_rank = 1
                     )
-            """;
+            """.replace("__openViolation__", CapDisplaySql.OPEN_VIOLATION);
 
     private static final String SEARCH = """
             __latestScopedCapChecks__

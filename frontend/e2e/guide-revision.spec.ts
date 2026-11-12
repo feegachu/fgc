@@ -142,7 +142,7 @@ test('대사 트리 조회와 원장 안내는 선택 후 유지되고 예외함
   await card.getByRole('button', { name: '다음', exact: true }).click()
   await page.locator('[data-guide-feature="navigation.menu.excp-w01"]').click()
   await expect(page).toHaveURL(/exceptions/)
-  await expect(card.getByRole('heading', { name: '유형별 미처리 현황' })).toBeVisible()
+  await expect(card.getByRole('heading', { name: '예외와 모니터링 현황' })).toBeVisible()
   await expect(card).not.toContainText('확인할 점')
   const exceptionBox = await card.boundingBox()
   expect(exceptionBox!.x).toBeGreaterThan(900)

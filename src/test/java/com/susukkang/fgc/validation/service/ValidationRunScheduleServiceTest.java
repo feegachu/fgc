@@ -41,6 +41,7 @@ class ValidationRunScheduleServiceTest {
 
     @Mock com.susukkang.fgc.schedule.repository.SchedulePreviewRepository previews;
     @Mock com.susukkang.fgc.policy.service.FeeRegimeSchedulePolicyService previewPolicies;
+    @Mock com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService clawbackCandidates;
     private ValidationRunScheduleService service;
 
     @BeforeEach
@@ -50,7 +51,30 @@ class ValidationRunScheduleServiceTest {
                 commissionPolicyService,
                 scheduleMapper,
                 exceptionCaseRepository,
-                itemService, previews, previewPolicies);
+                itemService, previews, previewPolicies, clawbackCandidates);
+    }
+
+    @Test
+    void monthlyEntryCapturesStatusEventsEvenWithoutSelectedScheduleTargets() {
+        var job = new com.susukkang.fgc.validation.batch.contract.ValidationJobContext(
+                java.time.LocalDate.of(2026, 10, 1), 1,
+                com.susukkang.fgc.common.code.ValidationRunType.MONTHLY, 1, "monthly-clawback");
+        service.regenerateSchedules(new com.susukkang.fgc.validation.batch.contract.ValidationStepContext(118L, job));
+        verify(clawbackCandidates).captureMonthlyStatusEvents(118L);
+    }
+
+    @Test
+    void monthlyCaptureWaitsUntilSeparateScheduleTransactionsReleaseContractLocks() {
+        given(validationTargetRepository.selectScheduleStates(118L))
+                .willReturn(List.of(validState(10L, PaymentStage.GA_TO_FC)));
+        given(itemService.process(10L, 118L)).willReturn(new ScheduleGenerationResult(List.of(200L), 12));
+        var job = new com.susukkang.fgc.validation.batch.contract.ValidationJobContext(
+                java.time.LocalDate.of(2026, 10, 1), 1,
+                com.susukkang.fgc.common.code.ValidationRunType.MONTHLY, 1, "monthly-lock-order");
+        service.regenerateSchedules(new com.susukkang.fgc.validation.batch.contract.ValidationStepContext(118L, job));
+        var order = org.mockito.Mockito.inOrder(itemService, clawbackCandidates);
+        order.verify(itemService).process(10L, 118L);
+        order.verify(clawbackCandidates).captureMonthlyStatusEvents(118L);
     }
 
     @Test

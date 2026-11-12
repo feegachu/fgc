@@ -21,10 +21,10 @@ export function RunSummaryCards({ detail, completed }: { detail: ValidationRunDe
   const { capSummary: cap, arbitrageSummary: arb, ledgerSummary: ledger, reconciliationSummary: reco, exceptionSummary: exceptions } = detail
   return <ResultKpis completed={completed} cards={[
     { step: 4, label: '1,200% 위반', value: cap?.violationCount, footer: '확정 위반 판정', error: true },
+    { step: 7, label: '대사 불일치', value: reco?.mismatchCount, footer: '허용오차 0원', error: true },
     { step: 4, label: '1,200% 주의', value: cap?.warningCount, footer: '사용률 경고 기준 이상' },
     { step: 5, label: '차익거래 검토대상', value: arb?.candidateCount, footer: '위반 확정 아님' },
     { step: 6, label: '원장 불균형', value: ledger?.imbalanceCount, footer: '이번 실행 · 기표 전 0건 필수', error: true },
-    { step: 7, label: '대사 불일치', value: reco?.mismatchCount, footer: '허용오차 0원' },
     { step: 8, label: '미처리 예외', value: exceptions?.openWorkItemCount, footer: '해당 검증월 · 신규 + 검토중' },
   ]} />
 }

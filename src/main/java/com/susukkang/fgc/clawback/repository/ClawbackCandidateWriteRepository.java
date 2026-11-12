@@ -20,6 +20,23 @@ public class ClawbackCandidateWriteRepository {
 
     private final EntityManager entityManager;
 
+    /** 검증월에 효력이 발생한 사건만 수집한다. 청약철회 등 월 대상 선별에서 빠진 계약도 포함한다. */
+    public List<Long> findMonthlyStatusEventIds(long validationRunId) {
+        return entityManager.createNativeQuery("""
+                SELECT e.contract_status_event_id
+                  FROM fgc.contract_status_event e
+                  JOIN fgc.validation_run vr ON vr.validation_run_id = :runId
+                 WHERE vr.run_type IN ('MONTHLY', 'PRE_CONFIRM')
+                   AND e.new_status IN (:triggers)
+                   AND e.effective_at >= CAST(vr.validation_month AS timestamp) AT TIME ZONE 'Asia/Seoul'
+                   AND e.effective_at < (CAST(vr.validation_month AS timestamp) + INTERVAL '1 month') AT TIME ZONE 'Asia/Seoul'
+                 ORDER BY e.contract_status_event_id
+                """, Long.class)
+                .setParameter("runId", validationRunId)
+                .setParameter("triggers", STATUS_EVENT_TRIGGERS.stream().map(Enum::name).toList())
+                .getResultList();
+    }
+
     /** 실제 적격 사건을 해당 사건의 유일 인덱스로 UPSERT하며 동일 재관측은 변경하지 않는다. */
     public int captureStatusEvents(List<Long> eventIds) {
         if (eventIds.isEmpty()) return 0;

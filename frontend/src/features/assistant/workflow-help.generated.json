@@ -7688,8 +7688,8 @@
         "stepId": "help.0b94b0736016027c31a005faf8077644",
         "screenId": "EXCP-W01",
         "targetId": "features.exception.exception-page.section",
-        "title": "예외, 유형별 미처리 요약",
-        "instruction": "‘유형별 미처리 요약’ 위치입니다.",
+        "title": "예외, 예외와 모니터링 요약",
+        "instruction": "‘예외와 모니터링 요약’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -11597,8 +11597,8 @@
         "stepId": "help.0b94b0736016027c31a005faf8077644",
         "screenId": "EXCP-W01",
         "targetId": "features.exception.exception-page.section",
-        "title": "예외, 유형별 미처리 요약",
-        "instruction": "‘유형별 미처리 요약’ 위치입니다.",
+        "title": "예외, 예외와 모니터링 요약",
+        "instruction": "‘예외와 모니터링 요약’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",

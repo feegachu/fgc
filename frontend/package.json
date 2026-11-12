@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "generate:guide-features": "node scripts/guide-features.mjs --write",
-    "check:guide-features": "node scripts/guide-features.mjs",
+    "check:guide-features": "node scripts/guide-features.mjs && node --test scripts/guide-features.test.mjs",
     "dev": "vite",
     "build": "npm run check:guides && tsc -b && vite build",
     "lint": "eslint .",

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.time.LocalDate;
 
 @Repository
 @RequiredArgsConstructor
@@ -14,6 +15,10 @@ public class PaymentCorrectionReconciliationRepository {
     private final EntityManager entityManager;
 
     public List<?> lockValidations(Long originalRun, Long paymentId) {
+        return lockValidations(originalRun, paymentId, null, null, null);
+    }
+
+    public List<?> lockValidations(Long originalRun, Long paymentId, LocalDate targetMonth, String targetStage, Long targetContractId) {
         return entityManager.createNativeQuery("""
                 SELECT vr.validation_run_id, vr.status,
                     EXISTS (SELECT 1 FROM fgc.reconciliation_run fr
@@ -21,30 +26,47 @@ public class PaymentCorrectionReconciliationRepository {
                         JOIN fgc.reconciliation_match match ON match.reconciliation_result_id = result.reconciliation_result_id
                         JOIN fgc.transaction_attribution ta ON ta.transaction_attribution_id = match.transaction_attribution_id
                         WHERE fr.validation_run_id = vr.validation_run_id AND NOT fr.superseded_yn
-                          AND ta.commission_transaction_id = :paymentId) AS includes_payment
+                          AND ta.commission_transaction_id = :paymentId) AS includes_payment,
+                    vr.validation_month = CAST(:targetMonth AS date) AS includes_target_month
                 FROM fgc.validation_run vr
                 WHERE vr.validation_run_id = :originalRun OR vr.validation_run_id IN (
                     SELECT r.validation_run_id FROM fgc.reconciliation_run r
                     JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = :paymentId
-                    WHERE r.settlement_month = ct.settlement_month AND r.payment_stage = ct.payment_stage
+                    WHERE ((r.settlement_month = ct.settlement_month AND r.payment_stage = ct.payment_stage)
+                        OR (r.settlement_month = CAST(:targetMonth AS date) AND r.payment_stage = CAST(:targetStage AS varchar)
+                            AND r.insurer_id = (SELECT insurer_id FROM fgc.insurance_contract WHERE contract_id=CAST(:targetContractId AS bigint))))
                     AND NOT r.superseded_yn)
                 ORDER BY vr.validation_run_id FOR UPDATE
                 """).setParameter("originalRun", originalRun)
-                .setParameter("paymentId", paymentId).getResultList();
+                .setParameter("paymentId", paymentId).setParameter("targetMonth", targetMonth)
+                .setParameter("targetStage", targetStage).setParameter("targetContractId", targetContractId).getResultList();
     }
 
     public List<?> lockRuns(Long paymentId, Long contractId) {
+        return lockRuns(paymentId, contractId, null, null, null);
+    }
+
+    public List<?> lockRuns(Long paymentId, Long contractId, LocalDate targetMonth, String targetStage, Long targetContractId) {
+        // 원천 계약이 없는 지급도 귀속 계약의 보험사 범위를 잠근다. 대상 범위는 원천 계약 유무와 독립적이다.
         return entityManager.createNativeQuery("""
                 SELECT r.reconciliation_run_id, r.status FROM fgc.reconciliation_run r
                 JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = :paymentId
-                JOIN fgc.insurance_contract c ON c.contract_id = :contractId
                 LEFT JOIN fgc.validation_run vr ON vr.validation_run_id = r.validation_run_id
-                WHERE r.settlement_month = ct.settlement_month AND r.payment_stage = ct.payment_stage
-                AND r.insurer_id = CASE WHEN ct.payment_stage = 'GA_TO_FC' THEN c.insurer_id ELSE ct.insurer_id END
+                WHERE ((r.settlement_month = ct.settlement_month AND r.payment_stage = ct.payment_stage
+                    AND ((ct.payment_stage = 'GA_TO_FC' AND r.insurer_id IN (
+                            SELECT c.insurer_id FROM fgc.insurance_contract c
+                            WHERE c.contract_id = CAST(:contractId AS bigint)
+                               OR EXISTS (SELECT 1 FROM fgc.transaction_attribution ta
+                                          WHERE ta.commission_transaction_id = ct.commission_transaction_id
+                                            AND ta.contract_id = c.contract_id)))
+                         OR (ct.payment_stage = 'INSURER_TO_GA' AND r.insurer_id = ct.insurer_id)))
+                    OR (r.settlement_month = CAST(:targetMonth AS date) AND r.payment_stage = CAST(:targetStage AS varchar)
+                        AND r.insurer_id = (SELECT insurer_id FROM fgc.insurance_contract WHERE contract_id=CAST(:targetContractId AS bigint))))
                 AND NOT r.superseded_yn AND COALESCE(vr.status, '') <> 'FINALIZED'
                 ORDER BY r.reconciliation_run_id FOR UPDATE OF r
                 """).setParameter("paymentId", paymentId)
-                .setParameter("contractId", contractId).getResultList();
+                .setParameter("contractId", contractId).setParameter("targetMonth", targetMonth)
+                .setParameter("targetStage", targetStage).setParameter("targetContractId", targetContractId).getResultList();
     }
 
     public int supersede(Long oldId) {

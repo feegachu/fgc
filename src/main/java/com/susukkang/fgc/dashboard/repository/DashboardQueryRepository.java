@@ -78,12 +78,13 @@ public class DashboardQueryRepository {
     }
 
     private long countCapByStatus(LocalDate month, String resultStatus) {
-        // 월을 먼저 제한한 뒤 계약·지급단계별 최신 판정을 선택한다.
+        // 월별 최신 판정에 미처리 한도 위반을 합친다. 초과 지급 초안이 차단된 뒤 월 검증의
+        // 정상 스케줄 판정이 생겨도, 아직 정정하지 않은 위반 업무가 카드에서 사라지면 안 된다.
+        // 동일 계약·지급단계는 한 번만 세고, 위반이 남아 있으면 주의에 중복 집계하지 않는다.
         // timestamp 캐스팅은 기존 월별 표현식 인덱스와 같은 타입을 유지한다.
         return ((Number) entityManager.createNativeQuery("""
-                SELECT COUNT(*)
-                  FROM (
-                      SELECT DISTINCT ON (contract_id, payment_stage) result_status
+                WITH latest_in_month AS (
+                      SELECT DISTINCT ON (contract_id, payment_stage) contract_id, payment_stage, result_status
                         FROM fgc.cap_check cc
                        WHERE date_trunc('month', CAST(as_of_date AS timestamp))
                              = date_trunc('month', CAST(CAST(:month AS date) AS timestamp))
@@ -97,8 +98,31 @@ public class DashboardQueryRepository {
                               )
                           )
                        ORDER BY contract_id, payment_stage, checked_at DESC, cap_check_id DESC
-                  ) AS latest_in_month
-                 WHERE result_status = :resultStatus
+                ), open_violations AS (
+                    SELECT DISTINCT cc.contract_id, cc.payment_stage
+                      FROM fgc.exception_case e
+                      JOIN fgc.cap_check cc ON cc.cap_check_id = e.cap_check_id
+                        OR (e.source_entity_type = 'CAP_CHECK' AND e.source_entity_id = cc.cap_check_id::text)
+                     WHERE e.exception_type = 'CAP_VIOLATION'
+                       AND e.status IN ('NEW', 'IN_REVIEW')
+                       AND COALESCE(e.validation_month, CAST(date_trunc('month', cc.as_of_date) AS date)) = :month
+                       AND ((cc.candidate_transaction_id IS NULL
+                             AND NOT jsonb_exists(cc.calculation_snapshot, 'deletedCandidateTransactionId'))
+                            OR EXISTS (
+                                SELECT 1 FROM fgc.commission_transaction candidate
+                                 WHERE candidate.commission_transaction_id = cc.candidate_transaction_id
+                                   AND candidate.status IN ('DRAFT', 'CONFIRMED')
+                            ))
+                ), current_caps AS (
+                    SELECT contract_id, payment_stage, 'VIOLATION' AS result_status FROM open_violations
+                    UNION ALL
+                    SELECT l.contract_id, l.payment_stage, l.result_status FROM latest_in_month l
+                     WHERE NOT EXISTS (
+                         SELECT 1 FROM open_violations v
+                          WHERE v.contract_id = l.contract_id AND v.payment_stage = l.payment_stage
+                     )
+                )
+                SELECT COUNT(*) FROM current_caps WHERE result_status = :resultStatus
                 """)
                 .setParameter("month", month)
                 .setParameter("resultStatus", resultStatus)

@@ -185,7 +185,7 @@ class ReleaseTests(unittest.TestCase):
 class DeploymentTests(unittest.TestCase):
     def deploy(self, *, bad_revision=False, bad_digest=False, backup_failure=False, api_failure=False, public_failure=False,
                unprotected_before="", unprotected_after="", agent_unset="f", demo_agent_pending="0", login_accepted="",
-               missing_accounts=""):
+               missing_accounts="", filming=False):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         base = pathlib.Path(directory.name)
@@ -194,6 +194,8 @@ class DeploymentTests(unittest.TestCase):
         (state / "nginx").mkdir(parents=True)
         (state / ".env").write_text("DB_PASSWORD=preserve-me\nJWT_SECRET=preserve-this-key\n")
         (state / "compose.yaml").write_text("old compose")
+        if filming:
+            (state / "filming.override.yaml").write_text('services:\n  api:\n    environment:\n      FGC_DEMO_MONTH: "2026-10"\n')
         (state / "nginx/default.conf.template").write_text("old template")
         (state / "nginx/guard.conf").write_text("old guard")
         promotion_path = base / "promotion.json"
@@ -303,6 +305,16 @@ fi
         self.assertLess(log.index("up -d db api"), log.index("login admin"))
         self.assertLess(log.index("login agent01"), log.index("up -d --force-recreate"))
         self.assertIn("http://127.0.0.1:18081/api/v1/auth/login", log)
+
+    def test_filming_runtime_settings_survive_deployment(self):
+        result, state, log = self.deploy(filming=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        upgrades = [line for line in log.splitlines() if 'up -d db api' in line]
+        self.assertEqual(len(upgrades), 1)
+        self.assertIn('filming.override.yaml', upgrades[0])
+        copies = list((state / 'releases').glob('*/filming.override.yaml'))
+        self.assertEqual(len(copies), 1)
+        self.assertEqual(copies[0].read_text(), (state / 'filming.override.yaml').read_text())
 
     def test_demo_agent_migrations_pending_enable_out_of_order_only_for_that_run(self):
         result, state, log = self.deploy(demo_agent_pending="3")

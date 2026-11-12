@@ -315,6 +315,11 @@ public class ExceptionCaseQueryRepository {
                     criteria.getTypes().stream().map(Enum::name).toList());
         }
         if (statuses != null && !statuses.isEmpty()) {
+            // 유형 미지정 미처리 집계에서는 모니터링을 제외한다. 유형을 직접 고른 상태 조회는 보존한다.
+            if (criteria.getType() == null && (criteria.getTypes() == null || criteria.getTypes().isEmpty())
+                    && statuses.stream().allMatch(status -> status == ExceptionStatus.NEW || status == ExceptionStatus.IN_REVIEW)) {
+                where.append(" AND ec.exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING')");
+            }
             append(where, parameters, "ec.status IN (:statuses)", "statuses",
                     statuses.stream().map(Enum::name).toList());
         }

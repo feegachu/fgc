@@ -10,6 +10,7 @@ export interface ScreenDefinition {
   section?: string
   icon: string
   permission?: Permission
+  enabled?: boolean
 }
 export const screens: ScreenDefinition[] = [
   { id: 'DASH-W01', path: '/', title: '업무 대시보드', menu: '/', icon: 'dashboard' },
@@ -125,6 +126,7 @@ export const screens: ScreenDefinition[] = [
   },
   {
     id: 'ACQC-W01',
+    enabled: false,
     path: '/acquisition-cost-checks',
     title: '계약체결비용 한도',
     menu: '/acquisition-cost-checks',
@@ -189,6 +191,7 @@ export const canOpen = (
   screen: ScreenDefinition,
   user: Partial<Record<Permission, boolean>> & { isAgent?: boolean; roleCode?: string },
 ) => {
+  if (screen.enabled === false) return false
   const agent = user.isAgent || user.roleCode === 'AGENT'
   if (screen.id === 'AGNT-W01') return agent
   if (agent && !['CONT-W01', 'CONT-W02', 'TRAN-W01', 'RPT-W02'].includes(screen.id)) return false

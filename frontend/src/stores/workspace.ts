@@ -106,7 +106,7 @@ export function createWorkspaceStore(
       save(bounded, month)
     },
     openTab: (tab) => {
-      if (!screens.some((screen) => screen.id === tab.id)) return
+      if (!screens.some((screen) => screen.id === tab.id && screen.enabled !== false)) return
       // The shell opens the destination only after navigation (and any draft confirmation) succeeds.
       let tabs = get().tabs
         .filter((item) => item.id === tab.id || !editorTabIds.has(item.id))

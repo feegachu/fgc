@@ -102,7 +102,7 @@ describe('AppShell·라우트', () => {
       const labels = [...screen.getByRole('navigation', { name: '주요 업무 메뉴' }).querySelectorAll('a')].map(
         (link) => link.querySelector('.sidebar-nav-label')?.textContent ?? link.textContent,
       )
-      expect(labels.slice(0, 15)).toEqual([
+      expect(labels.slice(0, 14)).toEqual([
         '업무 대시보드',
         '보험계약',
         '수수료 지급',
@@ -111,7 +111,6 @@ describe('AppShell·라우트', () => {
         '환수',
         '1,200% 한도 검증',
         '차익거래 검증',
-        '계약체결비용 한도',
         '월 통합검증',
         '검증원장',
         '대사 실행/결과',
@@ -126,6 +125,11 @@ describe('AppShell·라우트', () => {
     await screen.findByRole('heading', { name: '월 통합검증 상세' })
     await waitFor(() => expect(router.state.location.search).toBe('?status=ACTIVE&page=2&month=2026-07'))
     expect(router.state.location.pathname).toBe('/validation-runs/12')
+  })
+  it('계약체결비용 한도는 관리자도 메뉴와 직접 경로로 접근하지 못한다', async () => {
+    renderAt('/acquisition-cost-checks', 'SYSTEM_ADMIN')
+    expect(await screen.findByRole('heading', { name: '권한 없음' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '계약체결비용 한도', hidden: true })).not.toBeInTheDocument()
   })
   it('미등록 경로를 404 연결 화면으로 보낸다', async () => {
     renderAt('/xyz')

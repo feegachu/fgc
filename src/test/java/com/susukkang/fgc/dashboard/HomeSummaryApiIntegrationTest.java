@@ -118,6 +118,30 @@ class HomeSummaryApiIntegrationTest {
         cap(c10, "GA_TO_FC", AS_OF, "WARNING", "1999-06-30 09:00:00+09", "{}");
     }
 
+    /** FUN-057: 과거 월 미처리 위반은 예외로 남기되 현재 월 주의 판정을 가리지 않는다. */
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void currentMonthWarningIsIndependentOfPreviousMonthOpenViolation(boolean previousMonth) throws Exception {
+        Long agent2 = jdbc.queryForObject("SELECT agent_id FROM fgc.agent WHERE agent_code='IT-H-A2'", Long.class);
+        long contractId = contract("IT-H-MONTH-CAP", agent2, branchA, "1999-01-01", "ACTIVE");
+        String violationDate = previousMonth ? "1999-05-31" : "1999-06-01";
+        cap(contractId, "GA_TO_FC", violationDate, "VIOLATION", violationDate + " 09:00:00+09", "{}");
+        Long checkId = jdbc.queryForObject("SELECT MAX(cap_check_id) FROM fgc.cap_check WHERE contract_id=?", Long.class, contractId);
+        jdbc.update("""
+                INSERT INTO fgc.exception_case(exception_key, exception_type, severity, status, source_entity_type,
+                    source_entity_id, title, contract_id, cap_check_id, validation_month, created_at)
+                VALUES ('IT-HOME:MONTH-CAP', 'CAP_VIOLATION', 'CRITICAL', 'NEW', 'CAP_CHECK', ?,
+                    '과거 위반', ?, ?, CAST(? AS date), CAST(? AS timestamptz))
+                """, checkId.toString(), contractId, checkId, violationDate.substring(0, 7) + "-01", violationDate + " 09:00:00+09");
+        cap(contractId, "GA_TO_FC", AS_OF, "WARNING", AS_OF + " 09:00:00+09", "{}");
+        String reasons = "$.data.attentionAgents[?(@.agentId == " + agent2 + ")].reasons";
+        summary(AS_OF).andExpect(status().isOk())
+                .andExpect(jsonPath(reasons + "[*].code").value(previousMonth
+                        ? contains("OPEN_EXCEPTION", "NEAR_LIMIT") : contains("OPEN_EXCEPTION")))
+                .andExpect(jsonPath(reasons + "[*].count").value(previousMonth ? contains(1, 1) : contains(1)))
+                .andExpect(jsonPath(reasons + "[?(@.code == 'OPEN_EXCEPTION')].count").value(contains(1)));
+    }
+
     @Test
     void 과거_기준일의_건수와_합계를_돌려준다() throws Exception {
         summary(AS_OF)

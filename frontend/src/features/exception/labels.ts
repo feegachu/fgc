@@ -2,6 +2,23 @@ import type { ExceptionSearchResult } from './api'
 
 type ExceptionType = NonNullable<NonNullable<ExceptionSearchResult['summary']>[number]['type']>
 
+const defaultSummaryTypes = [
+  ['CAP_VIOLATION', '1,200% 위반'],
+  ['RECONCILIATION_MISMATCH', '대사 불일치'],
+  ['ARBITRAGE_CANDIDATE', '차익거래 검토대상'],
+  ['CAP_WARNING', '1,200% 주의'],
+  ['DATA_QUALITY', '데이터 품질'],
+  ['POLICY_MISSING', '정책 없음'],
+  ['REFUND_TABLE_MISSING', '환급률표 없음'],
+] satisfies [ExceptionType, string][]
+
+export function exceptionSummaryCards(summary: ExceptionSearchResult['summary']) {
+  const rows = summary ?? []
+  const defaults = defaultSummaryTypes.map(([type, typeLabel]) =>
+    rows.find((row) => row.type === type) ?? { type, typeLabel, count: 0 })
+  return [...defaults, ...rows.filter((row) => !defaultSummaryTypes.some(([type]) => type === row.type))]
+}
+
 const summaryDescriptions = {
   CAP_WARNING: '사용률 경고 기준 이상',
   CAP_VIOLATION: '확정 위반 판정',

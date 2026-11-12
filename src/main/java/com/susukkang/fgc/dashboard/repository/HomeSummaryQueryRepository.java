@@ -1,5 +1,6 @@
 package com.susukkang.fgc.dashboard.repository;
 
+import com.susukkang.fgc.cap.repository.CapDisplaySql;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -56,21 +57,25 @@ public class HomeSummaryQueryRepository {
                   FROM fgc.exception_case ec
                   LEFT JOIN fgc.insurance_contract c ON c.contract_id = ec.contract_id
                  WHERE ec.status IN (:openStatuses) AND ec.created_at < :asOfEnd
+                   AND ec.exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING')
                  GROUP BY COALESCE(ec.agent_id, c.agent_id)
             ),
             latest_cap AS (
-                -- vw_latest_cap_check 와 같은 최신 판정 규칙에 기준일 상한만 더한다. 주의가 한 번도 없던 계약은 미리 빼서 정렬량을 줄인다.
+                -- 기준월 안에서 미처리 위반을 우선한다. 과거 월 위반은 open_exception에서 별도로 센다.
                 SELECT DISTINCT ON (cc.contract_id, cc.payment_stage) cc.contract_id, cc.result_status
                   FROM fgc.cap_check cc
                  WHERE cc.as_of_date <= :asOf
+                   AND cc.as_of_date >= date_trunc('month', CAST(:asOf AS date))
                    AND cc.contract_id IN (SELECT w.contract_id FROM fgc.cap_check w
                                            WHERE w.result_status = 'WARNING' AND w.as_of_date <= :asOf)
-                   AND ((cc.candidate_transaction_id IS NULL
+                   AND (__openViolation__ OR (cc.candidate_transaction_id IS NULL
                          AND NOT jsonb_exists(cc.calculation_snapshot, 'deletedCandidateTransactionId'))
                         OR EXISTS (SELECT 1 FROM fgc.commission_transaction candidate
                                     WHERE candidate.commission_transaction_id = cc.candidate_transaction_id
                                       AND candidate.status = 'CONFIRMED'))
-                 ORDER BY cc.contract_id, cc.payment_stage, cc.checked_at DESC, cc.cap_check_id DESC
+                 ORDER BY cc.contract_id, cc.payment_stage,
+                          CASE WHEN __openViolation__ THEN 0 ELSE 1 END,
+                          cc.checked_at DESC, cc.cap_check_id DESC
             ),
             near_limit AS (
                 SELECT c.agent_id, COUNT(DISTINCT lc.contract_id) AS near_limit_count
@@ -150,7 +155,7 @@ public class HomeSummaryQueryRepository {
         MapSqlParameterSource params = new MapSqlParameterSource("asOf", asOf).addValue("asOfEnd", asOfEnd)
                 .addValue("recentFrom", recentFrom).addValue("openStatuses", openStatuses)
                 .addValue("eventStatuses", eventStatuses);
-        return jdbc.query(AGENT_ROWS, params, (rs, row) -> new AgentRow(
+        return jdbc.query(AGENT_ROWS.replace("__openViolation__", CapDisplaySql.OPEN_VIOLATION), params, (rs, row) -> new AgentRow(
                 rs.getLong("agent_id"), rs.getString("agent_code"), rs.getString("agent_name"),
                 rs.getString("agent_status"), rs.getBoolean("active_yn"), rs.getObject("termination_date", LocalDate.class),
                 rs.getLong("branch_id"), rs.getString("branch_code"), rs.getString("branch_name"),

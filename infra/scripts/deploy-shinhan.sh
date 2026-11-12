@@ -34,6 +34,10 @@ cp "$root/infra/shinhan/compose.yaml" "$release/compose.yaml"
 cp "$root/infra/shinhan/nginx-guard.conf" "$release/nginx/guard.conf"
 cp "$root/infra/shinhan/nginx-http.conf" "$release/nginx/http.conf"
 compose=(docker compose --project-directory "$state" --env-file "$state/.env" --env-file "$release/release.env" -f "$release/compose.yaml")
+if [[ -f "$state/filming.override.yaml" ]]; then
+    cp "$state/filming.override.yaml" "$release/filming.override.yaml"
+    compose+=(-f "$release/filming.override.yaml")
+fi
 "${compose[@]}" config --quiet
 # SRC-065: this server is public and the demo seed passwords are published in the repository.
 # Refuse to deploy while a demo account still accepts one, or while V66 would give agent01 one.
@@ -69,6 +73,9 @@ cp "$release/compose.yaml" "$state/compose.yaml"
 cp "$release/release.env" "$state/release.env"
 cp "$release/nginx/"* "$state/nginx/"
 compose=(docker compose --project-directory "$state" --env-file "$state/.env" --env-file "$state/release.env" -f "$state/compose.yaml")
+if [[ -f "$state/filming.override.yaml" ]]; then
+    compose+=(-f "$state/filming.override.yaml")
+fi
 # SRC-065: close the public entry first. The old web would otherwise proxy to the new API before the checks below pass.
 "${compose[@]}" stop web
 "${compose[@]}" up -d db api

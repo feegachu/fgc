@@ -40,12 +40,17 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
     private final ScheduleRegenerationBatchItemService itemService;
     private final SchedulePreviewRepository previews;
     private final FeeRegimeSchedulePolicyService previewPolicies;
+    private final com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService clawbackCandidates;
 
     // 같은 클래스 안의 호출은 프록시를 거치지 않아 아래 메서드의 @Transactional이 적용되지 않는다. 진입점에서 경계를 둔다.
     @Override
     @Transactional
     public StepProcessingResult regenerateSchedules(ValidationStepContext context) {
-        return validateContractSchedules(context.validationRunId());
+        var result = validateContractSchedules(context.validationRunId());
+        // 월 검증만 실행해도 해당 월 해지·실효·철회 사건의 환수 검토를 시작할 수 있어야 한다.
+        // REQUIRES_NEW 스케줄 생성이 계약 잠금을 놓은 뒤 후보 FK 잠금을 잡는다.
+        clawbackCandidates.captureMonthlyStatusEvents(context.validationRunId());
+        return result;
     }
 
     /**

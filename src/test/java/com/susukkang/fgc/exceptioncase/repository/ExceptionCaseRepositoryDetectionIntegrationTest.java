@@ -32,6 +32,32 @@ class ExceptionCaseRepositoryDetectionIntegrationTest {
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private EntityManager entityManager;
+    @Autowired
+    private ExceptionCaseQueryRepository queryRepository;
+
+    @Test
+    void monthlyWarningIsVisibleInAllHistoryButExcludedFromOpenWork() {
+        Long run = insertValidationRun(FIRST_MONTH);
+        Long contract = jdbcTemplate.queryForObject("SELECT MIN(contract_id) FROM fgc.insurance_contract", Long.class);
+        Long rule = jdbcTemplate.queryForObject("SELECT MIN(cap_rule_set_id) FROM fgc.cap_rule_set", Long.class);
+        insertCapCheck(run, contract, rule, FIRST_MONTH, "INSURER_TO_GA", "WARNING", 95.0);
+        jdbcTemplate.update("UPDATE fgc.cap_check SET included_amount=1140000,remaining_amount=60000 WHERE validation_run_id=?", run);
+        assertThat(exceptionCaseRepository.insertFromCapChecks(run)).isEqualTo(1);
+        assertThat(exceptionCaseRepository.insertFromCapChecks(run)).isZero();
+        var criteria = com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO.builder()
+                .validationMonth(FIRST_MONTH).type(com.susukkang.fgc.common.code.ExceptionType.CAP_WARNING).build();
+        assertThat(queryRepository.count(criteria, List.of())).isEqualTo(1);
+        // 주의 유형을 명시한 조회는 신규 건을 보여 주지만, 유형 없는 미처리 업무에서는 제외한다.
+        assertThat(queryRepository.count(criteria, ExceptionStatus.dbStatuses("OPEN"))).isEqualTo(1);
+        assertThat(queryRepository.search(criteria, ExceptionStatus.dbStatuses("OPEN"), 0, 20))
+                .hasSize(1).allSatisfy(row -> assertThat(row.exceptionType()).isEqualTo("CAP_WARNING"));
+        var openWork = com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO.builder()
+                .validationMonth(FIRST_MONTH).build();
+        assertThat(queryRepository.count(openWork, ExceptionStatus.dbStatuses("OPEN"))).isZero();
+        assertThat(queryRepository.search(openWork, ExceptionStatus.dbStatuses("OPEN"), 0, 20)).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fgc.exception_occurrence WHERE validation_run_id=?", Long.class, run))
+                .isEqualTo(1);
+    }
 
     @Test
     void reconciliationSkipPreservesContractStageReasonAndIsIdempotentOnRestart() {

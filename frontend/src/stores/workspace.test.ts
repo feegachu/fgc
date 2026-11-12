@@ -22,7 +22,7 @@ it.each(['/contracts/new', '/contracts/21/edit', '/transactions/new'])('입력 �
 it('11개 업무 탭은 최대 10개로 제한하고 대시보드를 고정·복원한다', () => {
   const store = createWorkspaceStore()
   store.getState().initialize('settle01', '2026-07', null, permissions)
-  for (const screen of screens.filter((screen) => !screen.path.includes(':') && !['AGNT-W01', 'CONT-W03', 'TRAN-W02'].includes(screen.id)).slice(0, 12))
+  for (const screen of screens.filter((screen) => screen.enabled !== false && !screen.path.includes(':') && !['AGNT-W01', 'CONT-W03', 'TRAN-W02'].includes(screen.id)).slice(0, 12))
     store.getState().openTab({ id: screen.id, title: screen.title, icon: screen.icon, href: screen.path })
   expect(store.getState().tabs).toHaveLength(10)
   expect(store.getState().tabs[0].id).toBe('DASH-W01')
@@ -79,6 +79,7 @@ it('변조·다른 사용자 저장 상태를 배제하고 URL 월을 우선한�
       tabs: [
         { href: '//evil.test' },
         { href: '/audit-logs', modified: true },
+        { href: '/acquisition-cost-checks', modified: true },
         { href: '/contracts?status=ACTIVE&page=2', modified: true },
       ],
     }),

@@ -1,18 +1,24 @@
 import { spawn } from 'node:child_process'
-import { createWriteStream, mkdirSync, readdirSync } from 'node:fs'
+import { copyFileSync, createWriteStream, mkdirSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { databaseCommand } from './e2e-db.mjs'
 import { waitForBackend } from './check-backend.mjs'
 
 databaseCommand(['pg_isready', '-U', 'fgc_e2e', '-d', 'fgc_e2e'])
-const jars = readdirSync('../build/libs').filter((name) => name.endsWith('.jar') && !name.endsWith('-plain.jar'))
+const jars = process.env.FGC_E2E_JAR
+  ? [resolve(process.env.FGC_E2E_JAR)]
+  : readdirSync('../build/libs').filter((name) => name.endsWith('.jar') && !name.endsWith('-plain.jar')).map(name => resolve('../build/libs', name))
 if (jars.length !== 1)
   throw new Error('Build the backend first: ./gradlew bootJar (exactly one executable jar required)')
+if (!statSync(jars[0]).isFile()) throw new Error('FGC_E2E_JAR must point to an executable jar file')
 const port = process.env.FGC_E2E_DB_PORT ?? '55418'
 if (!/^\d+$/.test(port)) throw new Error('FGC_E2E_DB_PORT must be numeric')
 mkdirSync('e2e-artifacts', { recursive: true })
+// IntelliJ나 다음 Gradle 빌드가 원본 JAR를 교체해도 실행 중인 시험 서버는 같은 산출물을 사용한다.
+const serverJar = resolve('e2e-artifacts/server.jar')
+if (jars[0] !== serverJar) copyFileSync(jars[0], serverJar)
 const log = createWriteStream('e2e-artifacts/backend.log')
-const child = spawn('java', ['-jar', resolve('../build/libs', jars[0])], {
+const child = spawn('java', ['-jar', serverJar], {
   windowsHide: true,
   env: {
     ...process.env,

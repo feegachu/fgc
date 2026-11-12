@@ -37,8 +37,9 @@ import {
 } from './api'
 import type { ExceptionCase, ExceptionFilters, ExceptionOptions } from './api'
 import { severityTone, statusOptions, statusTone, typeTone } from './rules'
-import { exceptionSummaryDescription, sourceReference } from './labels'
+import { exceptionSummaryCards, exceptionSummaryDescription, sourceReference } from './labels'
 import { paymentDeletedReason } from '../audit/labels'
+import { dashboardSummaryQueryOptions } from '../dashboard/api'
 
 const EMPTY_MESSAGE = '조건에 맞는 자료가 없습니다.'
 const cardTone = (type: string) => {
@@ -46,7 +47,7 @@ const cardTone = (type: string) => {
   return tone === 'review' ? 'risk' : tone
 }
 
-/** URL 이 상태의 단일 출처다 — status 가 없으면 미처리, 빈 값이면 전체(레거시 링크 호환). */
+/** URL 이 상태의 단일 출처다. 첫 진입과 초기화는 전체, 명시적 OPEN 링크는 미처리다. */
 function filtersFromParams(params: URLSearchParams): ExceptionFilters {
   const status = params.get('status')
   const page = Number(params.get('page'))
@@ -54,7 +55,7 @@ function filtersFromParams(params: URLSearchParams): ExceptionFilters {
     type: params.get('type') ?? '',
     reasonCode: params.get('reasonCode') ?? '',
     severity: params.get('severity') ?? '',
-    status: status === null ? OPEN_STATUS : status === '' ? ALL_STATUS : status,
+    status: status === null || status === '' ? ALL_STATUS : status,
     assigneeFilter: params.get('assigneeFilter') ?? '',
     validationMonth: params.get('validationMonth') ?? '',
     contractNo: params.get('contractNo') ?? '',
@@ -77,9 +78,22 @@ export function ExceptionPage() {
   const processing = useIsMutating({ mutationKey: ['exception', 'write'] }) > 0
   const [confirmClose, setConfirmClose] = useState(false)
   const { month, revised = false } = useOutletContext<ShellContext>()
+  const monitoringMonth = (filters.validationMonth || month)?.slice(0, 7)
+  const monitoring = useQuery({ ...dashboardSummaryQueryOptions(monitoringMonth ?? ''), enabled: Boolean(monitoringMonth) })
   const search = useQuery(exceptionSearchQueryOptions(filters))
   const options = useQuery(exceptionOptionsQueryOptions())
   const data = search.data
+  const summaryCards = data ? exceptionSummaryCards(data.summary).map((card) => ({
+    ...card,
+    count: card.type === 'CAP_WARNING' ? monitoring.data?.capWarning ?? card.count
+      : card.type === 'ARBITRAGE_CANDIDATE' ? monitoring.data?.arbitrageCandidate ?? card.count : card.count,
+  })) : []
+  const summaryHref = (type?: string) => {
+    const isMonitoring = type === 'CAP_WARNING' || type === 'ARBITRAGE_CANDIDATE'
+    const path = `/exceptions?type=${type}&status=${isMonitoring ? ALL_STATUS : OPEN_STATUS}`
+      + (isMonitoring && monitoringMonth ? `&validationMonth=${monitoringMonth}-01` : '')
+    return monitoringMonth ? withMonth(path, monitoringMonth) : path
+  }
   const rows = data?.content ?? []
   const selected = rows.find((row) => String(row.exceptionCaseId) === selectedId)
   const ownReview = selected?.status === 'IN_REVIEW' && selected.assigneeLoginId === user?.loginId
@@ -120,7 +134,7 @@ export function ExceptionPage() {
     setParams((current) => {
       const merged = new URLSearchParams(current)
       for (const [key, value] of Object.entries(next)) {
-        if (key === 'status') merged.set('status', value || OPEN_STATUS)
+        if (key === 'status') merged.set('status', value || ALL_STATUS)
         else if (value) merged.set(key, value)
         else merged.delete(key)
       }
@@ -293,20 +307,16 @@ export function ExceptionPage() {
       <section
         data-guide-feature="features.exception.exception-page.section"
         className="exception-summary-grid kpi-group"
-        aria-label="유형별 미처리 요약"
-        style={{ '--exception-kpi-count': data?.summary?.length || 1 } as CSSProperties}
+        aria-label="예외와 모니터링 요약"
+        style={{ '--exception-kpi-count': summaryCards.length || 1 } as CSSProperties}
       >
-        {data?.summary?.map((summary) => (
+        {summaryCards.map((summary) => (
           <Link data-guide-feature={guideFeatureId('exception.summary', summary.type ?? '')}
             key={summary.type}
             className={`kpi-card kpi-card-${cardTone(summary.type ?? '')} exception-summary-card ${filters.type === summary.type ? 'is-active' : ''}`}
             aria-current={filters.type === summary.type ? 'true' : undefined}
             aria-label={`${summary.typeLabel} ${int(summary.count)}건`}
-            to={
-              month
-                ? withMonth(`/exceptions?type=${summary.type}&status=${OPEN_STATUS}`, month)
-                : `/exceptions?type=${summary.type}&status=${OPEN_STATUS}`
-            }
+            to={summaryHref(summary.type)}
           >
             <KpiCardContent
               label={summary.typeLabel ?? '-'}
@@ -320,6 +330,7 @@ export function ExceptionPage() {
           <p className="empty-state exception-summary-empty">미처리 예외가 없습니다.</p>
         )}
       </section>
+      {monitoring.isError && <p role="alert">주의와 차익거래 판정을 불러오지 못했습니다.</p>}
 
       <FilterForm
         key={JSON.stringify(filters)}

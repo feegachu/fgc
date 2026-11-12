@@ -1,5 +1,5 @@
-import { test, expect, login, sql } from './fixtures'
-import type { Page } from '@playwright/test'
+import { test, expect, login, sql, password } from './fixtures'
+import { request, type Page } from '@playwright/test'
 
 const CONTRACT_NO = 'FGC-FGL01-202703-0001'
 const BOUNDARY_CONTRACT_NO = 'FGC-FGL02-202611-0001'
@@ -75,37 +75,39 @@ function scheduleLine(installment: number, item: string, amount: number) {
   `)
 }
 
-async function requestCheck(page: Page, contractNo: string, capture?: string) {
-  await page.getByRole('button', { name: '검증 요청' }).click()
-  const dialog = page.getByRole('dialog')
-  await dialog.getByRole('combobox', { name: /계약/ }).click()
-  await dialog.getByRole('combobox', { name: /계약/ }).fill(contractNo)
-  await page.getByRole('option', { name: new RegExp(contractNo) }).click()
-  if (capture) await page.screenshot({ path: capture, fullPage: true })
-  const response = page.waitForResponse(
-    (r) => new URL(r.url()).pathname === '/api/v1/acquisition-cost-checks' && r.request().method() === 'POST',
-  )
-  await dialog.getByRole('button', { name: '검증 요청' }).click()
-  const result = await response
-  expect(result.status(), await result.text()).toBe(201)
-  await expect(dialog).toBeHidden()
-  return (await result.json()).data
+async function requestCheck(page: Page, contractNo: string) {
+  const contractId = Number(sql(`SELECT contract_id FROM fgc.insurance_contract WHERE contract_no = '${contractNo}'`))
+  const origin = new URL(page.url()).origin
+  const client = await request.newContext({ baseURL: origin, extraHTTPHeaders: { Origin: origin, 'X-FGC-Client': 'web' } })
+  try {
+    const auth = await client.post('/api/v1/auth/login', { data: { loginId: 'admin', password } })
+    expect(auth.ok(), await auth.text()).toBe(true)
+    const token = (await auth.json()).data.accessToken
+    const result = await client.post('/api/v1/acquisition-cost-checks', {
+      data: { contractId, paymentStage: 'GA_TO_FC' },
+      headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': crypto.randomUUID() },
+    })
+    expect(result.status(), await result.text()).toBe(201)
+    return (await result.json()).data
+  } finally {
+    await client.dispose()
+  }
 }
 
-test('실제 서버에서 두 한도를 따로 판정하고 자료 부족과 적용 대상 아님을 구분한다', async ({ page }) => {
+test('숨긴 계약체결비용 화면은 접근을 막고 기존 서버 판정은 유지한다', async ({ page }) => {
+  const browserCalls: string[] = []
+  page.on('request', r => {
+    if (r.url().includes('/api/v1/acquisition-cost-checks')) browserCalls.push(r.url())
+  })
   await login(page, 'settle01', '/acquisition-cost-checks')
-  await expect(page.getByRole('heading', { name: '계약체결비용 한도 검증' })).toBeVisible()
-  await expect(page.getByText('조건에 맞는 검증 결과가 없습니다.')).toBeVisible()
-  await page.screenshot({ path: 'e2e-artifacts/729-empty.png', fullPage: true })
+  await expect(page.getByRole('heading', { name: '권한 없음' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '계약체결비용 한도', exact: true })).toHaveCount(0)
+  expect(browserCalls).toEqual([])
 
-  // 현행 판매버전은 적용 대상 아님이다. 금액을 0으로 채우지 않는다.
-  const current = await requestCheck(page, 'FGC-FGL01-202607-0001', 'e2e-artifacts/729-request-modal.png')
+  // 화면만 숨긴다. 실제 HTTP/DB의 기존 정책 판정 회귀 검사는 유지한다.
+  const current = await requestCheck(page, 'FGC-FGL01-202607-0001')
   expect(current.resultStatus).toBe('NOT_APPLICABLE')
   expect(current.upfront).toBeNull()
-  await expect(page.getByRole('list', { name: '판정 사유' })).toContainText('적용 대상이 아닙니다')
-  await page.screenshot({ path: 'e2e-artifacts/729-not-applicable.png', fullPage: true })
-
-  // 지급 정책과 기준 값이 없으면 금액 없이 검토 필요다. 데모 시드의 상태와 같다.
   const contractId = fourYearFixture(false)
   scheduleLine(1, 'BASE_COMMISSION', 600000)
   const missing = await requestCheck(page, CONTRACT_NO)
@@ -113,91 +115,44 @@ test('실제 서버에서 두 한도를 따로 판정하고 자료 부족과 적
   expect(missing.acquisitionCost.amount).toBeNull()
   expect(missing.upfront.limitAmount).toBeNull()
   expect(missing.upfront.calculatedAmount).toBe(600000)
-  await expect(page.getByRole('article', { name: '선지급 총액 한도 결과' })).toContainText('자료 없음')
-  await page.screenshot({ path: 'e2e-artifacts/729-review-required.png', fullPage: true })
 
-  // 같은 판매버전에 기준 값이 있는 새 지급 정책으로 바꾸면 금액이 나온다.
   fourYearFixture(true)
   scheduleLine(1, 'BASE_COMMISSION', 600000)
   for (let installment = 1; installment <= 48; installment++)
     scheduleLine(installment, 'MAINTENANCE_COMMISSION', 45000)
   scheduleLine(1, 'COMMON_COST', 500000)
-
-  // 한도 이내. 간접지원경비는 유지관리 총액에 들어가고 고정 비율로 막지 않는다(기준액의 16.7%).
   const normal = await requestCheck(page, CONTRACT_NO)
   expect(normal.resultStatus).toBe('NORMAL')
   expect(normal.upfront.calculatedAmount).toBe(600000)
   expect(normal.maintenance.calculatedAmount).toBe(2660000)
   expect(normal.indirectSupportAmount).toBe(500000)
   expect(normal.limitPolicy.policyCode).toBe('REG-FOUR-YEAR-2027-V1')
-  const maintenance = page.getByRole('article', { name: '유지관리 총액 한도 결과' })
-  await expect(maintenance).toContainText('2,660,000원')
-  await expect(maintenance).toContainText('500,000원')
-  await expect(page.getByRole('article', { name: '선지급 총액 한도 결과' })).toContainText('600,000원')
-  // 화면의 판과 정책 근거는 API가 준 값이다.
-  const basis = page.getByRole('heading', { name: '계산 근거' }).locator('..')
-  await expect(basis).toContainText(`#${normal.scheduleHeaderId} v${normal.scheduleVersionNo}`)
-  await expect(basis).toContainText(`${normal.paymentPolicy.policyName} v${normal.paymentPolicy.versionNo}`)
-  await expect(basis).toContainText(`${normal.limitPolicy.policyName} v${normal.limitPolicy.versionNo}`)
   expect(normal.limitPolicy.regulationRefs).toContain('REG-02')
-  await expect(basis).toContainText('선지급수수료')
-  await page.getByRole('region', { name: '알림' }).getByRole('button').first().click()
-  await page.screenshot({ path: 'e2e-artifacts/729-normal.png', fullPage: true })
 
-  // 1원 초과는 그 한도만 초과이고 유지관리 판정은 그대로다.
   scheduleLine(2, 'BASE_COMMISSION', 2400001)
   const violation = await requestCheck(page, CONTRACT_NO)
   expect(violation.resultStatus).toBe('VIOLATION')
   expect(violation.upfront.status).toBe('VIOLATION')
   expect(violation.upfront.exceededFromInstallmentNo).toBe(2)
   expect(violation.maintenance.status).toBe('NORMAL')
-  await expect(page.getByRole('article', { name: '선지급 총액 한도 결과' })).toContainText('2회차부터 초과')
-  await page.screenshot({ path: 'e2e-artifacts/729-violation.png', fullPage: true })
-
-  // 시드의 판매기간 밖 계약은 경계라 금액 없이 검토 필요다.
   const boundary = await requestCheck(page, BOUNDARY_CONTRACT_NO)
   expect(boundary.resultStatus).toBe('REVIEW_REQUIRED')
   expect(boundary.upfront).toBeNull()
-  await expect(page.getByRole('list', { name: '판정 사유' })).toContainText('계약일이 판매기간 밖입니다.')
-  await page.screenshot({ path: 'e2e-artifacts/729-boundary.png', fullPage: true })
 
-  // 계약 상세의 작은 영역은 같은 저장 결과를 보인다. 탭을 열어도 새 결과를 만들지 않는다.
   const before = sql('SELECT count(*) FROM fgc.acquisition_cost_check')
   await page.goto(`/contracts/${contractId}?tab=acquisition&month=2026-07`)
-  const panel = page.getByRole('tabpanel', { name: '계약체결비용' })
-  await expect(panel.getByRole('table')).toContainText('한도 초과')
-  await expect(panel.getByRole('columnheader', { name: '선지급 판정' })).toBeVisible()
-  await page.screenshot({ path: 'e2e-artifacts/729-contract-tab.png', fullPage: true })
+  await expect(page.getByRole('tab', { name: '기본정보', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tab', { name: '계약체결비용', exact: true })).toHaveCount(0)
   expect(sql('SELECT count(*) FROM fgc.acquisition_cost_check')).toBe(before)
 
-  // 상세의 전체 결과 링크는 제거하고, 독립 검증 화면의 계약 필터는 유지한다.
-  await expect(panel.getByRole('link', { name: '전체 결과 보기' })).toHaveCount(0)
-  await page.goto(`/acquisition-cost-checks?contractNo=${CONTRACT_NO}`)
-  await expect(page.getByRole('heading', { name: '계약체결비용 한도 검증' })).toBeVisible()
-  await expect(page).toHaveURL(new RegExp(`contractNo=${CONTRACT_NO}`))
-  await expect(page.getByRole('row', { name: new RegExp(BOUNDARY_CONTRACT_NO) })).toHaveCount(0)
-  await expect(page.getByRole('row', { name: new RegExp(`계약 ${CONTRACT_NO} 결과 보기`) }).first()).toBeVisible()
-
-  // 준법 담당은 결과만 본다.
-  await login(page, 'audit01', '/acquisition-cost-checks')
-  await expect(page.getByRole('row', { name: new RegExp(`계약 ${CONTRACT_NO} 결과 보기`) }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: '검증 요청' })).toBeHidden()
-  await expect(page.getByText('검증 요청은 처리 권한이 있는 계정만 할 수 있습니다.')).toBeVisible()
-  await page.screenshot({ path: 'e2e-artifacts/729-read-only.png', fullPage: true })
-
-  // 설계사는 직접 URL로 들어와도 화면이 열리지 않고 이 API를 부르지 않는다. 서버 거절은 통합 시험에서 본다.
-  // V64가 막아 둔 계정이라 격리 DB에서만 연다.
+  for (const account of ['audit01', 'admin']) {
+    await login(page, account, '/acquisition-cost-checks')
+    await expect(page.getByRole('heading', { name: '권한 없음' })).toBeVisible()
+  }
   sql("UPDATE fgc.app_user SET account_status='ACTIVE', password_hash=(SELECT password_hash FROM fgc.app_user WHERE login_id='settle01') WHERE login_id='agent01'")
-  await page.goto('about:blank')
-  const agentCalls: string[] = []
-  page.on('request', (r) => {
-    if (r.url().includes('/api/v1/acquisition-cost-checks')) agentCalls.push(r.url())
-  })
   await login(page, 'agent01', '/acquisition-cost-checks')
   await expect(page.getByRole('heading', { name: '권한 없음' })).toBeVisible()
-  expect(agentCalls).toEqual([])
-
-  // 세션이 끝나면 기존 인증 복구 흐름으로 로그인 화면에 간다. 저장한 결과를 비인증으로 보이지 않는다.
+  expect(browserCalls).toEqual([])
   await page.context().clearCookies()
   await page.reload()
   await expect(page).toHaveURL(/\/login/)

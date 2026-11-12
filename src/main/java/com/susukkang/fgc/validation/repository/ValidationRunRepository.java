@@ -477,6 +477,7 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                              ON target_run.validation_run_id = :validationRunId
                           WHERE ec.validation_month = target_run.validation_month
                             AND ec.status IN ('NEW', 'IN_REVIEW')
+                            AND ec.exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING')
                             AND NOT EXISTS (
                                 SELECT 1
                                   FROM fgc.exception_occurrence current_occurrence
@@ -488,7 +489,8 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                            JOIN fgc.validation_run target_run
                              ON target_run.validation_run_id = :validationRunId
                           WHERE ec.validation_month = target_run.validation_month
-                            AND ec.status IN ('NEW', 'IN_REVIEW')) AS exceptionOpenWorkItemCount
+                            AND ec.status IN ('NEW', 'IN_REVIEW')
+                            AND ec.exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING')) AS exceptionOpenWorkItemCount
                    FROM fgc.exception_occurrence occurrence
                   WHERE occurrence.validation_run_id = :validationRunId
              ) ex
