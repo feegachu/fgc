@@ -248,9 +248,9 @@ class PaymentJournalCorrectionIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(booleans = {false, true})
+    @org.junit.jupiter.params.provider.CsvSource({"false,true", "true,true", "false,false", "true,false"})
     @WithMockUser(roles = "SETTLEMENT")
-    void capDraftMonthCorrectionRefreshesBothScopesUnlessTargetMonthIsFinalized(boolean finalized) {
+    void capDraftMonthCorrectionRefreshesBothScopesUnlessTargetMonthIsFinalized(boolean finalized, boolean sourceContractPresent) {
         Fixture f = fixture();
         jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=? WHERE contract_id=?", TEST_MONTH, contractId);
         LocalDate targetMonth = TEST_MONTH.plusMonths(1);
@@ -262,6 +262,11 @@ class PaymentJournalCorrectionIntegrationTest {
         jdbcTemplate.update("UPDATE fgc.validation_run SET status='RUNNING' WHERE validation_run_id=?", targetValidation);
         jdbcTemplate.update("UPDATE fgc.validation_run SET status='COMPLETED',current_step=8 WHERE validation_run_id=?", targetValidation);
         var draft = payments.create(paymentBody(payments.get(f.payment()), "1000000000", TEST_MONTH));
+        if (!sourceContractPresent) {
+            // 원천 계약 없이 귀속 행으로만 계약에 연결된 지급도 정정 전후 범위를 모두 갱신한다.
+            jdbcTemplate.update("UPDATE fgc.commission_transaction SET source_contract_id=NULL WHERE commission_transaction_id=?", draft.paymentId());
+            assertThat(payments.get(draft.paymentId()).contractId()).isNull();
+        }
         assertThatThrownBy(() -> payments.confirm(draft.paymentId(), "CAP-MOVE-" + draft.paymentId()))
                 .isInstanceOf(com.susukkang.fgc.transaction.service.CommissionPaymentConfirmationRejectedException.class);
         Long exception = id("SELECT exception_case_id FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND exception_type='CAP_VIOLATION'", draft.paymentId().toString());

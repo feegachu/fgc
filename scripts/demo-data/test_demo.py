@@ -133,6 +133,37 @@ class SnapshotSafetyTest(unittest.TestCase):
         self.assertEqual([c.args[0][-3:] for c in command.call_args_list], [['stop', 'web', 'api'], ['stop', 'web', 'api']])
 
 
+    def test_failed_ec2_restart_stops_services_and_preserves_original_error(self):
+        args = options(self.root, environment='ec2')
+        args.state.mkdir()
+        for name in ('.env', 'release.env', 'compose.yaml'):
+            (args.state / name).touch()
+        target = demo.Demo(args)
+        for step in ('api', 'health', 'web'):
+            for stop_fails in (False, True):
+                with self.subTest(step=step, stop_fails=stop_fails):
+                    failure = RuntimeError('restart failed: ' + step)
+                    commands = []
+
+                    def command(argv):
+                        commands.append(argv)
+                        if argv[-3:] == ['up', '-d', step]:
+                            raise failure
+                        if stop_fails and len(commands) > 1 and argv[-3:] == ['stop', 'web', 'api']:
+                            raise RuntimeError('stop failed')
+
+                    with patch('demo.run', side_effect=command), \
+                         patch('demo.wait_health', side_effect=failure if step == 'health' else None), \
+                         patch.object(target, 'sql', return_value='0'):
+                        with self.assertRaises(RuntimeError) as raised:
+                            with target.maintenance():
+                                pass
+                    self.assertIs(raised.exception, failure)
+                    self.assertEqual(commands[-1][-3:], ['stop', 'web', 'api'])
+                    if step != 'web':
+                        self.assertNotIn(target.compose + ['up', '-d', 'web'], commands)
+
+
 class LoaderGuardsTest(unittest.TestCase):
     def test_api_session_must_exist_in_target_database_before_business_changes(self):
         payload = base64.urlsafe_b64encode(json.dumps({'sid': str(uuid.uuid4())}).encode()).decode().rstrip('=')

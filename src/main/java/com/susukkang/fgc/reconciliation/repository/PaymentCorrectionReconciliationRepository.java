@@ -47,13 +47,19 @@ public class PaymentCorrectionReconciliationRepository {
     }
 
     public List<?> lockRuns(Long paymentId, Long contractId, LocalDate targetMonth, String targetStage, Long targetContractId) {
+        // 원천 계약이 없는 지급도 귀속 계약의 보험사 범위를 잠근다. 대상 범위는 원천 계약 유무와 독립적이다.
         return entityManager.createNativeQuery("""
                 SELECT r.reconciliation_run_id, r.status FROM fgc.reconciliation_run r
                 JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = :paymentId
-                JOIN fgc.insurance_contract c ON c.contract_id = :contractId
                 LEFT JOIN fgc.validation_run vr ON vr.validation_run_id = r.validation_run_id
                 WHERE ((r.settlement_month = ct.settlement_month AND r.payment_stage = ct.payment_stage
-                    AND r.insurer_id = CASE WHEN ct.payment_stage = 'GA_TO_FC' THEN c.insurer_id ELSE ct.insurer_id END)
+                    AND ((ct.payment_stage = 'GA_TO_FC' AND r.insurer_id IN (
+                            SELECT c.insurer_id FROM fgc.insurance_contract c
+                            WHERE c.contract_id = CAST(:contractId AS bigint)
+                               OR EXISTS (SELECT 1 FROM fgc.transaction_attribution ta
+                                          WHERE ta.commission_transaction_id = ct.commission_transaction_id
+                                            AND ta.contract_id = c.contract_id)))
+                         OR (ct.payment_stage = 'INSURER_TO_GA' AND r.insurer_id = ct.insurer_id)))
                     OR (r.settlement_month = CAST(:targetMonth AS date) AND r.payment_stage = CAST(:targetStage AS varchar)
                         AND r.insurer_id = (SELECT insurer_id FROM fgc.insurance_contract WHERE contract_id=CAST(:targetContractId AS bigint))))
                 AND NOT r.superseded_yn AND COALESCE(vr.status, '') <> 'FINALIZED'

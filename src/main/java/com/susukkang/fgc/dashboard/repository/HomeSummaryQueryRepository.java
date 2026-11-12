@@ -61,10 +61,11 @@ public class HomeSummaryQueryRepository {
                  GROUP BY COALESCE(ec.agent_id, c.agent_id)
             ),
             latest_cap AS (
-                -- 최신 판정에 미처리 위반 우선 규칙을 적용한다. 주의가 한 번도 없던 계약은 정렬 전에 제외한다.
+                -- 기준월 안에서 미처리 위반을 우선한다. 과거 월 위반은 open_exception에서 별도로 센다.
                 SELECT DISTINCT ON (cc.contract_id, cc.payment_stage) cc.contract_id, cc.result_status
                   FROM fgc.cap_check cc
                  WHERE cc.as_of_date <= :asOf
+                   AND cc.as_of_date >= date_trunc('month', CAST(:asOf AS date))
                    AND cc.contract_id IN (SELECT w.contract_id FROM fgc.cap_check w
                                            WHERE w.result_status = 'WARNING' AND w.as_of_date <= :asOf)
                    AND (__openViolation__ OR (cc.candidate_transaction_id IS NULL

@@ -157,22 +157,25 @@ class Demo:
     def maintenance(self):
         if self.ec2:
             run(self.compose + ['stop', 'web', 'api'])
-        succeeded = False
         try:
             sessions = self.sql("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() "
                                 "AND pid<>pg_backend_pid() AND backend_type='client backend'")
             if sessions != '0':
                 raise RuntimeError('다른 DB 연결이 남아 있습니다. IntelliJ DB 콘솔/다른 API를 종료하세요.')
             yield
-            succeeded = True
-        finally:
-            if self.ec2 and succeeded:
+            if self.ec2:
                 run(self.compose + ['up', '-d', 'api'])
                 wait_health(self.base)
                 run(self.compose + ['up', '-d', 'web'])
-            elif self.ec2:
-                run(self.compose + ['stop', 'web', 'api'])
-                print('작업 실패: web/api는 중지 상태입니다. 로그 확인 후 복원 명령을 실행하세요.', flush=True)
+        except BaseException:
+            if self.ec2:
+                try:
+                    run(self.compose + ['stop', 'web', 'api'])
+                except Exception as stop_error:
+                    print(f'web/api 중지 실패: 직접 중지 후 복구하세요. {stop_error}', flush=True)
+                else:
+                    print('작업 실패: web/api는 중지 상태입니다. 로그 확인 후 복원 명령을 실행하세요.', flush=True)
+            raise
 
     def files_command(self, path, script, readonly=False):
         run(['docker', 'run', '--rm', '--network', 'none',
