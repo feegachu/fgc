@@ -415,5 +415,8 @@ it('판정 근거의 서버 원문은 화면에서 쉬운 말로 바꾸고 앞�
     '계약 금액 자료와 적용 환급률표가 맞지 않습니다.',
   )
   expect(decisionReasonText('계약일이 없습니다.')).toBe('계약일이 없습니다.')
+  // 분급 정책 검토 예외는 설명에 판정 코드가 그대로 저장된다. 화면에는 같은 뜻의 문장으로 보인다.
+  expect(decisionReasonText('REVIEW_REQUIRED: CONTRACT_OUTSIDE_SALES_PERIOD')).toBe('계약일이 판매기간 밖입니다.')
+  expect(decisionReasonText('REVIEW_REQUIRED: NEW_REASON_CODE')).toBe('적용할 분급 정책을 자동으로 정하지 못했습니다.')
   expect(decisionReasonText(null)).toBe('-')
 })

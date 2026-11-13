@@ -166,6 +166,11 @@ describe('DASH-W01 업무 대시보드', () => {
     )
     expect(screen.getByRole('heading', { name: '검증 항목별 건수 비중' })).toBeInTheDocument()
     expect(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' })).toHaveTextContent('1,234건')
+    // 기준 정산월을 따르는 카드에는 그 달을 먼저 적어 전체 기간 카드와 구분한다.
+    expect(within(kpis).getByText('7월, 확정 위반 판정')).toBeInTheDocument()
+    expect(within(kpis).getByText('7월, 한도에 가까움')).toBeInTheDocument()
+    expect(within(kpis).getByText('7월, 위반 확정 아님')).toBeInTheDocument()
+    expect(within(kpis).getByText('7월, 허용오차 0원')).toBeInTheDocument()
     expect(summaryCalls()).toEqual(['/api/v1/dashboard/summary?month=2026-07'])
     const table = screen.getByRole('table', { name: '최근 예외 목록' })
     expect(within(table).queryByText('C-0001')).not.toBeInTheDocument()

@@ -249,6 +249,8 @@ describe('EXCP-W01 예외함', () => {
     const row = within(await table()).getAllByRole('row')[1]
     expect(within(row).getByText('1,200% 위반')).toBeInTheDocument()
     expect(within(row).getByText('C-0001')).toBeInTheDocument()
+    // 같은 계약의 같은 예외가 달마다 따로 생기므로 어느 검증월 건인지 행에서 구분한다.
+    expect(within(row).getByText('2026-07')).toBeInTheDocument()
     // UTC 15:30 은 Asia/Seoul 로 다음 날 00:30 이다.
     expect(within(row).getByText('2026-07-11 00:30')).toBeInTheDocument()
     expect(within(row).getByText('2회')).toBeInTheDocument()

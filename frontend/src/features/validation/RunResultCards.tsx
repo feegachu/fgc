@@ -1,4 +1,5 @@
 import { KpiCardContent } from '../../components/KpiCard'
+import { int } from '../../lib/format'
 import type { ValidationRunDetail } from './api'
 
 type ResultKpi = { label: string; value?: number; step: number; footer?: string; error?: boolean }
@@ -17,15 +18,19 @@ function ResultKpis({ cards, completed }: { cards: ResultKpi[]; completed: numbe
   })}</div>
 }
 
+// 카드마다 세는 단위가 달라, 무엇 중 몇 건인지 분모를 함께 보여 준다.
+const outOf = (noun: string, total: number | undefined, note: string) =>
+  total == null ? note : `${noun} ${int(total)}건 중, ${note}`
+
 export function RunSummaryCards({ detail, completed }: { detail: ValidationRunDetail; completed: number }) {
   const { capSummary: cap, arbitrageSummary: arb, ledgerSummary: ledger, reconciliationSummary: reco, exceptionSummary: exceptions } = detail
   return <ResultKpis completed={completed} cards={[
-    { step: 4, label: '1,200% 위반', value: cap?.violationCount, footer: '확정 위반 판정', error: true },
-    { step: 7, label: '대사 불일치', value: reco?.mismatchCount, footer: '허용오차 0원', error: true },
-    { step: 4, label: '1,200% 주의', value: cap?.warningCount, footer: '사용률 경고 기준 이상' },
-    { step: 5, label: '차익거래 검토대상', value: arb?.candidateCount, footer: '위반 확정 아님' },
-    { step: 6, label: '원장 불균형', value: ledger?.imbalanceCount, footer: '이번 실행 · 기표 전 0건 필수', error: true },
-    { step: 8, label: '미처리 예외', value: exceptions?.openWorkItemCount, footer: '해당 검증월 · 신규 + 검토중' },
+    { step: 4, label: '1,200% 위반', value: cap?.violationCount, footer: outOf('검사', cap?.checkedCount, '확정 위반 판정'), error: true },
+    { step: 7, label: '대사 불일치', value: reco?.mismatchCount, footer: outOf('대사', reco?.resultCount, '허용오차 0원'), error: true },
+    { step: 4, label: '1,200% 주의', value: cap?.warningCount, footer: outOf('검사', cap?.checkedCount, '한도에 가까움') },
+    { step: 5, label: '차익거래 검토대상', value: arb?.candidateCount, footer: outOf('계약', arb?.checkedCount, '위반 확정 아님') },
+    { step: 6, label: '원장 불균형', value: ledger?.imbalanceCount, footer: outOf('분개', ledger?.journalCount, '0건이어야 확정'), error: true },
+    { step: 8, label: '미처리 예외', value: exceptions?.openWorkItemCount, footer: '이 검증월의 신규와 검토중' },
   ]} />
 }
 

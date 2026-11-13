@@ -110,6 +110,8 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
     { key: 'createdAt', label: '발생', cellClassName: 'tabular-nums', render: (e) => dateTime(e.createdAt) },
   ]
 
+  // 기준 정산월을 따르는 카드와 전체 기간 카드가 섞여 있어, 정산월을 따르는 카드에는 그 달을 먼저 적는다.
+  const inMonth = (text: string) => (revised ? `${Number(month.slice(5, 7))}월, ${text}` : text)
   const kpis =
     data &&
     ([
@@ -118,7 +120,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
         color: 'error',
         label: '1,200% 위반',
         value: data.capViolation,
-        footer: '확정 위반 판정',
+        footer: inMonth('확정 위반 판정'),
         tone: 'error',
         to: href('/cap-checks', { status: 'VIOLATION' }),
       },
@@ -127,7 +129,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
         color: 'error',
         label: '대사 불일치',
         value: data.reconMismatch,
-        footer: '허용오차 0원',
+        footer: inMonth('허용오차 0원'),
         tone: 'error',
         to: href('/reconciliations', { onlyMismatch: 'true' }),
       },
@@ -136,7 +138,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
         color: 'warning',
         label: '1,200% 주의',
         value: data.capWarning,
-        footer: '사용률 경고 기준 이상',
+        footer: inMonth(revised ? '한도에 가까움' : '사용률 경고 기준 이상'),
         tone: 'warning',
         to: href('/cap-checks', { status: 'WARNING' }),
       },
@@ -145,7 +147,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
         color: 'review',
         label: '차익거래 검토대상',
         value: data.arbitrageCandidate,
-        footer: '위반 확정 아님',
+        footer: inMonth('위반 확정 아님'),
         tone: 'warning',
         to: href('/arbitrage-checks', { status: 'CANDIDATE' }),
       },

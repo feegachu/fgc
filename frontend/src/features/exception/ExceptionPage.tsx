@@ -197,6 +197,15 @@ export function ExceptionPage() {
       ),
     },
     {
+      // 같은 계약의 같은 예외가 검증월마다 따로 생긴다. 달이 안 보이면 같은 행이 두 번 나온 것처럼 보인다.
+      key: 'month',
+      label: '검증월',
+      width: '5rem',
+      align: 'center',
+      cellClassName: 'tabular-nums',
+      render: (row) => row.validationMonth?.slice(0, 7) ?? '-',
+    },
+    {
       key: 'severity',
       label: '심각도',
       sortKey: 'severity',

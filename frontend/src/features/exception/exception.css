@@ -32,7 +32,7 @@
 /* 좁은 화면에서는 표 영역 안에서 가로로 스크롤한다. */
 .exception-table {
   width: 100%;
-  min-width: 82.25rem;
+  min-width: 87.25rem; /* 검증월 열(5rem)만큼 넓혀 내용 칸 폭을 지킨다 */
   table-layout: fixed;
 }
 
