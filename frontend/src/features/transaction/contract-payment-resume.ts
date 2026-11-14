@@ -21,7 +21,7 @@ export async function loadSchedulePayments(contractId: string, stage: string, mo
     const lineId = keys.get(payment.sourceBusinessKey ?? '')
     if (lineId == null) continue
     if (payment.contractId !== Number(contractId) || payment.paymentStage !== stage || payment.settlementMonth?.slice(0, 7) !== month)
-      throw new Error('기존 지급 건의 계약·지급단계·정산월이 변경되었습니다. 목록에서 확인하세요.')
+      throw new Error('기존 지급 건의 계약, 지급단계 및 정산월이 변경되었습니다. 목록에서 확인하세요.')
     if (result[lineId]) throw new Error('동일 스케줄의 지급 건이 중복되었습니다. 목록에서 확인하세요.')
     if (!['DRAFT', 'CONFIRMED'].includes(payment.status ?? ''))
       throw new Error('취소된 지급 건은 같은 스케줄로 재등록할 수 없습니다. 지급 목록에서 확인하세요.')

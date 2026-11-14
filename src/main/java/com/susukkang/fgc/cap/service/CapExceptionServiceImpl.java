@@ -181,12 +181,12 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         // 예외 설명에는 관리자가 판단에 쓰는 수치만 사람이 읽는 문장으로 남긴다.
         DecimalFormat amount = new DecimalFormat("#,##0.##");
         return "지급단계 " + command.paymentStage()
-                + " · 기준일 " + command.asOfDate()
-                + " · 한도액 " + amount.format(command.limitAmount()) + "원"
-                + " · 산입액 " + amount.format(command.includedAmount()) + "원"
-                + " · 잔여 " + amount.format(command.remainingAmount()) + "원"
-                + " · 사용률 " + command.usagePct() + "%"
-                + " · 초과액 " + amount.format(exceededAmount) + "원";
+                + " 기준일 " + command.asOfDate()
+                + " 한도액 " + amount.format(command.limitAmount()) + "원"
+                + " 산입액 " + amount.format(command.includedAmount()) + "원"
+                + " 잔여 " + amount.format(command.remainingAmount()) + "원"
+                + " 사용률 " + command.usagePct() + "%"
+                + " 초과액 " + amount.format(exceededAmount) + "원";
     }
 
     private void validateCreateCommand(CapExceptionCreateCommand command) {

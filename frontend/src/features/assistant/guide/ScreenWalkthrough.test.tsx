@@ -76,7 +76,7 @@ it('opens immediately, omits hidden or ambiguous targets, and advances without s
     <button data-guide-target="last" disabled onClick={write}>실제 저장</button>
   </main></MemoryRouter></StrictMode>)
   await user.click(screen.getByRole('button', { name: '도움말' }))
-  expect(screen.getByText('화면 요소 안내 · 1/2')).toBeVisible()
+  expect(screen.getByText('화면 요소 안내 1/2')).toBeVisible()
   expect(save.isActive()).toBe(false)
   await user.type(screen.getByLabelText('입력'), ' 유지')
   await user.click(screen.getByRole('button', { name: '다음' }))

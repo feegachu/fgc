@@ -114,7 +114,7 @@ export function AgentOverview({ month }: { month: string }) {
     >
       <header className="surface-header agent-overview-header">
         <h2 id="agent-overview-title" className="surface-title">
-          GA·설계사 현황 {data?.basis && <EvidenceLink label="현황 집계 기준" icon="help">{data.basis}</EvidenceLink>}
+          GA 및 설계사 현황 {data?.basis && <EvidenceLink label="현황 집계 기준" icon="help">{data.basis}</EvidenceLink>}
         </h2>
         <div className="agent-overview-basis">
           <Field label="현황 기준일" className="agent-overview-date">

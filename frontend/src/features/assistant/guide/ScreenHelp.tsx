@@ -262,7 +262,7 @@ function ScreenHelpSession({ screenId, variant, walkthrough, saveGuide, finalize
       <section ref={card} className={`payment-guide-card${walkthrough ? ' screen-step-guide' : ''}`} aria-label={`${definition.title} 도움말`} data-help-target={snapshot.step?.targetId} data-guide-anchored={Boolean(snapshot.target && !modal)} style={position.card}>
         <header className="payment-guide-header">
           <img className="payment-guide-mascot" src={guideMascot} width="40" height="40" alt="" />
-          <span className={walkthrough ? 'screen-step-count' : undefined}>{walkthrough ? '화면 요소 안내' : saveGuide ? `${action} 가이드` : '화면 사용법'} · {Math.max(1, index + 1)}/{definition.steps.length}</span>
+          <span className={walkthrough ? 'screen-step-count' : undefined}>{walkthrough ? '화면 요소 안내' : saveGuide ? `${action} 가이드` : '화면 사용법'}  {Math.max(1, index + 1)}/{definition.steps.length}</span>
           <Button variant="ghost" onClick={() => setFolded(!folded)}>{folded ? '펼치기' : '접기'}</Button>
           <Button variant="ghost" onClick={close}>종료</Button>
         </header>
@@ -272,11 +272,11 @@ function ScreenHelpSession({ screenId, variant, walkthrough, saveGuide, finalize
             <p className="screen-step-group">{detailStep?.group ?? '화면 요소를 찾고 있습니다'}</p>
             <span className="visually-hidden" role="status">{detailStep && `${index + 1}/${definition.steps.length} ${detailStep.title}`}</span>
           </>}
-          <h2>{detailStep && !complete ? detailStep.title : staleCompletion ? '실행 결과 변경 · 다시 확인' : complete ? (validation ? (failedPath ? '신규 실행 절차 안내 완료' : '확정 완료') : saveGuide ? `${action} 완료` : '화면 사용법 안내 완료') : definition.title}</h2>
+          <h2>{detailStep && !complete ? detailStep.title : staleCompletion ? '실행 결과가 바뀌었습니다. 다시 확인하세요' : complete ? (validation ? (failedPath ? '신규 실행 절차 안내 완료' : '확정 완료') : saveGuide ? `${action} 완료` : '화면 사용법 안내 완료') : definition.title}</h2>
           <p>{validation && complete && !staleCompletion ? (failedPath ? '실행 실패를 확인했습니다. 신규 실행 만들기로 이동해 새 검증을 생성하세요. 기존 실행을 최종 확정한 것이 아닙니다.' : '이 검증 실행이 확정되었습니다.') : staleCompletion ? '입력이나 선택 대상, 결과가 바뀌었습니다. 안내를 다시 시작하세요.' : complete ? (saveGuide ? (outcome === 'correction' ? '역분개와 재기표가 완료되었습니다. 안내를 마치면 정정 이력을 갱신합니다. 재검증과 재대사는 따로 실행하세요.' : outcome === 'processing' ? '선택한 예외를 처리했습니다. 원래 건 정정과 재검증, 재대사는 따로 해야 합니다. 안내를 마치면 처리 이력을 갱신합니다.' : outcome === 'finalization' ? '이 검증 실행이 확정되었습니다.' : outcome === 'execution' ? '실행이 완료되었습니다. 불일치 해소와 최종 확정은 따로 진행합니다.' : '저장되었습니다. 안내를 마치면 저장 결과 화면으로 이동합니다.') : '설명을 모두 확인했습니다.') : outcome === 'execution' && saveState.savedId !== null && index <= 1 ? '이미 완료된 실행입니다. 다시 실행하지 말고 다음을 누르세요.' : snapshot.step?.instruction}</p>
-          {saveGuide && !complete && !needsFinalization && <p role="status">{saveState.error || (saveState.pending ? `${action} 결과를 기다리고 있습니다.` : saveState.savedId !== null ? `${action}되었습니다. 다음을 누르세요.` : index === 0 ? (saveState.valid ? '필수 입력과 형식 조건을 충족했습니다.' : '필수 입력·형식을 확인하세요. 입력 조건이 충족되어야 다음으로 진행할 수 있습니다.') : `강조된 ${action} 버튼을 누르세요. 완료되어야 다음으로 넘어갑니다.`)}</p>}
+          {saveGuide && !complete && !needsFinalization && <p role="status">{saveState.error || (saveState.pending ? `${action} 결과를 기다리고 있습니다.` : saveState.savedId !== null ? `${action}되었습니다. 다음을 누르세요.` : index === 0 ? (saveState.valid ? '필수 입력과 형식 조건을 충족했습니다.' : '필수 입력 및 형식을 확인하세요. 입력 조건이 충족되어야 다음으로 진행할 수 있습니다.') : `강조된 ${action} 버튼을 누르세요. 완료되어야 다음으로 넘어갑니다.`)}</p>}
           {needsFinalization && !complete && <p role="status">{finalizeState.savedId !== null ? '확정되었습니다. 다음을 누르세요.' : '계산 완료와 최종 확정은 다릅니다. 확정 결과를 기다리고 있습니다.'}</p>}
-          {paused && <p role="status">{snapshot.status === 'ERROR' ? '시스템 오류가 발생했습니다. 잠시 후 다시 시작하세요.' : targetMessages[snapshot.reasonCode ?? ''] ?? '안내 대상을 표시할 수 없습니다. 대상 선택·탭·권한을 확인한 후 다시 찾으세요.'}</p>}
+          {paused && <p role="status">{snapshot.status === 'ERROR' ? '시스템 오류가 발생했습니다. 잠시 후 다시 시작하세요.' : targetMessages[snapshot.reasonCode ?? ''] ?? '안내 대상을 표시할 수 없습니다. 대상 선택, 탭 및 권한을 확인한 후 다시 찾으세요.'}</p>}
           {detailStep && !complete && <>
             <dl className="screen-step-details">
               {detailStep.details.map(item => <div key={item.label}><dt>{item.label}</dt><dd>{item.text}</dd></div>)}
@@ -286,7 +286,7 @@ function ScreenHelpSession({ screenId, variant, walkthrough, saveGuide, finalize
           <div className="payment-guide-actions">
             {complete ? <><Button onClick={staleCompletion ? restart : close}>{staleCompletion ? '다시 시작' : '안내 마치기'}</Button>{!staleCompletion && <Button variant="secondary" disabled={busy} onClick={restart}>다시 보기</Button>}</> : snapshot.status === 'ERROR' ? <Button disabled={busy} onClick={restart}>다시 시작</Button> : paused ? <Button disabled={busy} onClick={() => { refocus.current = true; void run(() => runtime.resume()) }}>다시 찾기</Button> : <>
               <Button variant={walkthrough ? 'secondary' : 'primary'} disabled={busy || index <= 0 || (Boolean(walkthrough) && !runtime.canGoBack())} onClick={() => void run(() => runtime.previous())}>이전</Button>
-              <Button className={walkthrough ? 'screen-step-next' : undefined} disabled={busy || !snapshot.target || !nextReady} onClick={() => walkthrough && index === definition.steps.length - 1 ? close() : void run(() => runtime.next())}>{walkthrough ? index === definition.steps.length - 1 ? '안내 마치기' : '다음' : saveGuide ? '다음' : '설명 확인 · 다음'}</Button>
+              <Button className={walkthrough ? 'screen-step-next' : undefined} disabled={busy || !snapshot.target || !nextReady} onClick={() => walkthrough && index === definition.steps.length - 1 ? close() : void run(() => runtime.next())}>{walkthrough ? index === definition.steps.length - 1 ? '안내 마치기' : '다음' : saveGuide ? '다음' : '설명 확인 후 다음'}</Button>
             </>}
           </div>
         </>}

@@ -32,7 +32,7 @@ test('수정 후 대사 도움말은 목록과 비교 창을 실제 실행 없�
   await page.getByRole('button', { name: '대사 결과 7 비교 보기' }).click()
   const modal = page.getByRole('dialog', { name: '대사 비교 상세' })
   const titles: string[] = []
-  for (const tab of ['비교 요약', '예상 원천', '실제 지급', '차액·분류 근거', '관련 화면']) {
+  for (const tab of ['비교 요약', '예상 원천', '실제 지급', '차액 및 분류 근거', '관련 화면']) {
     await modal.getByRole('tab', { name: tab, exact: true }).click()
     titles.push(...await readDetailedHelp(page, modal.getByRole('button', { name: '도움말', exact: true }), 1))
   }
@@ -83,13 +83,13 @@ test('비활성 보험회사 과거 이력 조회는 가능하고 신규 대사�
   await expect(page).toHaveURL(/insurer=9/)
 })
 
-test('비교 모달의 null 회차는 대시, 음수 예상·실제·차액은 마이너스와 빨간색으로 표시한다', async ({ page }) => {
+test('비교 모달의 null 회차는 대시, 음수 예상, 실제 및 차액은 마이너스와 빨간색으로 표시한다', async ({ page }) => {
   await historyFixture(page)
   await page.goto('reconciliations?month=2026-07&resultId=7')
   await expect(page.getByRole('dialog').getByText('C-001, 초회 수수료, -')).toBeVisible()
   await expect(page.getByRole('dialog')).not.toContainText('-회차')
   await expect(page.getByRole('dialog')).not.toContainText('—회차')
-  await page.getByRole('tab', { name: '차액·분류 근거', exact: true }).click()
+  await page.getByRole('tab', { name: '차액 및 분류 근거', exact: true }).click()
   for (const text of ['-12,000원', '-13,000원', '-1,000원']) {
     const amounts = page.getByRole('dialog').getByRole('tabpanel').getByText(text, { exact: true })
     await expect(amounts.first()).toBeVisible()

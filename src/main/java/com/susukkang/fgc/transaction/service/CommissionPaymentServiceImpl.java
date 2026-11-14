@@ -2293,7 +2293,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             CommissionItemReference item
     ) {
         if (!item.cashflowType().equals(requestedCashflowType)) {
-            invalid("cashflowType", "수수료 항목의 지급·차감 구분과 요청값이 다릅니다.");
+            invalid("cashflowType", "수수료 항목의 지급 및 차감 구분과 요청값이 다릅니다.");
         }
     }
 

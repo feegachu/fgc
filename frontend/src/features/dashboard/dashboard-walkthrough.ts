@@ -9,8 +9,8 @@ export const dashboardWalkthrough: readonly ScreenHelpStep[] = [
   brief({
     targetId: 'components.month-selector.button', attribute: 'data-guide-feature', scope: 'shell',
     group: '조회 기준', title: '기준 정산월',
-    instruction: '선택한 월의 수수료·검증 결과입니다.',
-    interaction: '원장·미처리 예외는 전체 기간입니다.',
+    instruction: '선택한 월의 수수료 및 검증 결과입니다.',
+    interaction: '원장 및 미처리 예외는 전체 기간입니다.',
   }),
   brief({
     targetId: 'features.dashboard.dashboard-page.section', attribute: 'data-guide-feature',
@@ -22,7 +22,7 @@ export const dashboardWalkthrough: readonly ScreenHelpStep[] = [
     targetId: 'features.dashboard.monthly-commissions.section', attribute: 'data-guide-feature',
     presentation: { side: 'right' },
     group: '수수료 흐름', title: '월별 수수료',
-    instruction: '확정된 GA 수령액·설계사 지급액입니다.',
+    instruction: '확정된 GA 수령액 및 설계사 지급액입니다.',
     interaction: '전월 증감과 월별 막대를 비교하세요.',
   }),
   brief({
@@ -43,7 +43,7 @@ export const dashboardWalkthrough: readonly ScreenHelpStep[] = [
     targetId: 'features.dashboard.agent-status-panel.section', attribute: 'data-guide-feature',
     presentation: { side: 'either' },
     group: '지점별 비교', title: '지점별 현황',
-    instruction: '수수료·설계사·계약·예외 현황입니다.',
+    instruction: '수수료, 설계사, 계약 및 예외 현황입니다.',
     interaction: '아이콘을 고르고 막대를 눌러보세요.',
   }),
   brief({
@@ -51,6 +51,6 @@ export const dashboardWalkthrough: readonly ScreenHelpStep[] = [
     presentation: { side: 'either' },
     group: '업무 이어가기', title: '업무 가이드와 보험GA협회',
     instruction: '업무 가이드로 정산을 따라갑니다.',
-    interaction: '협회에서 업계·제도 소식을 봅니다.',
+    interaction: '협회에서 업계 및 제도 소식을 봅니다.',
   }),
 ]

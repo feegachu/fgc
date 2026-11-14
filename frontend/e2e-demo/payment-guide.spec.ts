@@ -5,7 +5,7 @@ import { test, expect, login, api, responseFor, successful, sql } from './fixtur
 test.use({ video: 'off' })
 
 for (const multi of [false, true]) {
-  test(`FUN-087 실제 서버 ${multi ? '다중 계약·증빙 누락' : '단일 계약'}: 기존 도움말 → 초안 저장 → 사전검증 → 확정 → 목록`, async ({
+  test(`FUN-087 실제 서버 ${multi ? '다중 계약 및 증빙 누락' : '단일 계약'}: 기존 도움말 → 초안 저장 → 사전검증 → 확정 → 목록`, async ({
     page,
   }, info) => {
     const errors: string[] = []

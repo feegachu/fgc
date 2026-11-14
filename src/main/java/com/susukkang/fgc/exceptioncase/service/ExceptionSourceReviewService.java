@@ -49,24 +49,24 @@ public class ExceptionSourceReviewService {
         String encoded = java.net.URLEncoder.encode(Objects.toString(contractNo, ""), java.nio.charset.StandardCharsets.UTF_8);
         var links = new ArrayList<ExceptionReviewContext.Link>();
         if (contract != null) {
-            links.add(new ExceptionReviewContext.Link(mismatch ? "계약 판매버전 수정" : "계약 상태·입력 확인", contract + "/edit"));
-            links.add(new ExceptionReviewContext.Link("예상 스케줄 확인·재생성", contract + "?tab=schedules"));
-            links.add(new ExceptionReviewContext.Link("환수액 계산·PDF", "/clawbacks?contractNo=" + encoded));
+            links.add(new ExceptionReviewContext.Link(mismatch ? "계약 판매버전 수정" : "계약 상태 및 입력 확인", contract + "/edit"));
+            links.add(new ExceptionReviewContext.Link("예상 스케줄 확인 및 재생성", contract + "?tab=schedules"));
+            links.add(new ExceptionReviewContext.Link("환수액 계산 및 PDF", "/clawbacks?contractNo=" + encoded));
             Object item = em.createNativeQuery("SELECT commission_item_id FROM fgc.commission_item WHERE item_code='CLAWBACK'").getResultStream().findFirst().orElse(null);
-            links.add(new ExceptionReviewContext.Link("환수·상계 차감 등록", "/transactions/new?cashflowType=DEDUCTION&paymentStage=GA_TO_FC&contractId="
+            links.add(new ExceptionReviewContext.Link("환수 및 상계 차감 등록", "/transactions/new?cashflowType=DEDUCTION&paymentStage=GA_TO_FC&contractId="
                     + source.contractId() + (row[4] == null ? "" : "&agentId=" + row[4]) + (item == null ? "" : "&commissionItemId=" + item)
                     + "&returnTo=%2Fexceptions%3Fselected%3D" + id));
         }
-        links.add(new ExceptionReviewContext.Link("수수료·환수 규칙 확인", "/policies?tab=management"));
+        links.add(new ExceptionReviewContext.Link("수수료 및 환수 규칙 확인", "/policies?tab=management"));
         if ("RECONCILIATION_RESULT".equals(source.sourceType())) links.add(new ExceptionReviewContext.Link("대사 비교 근거", "/reconciliations?resultId=" + source.sourceId()));
         boolean admin = queries.requiresAdministratorReview(id);
         String guidance = admin ? "보험사 지급기준과 계산근거를 대조하세요. 기준이 맞으면 시정 요청 문서와 GA→설계사 한도 확인을 남겨 관리자 판단으로 반려하고, 입력 오류면 원천 데이터 정정을 요청하세요. 스케줄 재생성만으로 금액이 바뀌지는 않습니다."
-                : mismatch ? "계약일에 맞지 않는 판매버전입니다. 정책 신규 등록보다 계약의 판매버전을 먼저 정정하고 스케줄 재생성·재검증을 진행하세요."
-                : "ARBITRAGE_CANDIDATE".equals(source.type()) ? "차익거래 검토대상은 위반 확정이 아닙니다. 해지·실효는 환수 계산·PDF·수령인별 차감 후 재검증하고, 유지·부활은 환수 규칙 확인 후 반려할 수 있습니다. 미납은 의견을 남겨 검토중으로 유지하세요."
-                : "REFUND_TABLE_MISSING".equals(source.type()) ? "보험사에 환급률표를 요청하고 의견·요청 문서를 남기세요. 자료가 입력되기 전에는 검토중으로 유지하며, 이 계약은 계산 자료가 충분하지 않습니다."
-                : "DATA_QUALITY".equals(source.type()) ? "기준일·금융/해약환급금 스냅샷·예정 지표의 근거를 확인하세요. 외부 자료가 없으면 의견을 남겨 보류하고, 참고 지표나 의도한 시연 자료라면 판단 근거를 남겨 반려하세요."
+                : mismatch ? "계약일에 맞지 않는 판매버전입니다. 정책 신규 등록보다 계약의 판매버전을 먼저 정정하고 스케줄 재생성 및 재검증을 진행하세요."
+                : "ARBITRAGE_CANDIDATE".equals(source.type()) ? "차익거래 검토대상은 위반 확정이 아닙니다. 해지 및 실효는 환수 계산, PDF 및 수령인별 차감 후 재검증하고, 유지 및 부활은 환수 규칙 확인 후 반려할 수 있습니다. 미납은 의견을 남겨 검토중으로 유지하세요."
+                : "REFUND_TABLE_MISSING".equals(source.type()) ? "보험사에 환급률표를 요청하고 의견 및 요청 문서를 남기세요. 자료가 입력되기 전에는 검토중으로 유지하며, 이 계약은 계산 자료가 충분하지 않습니다."
+                : "DATA_QUALITY".equals(source.type()) ? "기준일 및 금융/해약환급금 스냅샷 및 예정 지표의 근거를 확인하세요. 외부 자료가 없으면 의견을 남겨 보류하고, 참고 지표나 의도한 시연 자료라면 판단 근거를 남겨 반려하세요."
                 : "CAP_WARNING".equals(source.type()) ? "잔여 한도를 확인하고 추가 지급 전 사전검증 계획을 기록하세요. 검토가 끝났다면 반려로 종결할 수 있습니다."
-                : "원지급과 실제 송금·입금 여부를 확인하세요. 청약철회 지급이나 실제 중복 송금은 환수·차감 후 통지서와 차감 관리번호를 남겨 반려합니다. 지급 기록이 남으므로 대사 일치로 강제 해결하지 않습니다. 스케줄 밖의 정상 지급은 지급 근거를 확인해 반려하고, 확인되지 않은 보험사 입금은 의견을 남겨 검토중으로 유지하세요.";
+                : "원지급과 실제 송금 및 입금 여부를 확인하세요. 청약철회 지급이나 실제 중복 송금은 환수 및 차감 후 통지서와 차감 관리번호를 남겨 반려합니다. 지급 기록이 남으므로 대사 일치로 강제 해결하지 않습니다. 스케줄 밖의 정상 지급은 지급 근거를 확인해 반려하고, 확인되지 않은 보험사 입금은 의견을 남겨 검토중으로 유지하세요.";
         boolean canRecheck = "CAP_CHECK".equals(source.sourceType()) || "ARBITRAGE_CHECK".equals(source.sourceType())
                 || ("POLICY_MISSING".equals(source.type()) && source.contractId() != null && !mismatch);
         return new ExceptionReviewContext(status, contractDate, mismatch, queries.requiresRejectionEvidence(id), admin, canRecheck, guidance, links);
@@ -82,7 +82,7 @@ public class ExceptionSourceReviewService {
         ExceptionActionType action = ExceptionActionType.CORRECT;
         String basis = "";
         if (!context.offeringMismatch() && "POLICY_MISSING".equals(source.type()) && source.contractId() != null) {
-            var schedules = contracts.regenerateSchedules(source.contractId(), "정책 없음 예외 재검증 · " + id);
+            var schedules = contracts.regenerateSchedules(source.contractId(), "정책 없음 예외 재검증 " + id);
             resolved = schedules.size() >= 2;
             basis = "재생성된 예상 스케줄 " + schedules;
         } else if (!context.offeringMismatch() && "CAP_CHECK".equals(source.sourceType())) {
@@ -102,7 +102,7 @@ public class ExceptionSourceReviewService {
                 Object date = ((Object[])stages.getFirst())[1];
                 LocalDate asOf = date instanceof java.sql.Date d ? d.toLocalDate() : (LocalDate) date;
                 var checked = arbitrage.reArbitrageCheck(source.contractId(), new ReArbitrageCheckRequest(
-                        asOf, "예외 원천 재검증 · " + id), actor);
+                        asOf, "예외 원천 재검증 " + id), actor);
                 resolved = checked.getResultStatus() != ArbitrageCheckStatus.REVIEW_REQUIRED
                         && (!"ARBITRAGE_CANDIDATE".equals(source.type()) || checked.getResultStatus() != ArbitrageCheckStatus.CANDIDATE);
                 basis = "차익거래 계산근거 " + checked.getArbitrageCheckId();
@@ -113,8 +113,8 @@ public class ExceptionSourceReviewService {
                         """).setParameter("id", source.contractId()).setParameter("caseId", id).getSingleResult()).longValue() > 0) action = ExceptionActionType.REDUCE;
             }
         }
-        var receipt = resolved ? actions.action(id, new ExceptionActionRequest(action, "원천 재검증 통과 · " + basis, basis), actor, login) : null;
+        var receipt = resolved ? actions.action(id, new ExceptionActionRequest(action, "원천 재검증 통과 " + basis, basis), actor, login) : null;
         return new ExceptionSourceRecheckResponse(null, resolved, resolved ? "원천 자료 재검증을 통과해 예외를 종결했습니다."
-                : "검토 원인이 남아 있습니다. 외부 자료·계약 입력·적용 규칙을 확인하고 의견을 남기세요.", receipt);
+                : "검토 원인이 남아 있습니다. 외부 자료 및 계약 입력 및 적용 규칙을 확인하고 의견을 남기세요.", receipt);
     }
 }

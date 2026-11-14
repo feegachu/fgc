@@ -45,8 +45,8 @@ export const contractPaymentHelp: ScreenHelpStep[] = ([
   {
     targetId: 'payment.precheck.result',
     title: '확정 전 6단계 점검',
-    instruction: '입력·금액·저장·검증 결과를 차례로 확인하세요.',
-    interaction: '확인 필요 항목을 수정하고 다시 저장·검증합니다.',
+    instruction: '입력, 금액, 저장 및 검증 결과를 차례로 확인하세요.',
+    interaction: '확인 필요 항목을 수정하고 다시 저장 및 검증합니다.',
     presentation: { side: 'left', preserveCardPosition: true },
   },
   {

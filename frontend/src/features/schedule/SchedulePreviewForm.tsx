@@ -124,7 +124,7 @@ function PreviewSession({ context, contractId, stage, scheduleId }: Props) {
   return (
     <section data-guide-feature="schedule.preview.region" data-guide-scope className="surface schedule-detail-card schedule-preview-card" aria-label={`${stage} ${years} 예정 생성`}>
       <header className="schedule-preview-header">
-        <h3 className="surface-title">{unresolvedRegime && !uncertain ? '적용 체계·정책 검토 필요' : `${years} 예정 스케줄`}</h3>
+        <h3 className="surface-title">{unresolvedRegime && !uncertain ? '적용 체계 및 정책 검토 필요' : `${years} 예정 스케줄`}</h3>
         {canProcess && (scheduleId
           ? <ScreenHelp screenId="SCHE-W02" variant="preview" saveGuide={saveGuide} />
           : <ScreenHelp screenId="CONT-W02" variant="preview" saveGuide={saveGuide} />)}

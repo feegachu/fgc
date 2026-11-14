@@ -82,14 +82,14 @@ export default function AgentStatementPage() {
     {
       targetId: 'features.agent-statement.agent-statement-page.summary',
       attribute: 'data-guide-feature',
-      title: '지급·보류·조정·환수',
-      instruction: isAgent ? '본인의 지급·보류·조정·환수 합계를 확인합니다.' : '선택한 지사·설계사의 합계를 확인합니다.',
-      interaction: isAgent ? '유형별 금액과 건수를 확인하세요.' : '지사는 전체 합계, 설계사는 개인 통계입니다.',
+      title: '지급, 보류, 조정 및 환수',
+      instruction: isAgent ? '본인의 지급, 보류, 조정 및 환수 합계를 확인합니다.' : '선택한 지사 및 설계사의 합계를 확인합니다.',
+      interaction: isAgent ? '유형별 금액을 확인하세요.' : '지사는 전체 합계, 설계사는 개인 통계입니다.',
     },
     {
       targetId: 'statement.results',
       title: isAgent ? '본인 계약별 명세' : '지점과 설계사 명세',
-      instruction: isAgent ? '계약·수수료 항목별 금액과 계산 근거를 확인합니다.' : '트리에서 지점·설계사별 내역을 확인합니다.',
+      instruction: isAgent ? '계약 및 수수료 항목별 금액과 계산 근거를 확인합니다.' : '트리에서 지점 및 설계사별 내역을 확인합니다.',
       interaction: '표에서는 계약별 금액과 근거를 볼 수 있습니다.',
       onEnter: () => {
         if (isAgent) return
@@ -239,7 +239,7 @@ export default function AgentStatementPage() {
                 명세 내역
               </h2>
               <div className="ast-list-tools">
-                <span className="ast-count"><span className="tabular-nums">{int(total)}</span>건 · 20건씩</span>
+                <span className="ast-count"><span className="tabular-nums">{int(total)}</span>건 20건씩</span>
                 {enhanced && view === 'table' && <StatementViewSwitch value={view} onChange={setView} />}
               </div>
             </header>
@@ -324,7 +324,7 @@ function SummaryCards({
   const cards: [EntryType, keyof StatementSummary, string, string][] = [
     ['PAYMENT', 'payment', '지급', '확정된 본인 귀속 지급'],
     ['HELD', 'held', '보류', '아직 확정되지 않은 지급 보류'],
-    ['ADJUSTMENT', 'adjustment', '조정', '정정·역분개로 반영된 금액(차감은 음수)'],
+    ['ADJUSTMENT', 'adjustment', '조정', '정정 및 역분개로 반영된 금액(차감은 음수)'],
     ['CLAWBACK', 'clawback', '환수', '환수 계산액이며 실제 회수 완료액이 아닙니다'],
   ]
   if (dashboardStyle) {
@@ -341,8 +341,7 @@ function SummaryCards({
             format={int}
             zero={bucket?.amount === 0}
             footer={<><span className="kpi-comparison" title={scopeLabel ?? note}>
-              {scopeLabel ?? <>{bucket ? `${int(bucket.count)}건` : ''}
-              {basis?.dateBasis[type] ? ` · ${basis.dateBasis[type]}` : ''}</>}
+              {scopeLabel ?? basis?.dateBasis[type] ?? ''}
             </span>{showNotes && <span className="ast-kpi-note">{note}</span>}</>}
           />
         })}
@@ -362,8 +361,7 @@ function SummaryCards({
               {bucket ? won(bucket.amount) : failed ? '조회 실패' : loading ? '…' : '-'}
             </strong>
             <span className="ast-card-note">
-              {bucket ? `${int(bucket.count)}건` : ''}
-              {basis?.dateBasis[type] ? ` · ${basis.dateBasis[type]}` : ''}
+              {basis?.dateBasis[type] ?? ''}
             </span>
             {/* 해석 안내는 호버 툴팁이 아니라 화면에 보이는 문구로 둔다(터치·키보드 사용자). */}
             <span className="ast-card-help">{note}</span>
@@ -421,7 +419,7 @@ function DetailPanel({
                 {entry.amount == null || entry.dataStatus === 'MISSING' ? '금액 미확인' : won(entry.amount)}
               </strong>
               <span className="ast-muted">
-                {entry.statusLabel} · {date(entry.basisDate)}
+                {entry.statusLabel}  {date(entry.basisDate)}
               </span>
             </div>
             <section data-guide-feature="features.agent-statement.agent-statement-page.detail-basic" className="ast-group" aria-label="기본 정보">

@@ -57,12 +57,12 @@ async function install(page: Page) {
   return writes
 }
 
-test('검증원장은 합계·분개별 묶음 표·연결 근거를 표시하고 계약과 분개 범위를 전환한다', async ({ page }, info) => {
+test('검증원장은 합계 및 분개별 묶음 표 및 연결 근거를 표시하고 계약과 분개 범위를 전환한다', async ({ page }, info) => {
   const writes = await install(page)
   await page.setViewportSize({ width: 1600, height: 1050 })
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/journals?month=2026-11')
-  const table = page.getByRole('table', { name: '분개별 차변·대변 내역' })
+  const table = page.getByRole('table', { name: '분개별 차변 및 대변 내역' })
   await expect(table).toBeVisible()
   await expect(table.locator('thead')).toHaveCount(1)
   const contractRow = page.locator('.ledger-contract-node').first()

@@ -10,7 +10,7 @@ test('환수 후보를 정책과 사유로 계산하면 서버 계산 결과의 
   await expect(calc).toBeVisible()
   // 정책 후보가 하나라 미리 골라 두지만, 사유를 쓰기 전에는 계산하지 않는다.
   await expect(calc.getByRole('radio', { name: /^표준 환수율 v1\b/ })).toBeChecked()
-  const button = page.getByRole('dialog', { name: /^환수 상세 ·/ }).getByRole('button', { name: '환수액 계산' })
+  const button = page.getByRole('dialog', { name: /^환수 상세 / }).getByRole('button', { name: '환수액 계산' })
   await expect(button).toBeDisabled()
   await calc.getByLabel(/계산 사유/).fill('등록된 환수 정책으로 계산')
   await expect(button).toBeEnabled()

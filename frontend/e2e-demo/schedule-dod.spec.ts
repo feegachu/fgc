@@ -80,7 +80,7 @@ async function downloadCsv(page: Page, name: string) {
 }
 
 for (const seven of [false, true]) {
-  test(`SCHE DoD CT-S0${seven ? 2 : 1}: 실제 승인 정책 ${seven ? 84 : 48}회차·CSV·새 판·복귀`, async ({ page }, info) => {
+  test(`SCHE DoD CT-S0${seven ? 2 : 1}: 실제 승인 정책 ${seven ? 84 : 48}회차, CSV 및 새 판 및 복귀`, async ({ page }, info) => {
     await page.setViewportSize({ width: 1280, height: 720 })
     const fixture = await preview(seven)
     const count = seven ? 84 : 48
@@ -93,7 +93,7 @@ for (const seven of [false, true]) {
     await page.getByLabel('적용 체계', { exact: true }).selectOption(fixture.regime)
     const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: fixture.code, exact: true }) })
     await expect(row).toContainText(`${count}회`)
-    await expect(page.getByText('4년·7년 스케줄은 예정 결과이며 지급 확정 대상이 아닙니다.')).toBeVisible()
+    await expect(page.getByText('4년 및 7년 스케줄은 예정 결과이며 지급 확정 대상이 아닙니다.')).toBeVisible()
     await expect.poll(async () => (await page.locator('p.schedule-data-warning').boundingBox())?.height ?? 999).toBeLessThan(80)
     const before = sql(`SELECT count(*) FROM fgc.schedule_header WHERE contract_id=${fixture.contract}`)
     const listCsv = await downloadCsv(page, info.outputPath('01-list.csv'))
@@ -161,7 +161,7 @@ test('SCHE DoD: 실제 12회차 정액 정책은 가짜 48/84행을 만들지 �
   }
 })
 
-test('SCHE DoD: 목록·상세 403/409/422/500은 0건·0원으로 위장하지 않고 재시도한다', async ({ page }, info) => {
+test('SCHE DoD: 목록 및 상세 403/409/422/500은 0건 및 0원으로 위장하지 않고 재시도한다', async ({ page }, info) => {
   const { id } = await preview(false)
   await login(page, 'settle01', '/schedules')
   for (const detail of [false, true]) {
@@ -189,7 +189,7 @@ test('SCHE DoD: 목록·상세 403/409/422/500은 0건·0원으로 위장하지 
   await page.screenshot({ path: info.outputPath('real-401-login.png'), fullPage: true })
 })
 
-test('SCHE DoD: 역할별 직접 API/URL·ID 변경과 읽기 전용 버튼을 서버에서 제한한다', async ({ page }, info) => {
+test('SCHE DoD: 역할별 직접 API/URL 및 ID 변경과 읽기 전용 버튼을 서버에서 제한한다', async ({ page }, info) => {
   const ids = [(await preview(false)).id, (await preview(true)).id]
   for (const account of ['admin', 'settle01', 'gaadmin', 'audit01', 'agent01']) {
     if (account === 'agent01') sql("UPDATE fgc.app_user SET account_status='ACTIVE',password_hash=(SELECT password_hash FROM fgc.app_user WHERE login_id='settle01') WHERE login_id='agent01'")
@@ -229,7 +229,7 @@ test('SCHE DoD: 역할별 직접 API/URL·ID 변경과 읽기 전용 버튼을 �
   try { expect((await anonymous.get(`/api/v1/schedules/${ids[0]}`)).status()).toBe(401) } finally { await anonymous.dispose() }
 })
 
-test('SCHE DoD: 로딩·늦은 응답·정상 0건·null/0/음수 표시를 구분한다', async ({ page }, info) => {
+test('SCHE DoD: 로딩 및 늦은 응답 및 정상 0건 및 null/0/음수 표시를 구분한다', async ({ page }, info) => {
   const fixture = await preview(false)
   await login(page, 'settle01', `/schedules?regime=${fixture.regime}&purpose=SIMULATION`)
   await expect(page.getByRole('link', { name: fixture.code, exact: true })).toBeVisible()

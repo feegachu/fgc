@@ -119,7 +119,7 @@ test('쪽 제목은 왼쪽 끝에, 도움말은 오른쪽 끝에 있고 격자�
         return rect.top + rect.height / 2
       }
       return Math.max(Math.abs(center(tabs) - center(help)), Math.abs(center(date) - center(help)))
-    }, dateSelector), { message: `${route}: 탭·기준일·도움말 세로 정렬` }).toBeLessThanOrEqual(1)
+    }, dateSelector), { message: `${route}: 탭, 기준일 및 도움말 세로 정렬` }).toBeLessThanOrEqual(1)
   }
 
   // VRUN-W01은 도움말이 쪽 머리가 아니라 새 실행 만들기 머리에 있다.

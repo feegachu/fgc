@@ -36,7 +36,7 @@ export function paymentWalkthrough(input: PaymentGuideInput | null, contractId?:
   add('amount', '#amount', '전체 지급금액을 입력하세요', '여러 계약에 나눌 금액을 포함한 지급 건 전체 금액입니다. 0원 이상 원 단위로 입력하세요.', validAmount(form.amount))
   add('key', '#bizKey', '지급 관리번호를 확인하세요', '같은 지급 건을 두 번 저장하지 않게 구분하는 번호입니다.', !!form.sourceBusinessKey.trim())
   for (const [index, row] of rows.entries()) {
-    const prefix = `귀속 ${index + 1} · `
+    const prefix = `귀속 ${index + 1} `
     if (row.attributionMethod !== 'NEWCOMER_NON_CONTRACT')
       add(`contract-${row.key}`, `#attr-${row.key}-contractId`, `${prefix}계약을 선택하세요`, '검색 결과에서 전체 업무 가이드를 시작할 때 선택한 계약을 선택하세요.', !!row.contractId && (!contractId || row.contractId === String(contractId)))
     add(`date-${row.key}`, `#attr-${row.key}-attributionDate`, `${prefix}귀속일을 입력하세요`, '이 계약에 금액이 귀속되는 날짜를 입력하세요.', !!row.attributionDate)

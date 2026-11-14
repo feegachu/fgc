@@ -65,17 +65,17 @@ export function LedgerExplorer() {
       <div className="ledger-explorer-right" aria-busy={query.isFetching || single.isFetching}>
       <section data-guide-feature="ledger.explorer.section-1" className="ledger-summary-group" aria-label="분개 합계">
         <header className="surface surface-header ledger-contract-summary"><h2 className="surface-title">{all ? '전체 분개' : contract?.contractNo ?? '분개 내역'}</h2>
-          {contract?.agentName && <span>{contract.agentName} · {contract.insurerName}</span>}<small>{selected ? '선택한 분개' : `분개 ${int(totals?.journalCount ?? 0)}건`}</small>
+          {contract?.agentName && <span>{contract.agentName}  {contract.insurerName}</span>}<small>{selected ? '선택한 분개' : `분개 ${int(totals?.journalCount ?? 0)}건`}</small>
           {selected && <Button data-guide-feature="ledger.explorer.all-entries" variant="ghost" onClick={() => update({ selected: '' })}>전체 내역</Button>}</header>
         <div className="ledger-balance-summary kpi-group">
-          <KpiCard guideId="ledger.kpi.debit" label="차변 합계" value={totals?.debitTotal ?? '—'} unit="원" format={int} footer="연결된 분개 전체 금액 · 계약별 배분액 아님" />
-          <KpiCard guideId="ledger.kpi.credit" label="대변 합계" value={totals?.creditTotal ?? '—'} unit="원" format={int} footer="연결된 분개 전체 금액 · 계약별 배분액 아님" />
+          <KpiCard guideId="ledger.kpi.debit" label="차변 합계" value={totals?.debitTotal ?? '—'} unit="원" format={int} footer="연결된 분개 전체 금액이며 계약별 배분액이 아닙니다" />
+          <KpiCard guideId="ledger.kpi.credit" label="대변 합계" value={totals?.creditTotal ?? '—'} unit="원" format={int} footer="연결된 분개 전체 금액이며 계약별 배분액이 아닙니다" />
           <KpiCard guideId="ledger.kpi.balance" label="차변 − 대변" value={totals ? totals.debitTotal - totals.creditTotal : '—'} unit="원" format={int}
-            tone={!totals ? 'neutral' : totals.debitTotal === totals.creditTotal ? 'success' : 'error'} footer={!totals ? '조회 대기' : totals.debitTotal === totals.creditTotal ? '차변·대변 균형' : '차변·대변 불일치'} />
+            tone={!totals ? 'neutral' : totals.debitTotal === totals.creditTotal ? 'success' : 'error'} footer={!totals ? '조회 대기' : totals.debitTotal === totals.creditTotal ? '차변 및 대변 균형' : '차변 및 대변 불일치'} />
         </div>
       </section>
       <section data-guide-feature="ledger.explorer.section-2" className="surface ledger-journals" aria-label="계약별 분개 내역" data-guide-completed={params.has('evidence') && evidenceVisible}>
-        <header className="surface-header"><h2 className="surface-title">분개 내역</h2><span>{int(active?.journals.totalElements ?? 0)}건 · {int(totals?.lineCount ?? 0)}행</span>
+        <header className="surface-header"><h2 className="surface-title">분개 내역</h2><span>{int(active?.journals.totalElements ?? 0)}건 {int(totals?.lineCount ?? 0)}행</span>
           <div className="ledger-journal-tools"><small>단위: 원</small>
             <ViewModeSwitch value={all ? 'table' : 'tree'} label="검증원장 보기 방식" treeLabel="계약별 보기" tableLabel="전체 분개 보기"
               onChange={view => update({ ledgerView: view === 'table' ? 'all' : '', selected: '', evidence: '', journalPage: '' })} />
@@ -91,7 +91,7 @@ export function LedgerExplorer() {
         {!selected && <ListPagination label="분개 내역 페이지" page={selection.page} totalPages={data?.journals.totalPages ?? 0} onPageChange={page => update({ journalPage: String(page), evidence: '' })} />}
       </section>
     {evidenceVisible && <section data-guide-feature="ledger.explorer.section-3" className="surface ledger-linked-evidence" aria-label="분개 상세">
-      <header className="surface-header"><h2 className="surface-title">연결 근거</h2><span>{detail.data?.journalNo}</span><small>{detail.data ? detail.data.balanced ? '차변·대변 일치' : '차변·대변 불일치' : ''}</small></header>
+      <header className="surface-header"><h2 className="surface-title">연결 근거</h2><span>{detail.data?.journalNo}</span><small>{detail.data ? detail.data.balanced ? '차변 및 대변 일치' : '차변 및 대변 불일치' : ''}</small></header>
       {detail.error && <p role="alert">{errorText(detail.error)}</p>}
       {detail.isPending && <p role="status">분개 근거를 불러오는 중입니다.</p>}
       {detail.data && <><DetailSummary detail={detail.data} /><div className="ledger-react-actions" data-guide-target="ledger.actions">
@@ -111,8 +111,8 @@ export function LedgerExplorer() {
 
 export function JournalTable({ entries, selected, onSelect, paginated }: { entries: LedgerEntry[]; selected: string; onSelect?: (id: number) => void; paginated: boolean }) {
   const total = (key: 'debitTotal' | 'creditTotal') => entries.reduce((sum, entry) => sum + entry[key], 0)
-  return <div className="data-table-viewport"><table data-guide-feature="ledger.explorer.table-1" className="data-table ledger-entry-table"><caption className="visually-hidden">분개별 차변·대변 내역</caption>
-    <thead><tr><th>분개일 · 분개번호</th><th>계정과목</th><th>적요</th><th className="text-right">차변</th><th className="text-right">대변</th></tr></thead>
+  return <div className="data-table-viewport"><table data-guide-feature="ledger.explorer.table-1" className="data-table ledger-entry-table"><caption className="visually-hidden">분개별 차변 및 대변 내역</caption>
+    <thead><tr><th>분개일 및 분개번호</th><th>계정과목</th><th>적요</th><th className="text-right">차변</th><th className="text-right">대변</th></tr></thead>
     {entries.map(entry => <tbody key={entry.journalHeaderId} className={selected === String(entry.journalHeaderId) ? 'is-selected' : undefined}>
       {(entry.lines.length ? entry.lines : [null]).map((line, index) => <tr key={line?.lineNo ?? 'empty'}>
         {index === 0 && <td rowSpan={Math.max(1, entry.lines.length)} className="ledger-journal-cell"><span>{date(entry.journalDate)}</span>{onSelect ? <button data-guide-feature="ledger.explorer.button-3" type="button" aria-pressed={selected === String(entry.journalHeaderId)} onClick={() => onSelect(entry.journalHeaderId)}>{entry.journalNo}</button> : <strong>{entry.journalNo}</strong>}

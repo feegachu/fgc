@@ -234,7 +234,7 @@ function DetailBody({
       : status === 'RUNNING' ? '월 통합검증 실행 중' : '검증 결과 표시 중'
   const activeStepName = STEP_NAMES.find((_name, index) => displayed.state(index + 1) === 'running')
   useRunProgressToast(progressToastActive,
-    `${progressToastTitle}, ${activeStepName ?? '진행 상태 확인 중'} · ${displayed.completed}/10단계 (${displayed.completed * 10}%)`,
+    `${progressToastTitle}, ${activeStepName ?? '진행 상태 확인 중'} ${displayed.completed}/10단계 (${displayed.completed * 10}%)`,
     { steps: STEP_NAMES, completed: displayed.completed, running: activeStepName ? STEP_NAMES.indexOf(activeStepName) : null, buffering: displayed.buffering })
 
   const link = (path: string) => (shellMonth ? withMonth(path, shellMonth) : path)
@@ -646,7 +646,7 @@ function ChecklistSection({
               <div className="vrun-checklist-label">
                 {revised ? <>
                   <span>{condition.no}. {condition.label}</span>
-                  <span className={condition.passed ? 'vrun-condition-pass' : 'vrun-condition-fail'}> · {condition.passed ? '통과' : `미충족 ${condition.count}건`}</span>
+                  <span className={condition.passed ? 'vrun-condition-pass' : 'vrun-condition-fail'}>  {condition.passed ? '통과' : `미충족 ${condition.count}건`}</span>
                 </> : <CellDisclosure preview={`${condition.no}. ${condition.label}`} />}
               </div>
               <div className="vrun-checklist-result">
@@ -759,7 +759,7 @@ function FinalizeSection({
   if (mutation.isPending) reason = '확정 요청을 처리하고 있습니다. 잠시 기다려 주세요.'
   else if (!canFinalize) reason = '확정은 GA관리자와 시스템관리자만 할 수 있습니다.'
   else if (status === 'FINALIZED') reason = '이미 확정된 실행입니다. 결과를 바꾸려면 새 실행을 만드세요.'
-  else if (!supportedType) reason = '월 전체를 계산한 월간·확정 전 실행만 최종 확정할 수 있습니다.'
+  else if (!supportedType) reason = '월 전체를 계산한 월간 및 확정 전 실행만 최종 확정할 수 있습니다.'
   else if (status !== 'COMPLETED') reason = '검증 계산이 끝난 실행만 확정할 수 있습니다.'
   else if (!checklist) reason = '확정 조건을 아직 확인하지 못했습니다. 잠시 후 새로고침해 주세요.'
   else if (!passed) reason = revised ? '위 8개 조건을 모두 통과하면 확정할 수 있습니다.' : '확정 조건 8개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.'
@@ -811,7 +811,7 @@ function FinalizeSection({
           <strong>확정할 수 없는 이유</strong>
           <p>{reason}</p>
           {status === 'COMPLETED' && blockedConditions.length > 0 && <ul>
-            {blockedConditions.map(condition => <li key={condition.no}>{condition.label} · 미충족 {condition.count}건</li>)}
+            {blockedConditions.map(condition => <li key={condition.no}>{condition.label}  미충족 {condition.count}건</li>)}
           </ul>}
         </div>}
         </div>

@@ -65,7 +65,7 @@ test('판정 태그와 헤더를 최소 너비로 보호하고 과거 저장값�
   await page.reload()
   await expect(badge).toBeVisible()
   await assertFits()
-  label = '적용대상 아님 · 추가 확인 필요'
+  label = '적용대상 아님 추가 확인 필요'
   await page.reload()
   await expect(page.getByText('적용대상 아님, 추가 확인 필요', { exact: true })).toBeVisible()
   await assertFits()
@@ -101,7 +101,7 @@ for (const [path, label] of [
   ['transactions/new', '지급 계약 건과 검증 결과 너비'],
   ['audit-logs', '감사 기록과 변경 내용 비교 카드 너비'],
 ]) {
-  test(path + ': 카드 드래그·저장·모바일 배치를 지원한다', async ({ page }, testInfo) => {
+  test(path + ': 카드 드래그, 저장 및 모바일 배치를 지원한다', async ({ page }, testInfo) => {
     await page.route('**/api/v1/**', async (route) => {
       const url = new URL(route.request().url())
       const empty = { content: [], page: 1, size: 20, totalPages: 0, totalElements: 0 }
@@ -322,7 +322,7 @@ test('예외 목록은 전체 너비를 쓰고 선택한 건은 모달에서 처
   await expect(table.getByRole('button', { name: '11', exact: true })).toBeFocused()
 })
 
-test('컬럼 확대·축소·가로 스크롤·저장 후에도 행 선택이 동작하고 전체 보기 없이 내용을 표시한다', async ({
+test('컬럼 확대, 축소 및 가로 스크롤 및 저장 후에도 행 선택이 동작하고 전체 보기 없이 내용을 표시한다', async ({
   page,
 }, testInfo) => {
   const table = page.getByRole('table', { name: '예외 목록' })

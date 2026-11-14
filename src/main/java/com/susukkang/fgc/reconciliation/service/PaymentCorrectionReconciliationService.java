@@ -97,8 +97,8 @@ public class PaymentCorrectionReconciliationService {
         // 다른 불일치나 원장 정정 요청 예외는 일괄 종결하지 않는다.
         List<?> ids = repository.lockMatchedExceptions(oldId, newId);
         String login = repository.loginId(actor);
-        String reason = (groupKey.startsWith("EXCP-SCHEDULE-") ? "스케줄·계약 정정" : "원장 정정") + " 후 재대사 일치 확인 (" + groupKey + ", 대사 " + newId + ")";
-        if (correctionReason != null && !correctionReason.isBlank()) reason += " · " + correctionReason;
+        String reason = (groupKey.startsWith("EXCP-SCHEDULE-") ? "스케줄 및 계약 정정" : "원장 정정") + " 후 재대사 일치 확인 (" + groupKey + ", 대사 " + newId + ")";
+        if (correctionReason != null && !correctionReason.isBlank()) reason += " " + correctionReason;
         for (Object value : ids) {
             Object[] row = (Object[]) value;
             Long id = ((Number) row[0]).longValue();

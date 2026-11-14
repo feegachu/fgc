@@ -111,14 +111,14 @@ const candidateCalls = (request: { mock: { calls: unknown[][] } }) =>
 afterEach(() => vi.restoreAllMocks())
 
 async function openDetail(contractNo = 'CLW-001', candidateId = 42) {
-  await userEvent.setup().click(await screen.findByRole('button', { name: `${contractNo} 환수 상세 보기 · 후보 ${candidateId}` }))
-  return screen.findByRole('dialog', { name: `환수 상세 · ${contractNo}` })
+  await userEvent.setup().click(await screen.findByRole('button', { name: `${contractNo} 환수 상세 보기 후보 ${candidateId}` }))
+  return screen.findByRole('dialog', { name: `환수 상세 ${contractNo}` })
 }
 
 it('opens details only from the chosen contract and restores focus and filters after closing', async () => {
   const user = userEvent.setup()
   const { request, router } = mount('/clawbacks?contractNo=CLW')
-  const trigger = await screen.findByRole('button', { name: 'CLW-001 환수 상세 보기 · 후보 42' })
+  const trigger = await screen.findByRole('button', { name: 'CLW-001 환수 상세 보기 후보 42' })
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(request.mock.calls.some(([path]) => /\/candidates\/\d+$/.test(String(path)))).toBe(false)
   await openDetail()
@@ -263,7 +263,7 @@ it('links evidence to the source contract, arbitrage check and payment', async (
   expect(within(sources).getByRole('link', { name: '계약 상태이력' })).toHaveAttribute('href', '/contracts/10')
   await user.click(screen.getByRole('button', { name: '닫기' }))
   const table = screen.getByRole('table', { name: '검색 조건에 해당하는 환수 검토 후보' })
-  await user.click(within(table).getByRole('button', { name: 'CLW-002 환수 상세 보기 · 후보 41' }))
+  await user.click(within(table).getByRole('button', { name: 'CLW-002 환수 상세 보기 후보 41' }))
   const arbitrage = await screen.findByRole('link', { name: '차익거래 검증' })
   expect(arbitrage).toHaveAttribute('href', '/arbitrage-checks?month=2026-07&contractNo=CLW-002')
 })
@@ -536,7 +536,7 @@ it('locks the button while a calculation is in flight', async () => {
   expect(screen.getByRole('button', { name: '닫기' })).toBeDisabled()
   await user.click(screen.getByRole('button', { name: '창 닫기' }))
   await user.keyboard('{Escape}')
-  expect(screen.getByRole('dialog', { name: '환수 상세 · CLW-001' })).toBeInTheDocument()
+  expect(screen.getByRole('dialog', { name: '환수 상세 CLW-001' })).toBeInTheDocument()
   await user.click(button)
   expect(posts).toHaveLength(1)
   finish(envelope(calculation))

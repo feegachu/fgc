@@ -652,3 +652,5 @@
 .exception-recovery-checklist p {
   margin: 0.5rem 0 0.75rem;
 }
+
+.exception-cap-overage .guidance-title { font-size: 0.9375rem; line-height: 1.5rem; }

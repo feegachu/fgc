@@ -57,7 +57,7 @@ describe('policy UI boundaries', () => {
   })
 
   it('시드가 남긴 승인 근거와 출처 문구의 개발 용어를 화면에서만 바꾼다', () => {
-    expect(policySeedText('시드 승인 (GOLDEN 프로파일·#332)')).toBe('내부 승인')
+    expect(policySeedText('시드 승인 (GOLDEN 프로파일 #332)')).toBe('내부 승인')
     expect(policySeedText('데모 승인 — #475, 운영 정책 승인을 대체하지 않음')).toBe('내부 승인')
     expect(policySeedText('PROJECT_ASSUMPTION — 2026년 말 최종 FAQ 확정 시 재검증 필요')).toBe('자체 기준, 2026년 말 최종 FAQ 확정 시 재검증')
     expect(policySeedText('PROJECT_ASSUMPTION — 합성값, #332 시연 커버리지 보강')).toBe('자체 기준 — 합성값 시연 커버리지 보강')

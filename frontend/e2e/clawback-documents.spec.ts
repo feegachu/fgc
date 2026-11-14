@@ -4,8 +4,8 @@ import { test, expect, type Page } from '@playwright/test'
 test.use({ channel: 'chromium' })
 
 async function openDetail(page: Page) {
-  await page.getByRole('button', { name: 'CLW-727-001 환수 상세 보기 · 후보 42' }).click()
-  await expect(page.getByRole('dialog', { name: '환수 상세 · CLW-727-001' })).toBeVisible()
+  await page.getByRole('button', { name: 'CLW-727-001 환수 상세 보기 후보 42' }).click()
+  await expect(page.getByRole('dialog', { name: '환수 상세 CLW-727-001' })).toBeVisible()
 }
 
 test('전체 너비 표에서 계약번호로 상세를 열고 좁은 화면에서도 모달 안에서 읽는다', async ({ page }, info) => {
@@ -20,10 +20,10 @@ test('전체 너비 표에서 계약번호로 상세를 열고 좁은 화면에�
   const trigger = table.getByRole('button', { name: /환수 상세 보기/ })
   await trigger.focus()
   await trigger.press('Enter')
-  const dialog = page.getByRole('dialog', { name: '환수 상세 · CLW-727-001' })
+  const dialog = page.getByRole('dialog', { name: '환수 상세 CLW-727-001' })
   await expect(dialog).toBeVisible()
   await expect(dialog.getByRole('tab')).toHaveCount(5)
-  await expect(dialog.getByRole('tab', { name: '계약·검토 정보' })).toHaveAttribute('aria-selected', 'true')
+  await expect(dialog.getByRole('tab', { name: '계약 및 검토 정보' })).toHaveAttribute('aria-selected', 'true')
   await dialog.getByRole('tab', { name: '지급 스케줄' }).click()
   await expect(dialog.getByRole('tabpanel', { name: '지급 스케줄' })).toBeVisible()
   await expect(dialog.locator('.modal-footer').getByRole('button', { name: 'PDF 출력', exact: true })).toHaveCount(0)
@@ -171,7 +171,7 @@ test('계산 결과에서 기본 PDF 뷰어를 열고 같은 계산의 문서를
   await page.getByLabel('계약번호', { exact: true }).fill('아직 조회하지 않은 입력')
   await openDetail(page)
   const output = page.getByRole('button', { name: 'PDF 출력하기', exact: true })
-  await expect(page.getByRole('region', { name: '환수 PDF·발행 이력' })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: '환수 PDF 및 발행 이력' })).toHaveCount(0)
   let downloads = 0
   page.on('download', () => downloads++)
   await output.click()

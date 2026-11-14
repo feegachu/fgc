@@ -1,3 +1,4 @@
+import { paymentEvidenceText } from '../../lib/screenText'
 import { SearchSelect } from '../../components/SearchSelect'
 import type { SearchSource } from '../../components/SearchSelect'
 import { Button } from '../../components/Button'
@@ -190,7 +191,7 @@ export function AttributionEditor({
         <input data-guide-feature="features.transaction.attribution-editor.input-5"
           {...control(row, 'evidenceRef', '증빙')}
           data-attr-evidence
-          value={row.evidenceRef}
+          value={paymentEvidenceText(row.evidenceRef)}
           placeholder={newcomer ? '신인 지원 증빙을 입력하세요' : '증빙 입력'}
           onChange={(event) => patch(row, { evidenceRef: event.target.value })}
         />

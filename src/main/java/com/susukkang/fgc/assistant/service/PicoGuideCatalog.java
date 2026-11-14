@@ -153,7 +153,7 @@ public class PicoGuideCatalog {
         if (steps.isEmpty()) return List.of();
         var chunks=new ArrayList<Chunk>();
         // A shared overview must not reintroduce instructions removed by the step permission filter.
-        String overview = steps.stream().map(Step::title).collect(java.util.stream.Collectors.joining(" · "));
+        String overview = steps.stream().map(Step::title).collect(java.util.stream.Collectors.joining(" "));
         chunks.add(new Chunk(guide.workflowId()+":overview",guide.workflowId(),null,guide.title(),overview));
         for(var step:steps) chunks.add(new Chunk(guide.workflowId()+":"+step.stepId(),guide.workflowId(),step.stepId(),step.title(),step.instruction()));
         return List.copyOf(chunks);
