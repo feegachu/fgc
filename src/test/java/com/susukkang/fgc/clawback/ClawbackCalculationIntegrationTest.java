@@ -478,10 +478,6 @@ class ClawbackCalculationIntegrationTest {
         return tx;
     }
 
-    private long deduction(long original, long candidate, long recipient, String amount, int version) {
-        return deduction(original, candidate, recipient, amount, version, " · ");
-    }
-
     private long deduction(long original, long candidate, long recipient, String amount, int version, String separator) {
         return payment(item("CLAWBACK"), amount, "CONFIRMED", recipient, "DEDUCTION", "CLAWBACK-RECOVERY:" + original + ":" + candidate,
                 "환수 계산 v" + version + separator + "원지급 " + original);
