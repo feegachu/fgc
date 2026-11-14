@@ -1819,7 +1819,7 @@ FGC — 설계사
 | 1   | 검증 실행이 계산완료 상태인가               | `validation_run.status='COMPLETED' AND current_step=8`                                                                                                |
 | 2   | 차변과 대변이 다른 분개가 0건인가           | `vw_journal_imbalance` ⋈ `journal_header` **WHERE `validation_run_id`**                                                                               |
 | 3   | 긴급 미처리 예외가 0건인가                  | `exception_case` — **`severity='CRITICAL'` 필터 필수**                                                                                                |
-| 4   | 정책 없음 · 정책 중복이 0건인가             | `exception_case.exception_type IN ('POLICY_MISSING','POLICY_DUPLICATE')`                                                                              |
+| 4   | 정책 없음 및 정책 중복이 0건인가             | `exception_case.exception_type IN ('POLICY_MISSING','POLICY_DUPLICATE')`                                                                              |
 | 5   | 귀속합계 오류가 0건인가                     | `vw_transaction_attribution_balance` ⋈ `commission_transaction` **WHERE `settlement_month` = 검증월**                                                 |
 | 6   | 계약별 상세 합계와 실행 요약 합계가 같은가  | `cap_check.included_amount` vs `SUM(cap_check_detail.amount WHERE INCLUDED)`                                                                          |
 | 7   | 같은 검증월의 가장 최근 실행인가            | 같은 `validation_month`·`run_type IN ('MONTHLY','PRE_CONFIRM')`에 `validation_run_id`가 더 큰 실행 수(상태 무관). 바로가기는 가장 최근 실행           |
