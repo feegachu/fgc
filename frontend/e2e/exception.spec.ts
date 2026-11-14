@@ -6,6 +6,7 @@ const envelope = (data: unknown) => ({ data, error: null, requestId: 'excp-fixtu
 
 for (const assignee of [{ id: 7, loginId: 'settle01' }, { id: 8, loginId: 'settle02' }]) {
 test(`예외 담당자를 ${assignee.loginId}에게 배정하고 본인 배정이면 검토를 이어간다`, async ({ page }, testInfo) => {
+  await page.route('**/api/v1/dashboard/summary?**', route => route.fulfill({ json: envelope({ capWarning: 0, arbitrageCandidate: 0 }) }))
   await page.route('**/api/v1/auth/refresh', (route) =>
     route.fulfill({ json: envelope({ accessToken: 'excp-fixture', tokenType: 'Bearer', expiresIn: 1800 }) }),
   )

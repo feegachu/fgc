@@ -65,9 +65,9 @@ test('판정 태그와 헤더를 최소 너비로 보호하고 과거 저장값�
   await page.reload()
   await expect(badge).toBeVisible()
   await assertFits()
-  label = '적용대상 아님 추가 확인 필요'
+  label = '적용대상 아님 · 추가 확인 필요'
   await page.reload()
-  await expect(page.getByText('적용대상 아님, 추가 확인 필요', { exact: true })).toBeVisible()
+  await expect(page.getByText('적용대상 아님 추가 확인 필요', { exact: true })).toBeVisible()
   await assertFits()
   expect((await header.boundingBox())!.width).toBeGreaterThan(width)
 })
@@ -242,6 +242,8 @@ test('예상 스케줄의 마지막 열이 남는 너비를 채우고 앞쪽 열
 })
 
 async function fixture(page: Page) {
+  await page.route('**/api/v1/dashboard/summary?**', route => route.fulfill({ json: envelope({ capWarning: 0, arbitrageCandidate: 0 }) }))
+  await page.route('**/api/v1/exceptions/*/review', route => route.fulfill({ json: envelope({ links: [], recheckAvailable: false, administratorReviewRequired: false, rejectionRequiresEvidence: false }) }))
   await page.route('**/api/v1/auth/refresh', (route) =>
     route.fulfill({ json: envelope({ accessToken: 'resize-fixture', tokenType: 'Bearer', expiresIn: 1800 }) }),
   )
