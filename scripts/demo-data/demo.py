@@ -303,7 +303,8 @@ class Demo:
         with self.server():
             run([sys.executable, '-X', 'utf8', ROOT / 'scripts/demo-data/load_filming_demo.py',
                  '--base', self.base, '--container', self.db, '--database', 'fgc',
-                 '--accounts', self.accounts, '--env', self.environment, '--seed', str(self.args.seed)], cwd=ROOT)
+                 '--accounts', self.accounts, '--env', self.environment, '--seed', str(self.args.seed),
+                 '--variant', self.args.variant], cwd=ROOT)
 
     def execute(self):
         self.setup()
@@ -335,6 +336,8 @@ def main(argv=None):
     parser.add_argument('--backups', type=Path, help='백업 저장 위치')
     parser.add_argument('--files', type=Path, default=ROOT / 'files', help='로컬 FGC_STORAGE_ROOT와 동일한 경로')
     parser.add_argument('--seed', type=int, default=20261112)
+    parser.add_argument('--variant', choices=('full', 'compact'), default='full',
+                        help='적재 버전: full(기존), compact(10월 지급 누락 제외·정상 계약 절반)')
     args = parser.parse_args(argv)
     args.backups = args.backups or Path.home() / 'fgc-demo-backups' / args.environment
     args.backups.expanduser().mkdir(parents=True, exist_ok=True, mode=0o700)
