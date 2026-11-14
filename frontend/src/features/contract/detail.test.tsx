@@ -102,7 +102,7 @@ describe('CONT-W02 계약 상세', () => {
       arbitrageCheckId: 5, plannedCommissionAmount: 50000, plannedCommissionBasis: basis,
     }] : undefined)
     const table = await screen.findByRole('table', { name: '차익거래 검증 결과' })
-    expect(within(table).getByRole('columnheader', { name: '지급예정액·계산 기준' })).toBeVisible()
+    expect(within(table).getByRole('columnheader', { name: '지급예정액 및 계산 기준' })).toBeVisible()
     expect(within(table).getByText('50,000원')).toBeVisible()
     expect(within(table).getByText(label!)).toBeVisible()
     expect(within(table).getByText(label!)).not.toHaveAttribute('title')
@@ -178,7 +178,7 @@ describe('CONT-W02 계약 상세', () => {
       if (!url.includes('/schedules?')) return
       return { headers: [{ scheduleHeaderId: 10, schedulePurpose: 'SIMULATION', scheduleVersionNo: 1, installmentCount: 48, lineCount: 48 }], lines: [] }
     })
-    await waitFor(() => expect(screen.getAllByText('예정 결과 · 지급 확정 대상이 아닙니다.')).toHaveLength(2))
+    await waitFor(() => expect(screen.getAllByText('예정 결과이며 지급 확정 대상이 아닙니다.')).toHaveLength(2))
     expect(screen.getAllByText('버전 1, 48회차')).toHaveLength(2)
   })
 
@@ -564,9 +564,9 @@ it('finishes AGENT detail help using only visible basic information', async () =
   await screen.findByRole('tab', { name: '기본정보' })
   await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(1))
   await actions.click(screen.getByRole('button', { name: '도움말' }))
-  const next = await screen.findByRole('button', { name: '설명 확인 · 다음' })
+  const next = await screen.findByRole('button', { name: '설명 확인 후 다음' })
   await waitFor(() => expect(next).toBeEnabled())
-  expect(screen.getByText('화면 사용법 · 1/1')).toBeVisible()
+  expect(screen.getByText('화면 사용법 1/1')).toBeVisible()
   await actions.click(next)
   expect(await screen.findByText('화면 사용법 안내 완료')).toBeVisible()
   expect(screen.queryByRole('tab', { name: /스케줄/ })).toBeNull()

@@ -14,7 +14,7 @@ export function SourceReviewModal({ item, onClose }: { item: ExceptionCase; onCl
     else onClose()
   }
   return <>
-    <Modal open title="검토·원천 처리" onClose={close} closeOnBackdrop={false} closeOnEscape={!busy}
+    <Modal open title="검토 및 원천 처리" onClose={close} closeOnBackdrop={false} closeOnEscape={!busy}
       footer={<Button data-guide-feature="features.exception.review.close" disabled={busy} onClick={close}>닫기</Button>}>
       <ReviewPanel item={item} onClosed={onClose} />
     </Modal>

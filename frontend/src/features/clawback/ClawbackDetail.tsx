@@ -196,7 +196,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 export function ClawbackDetail({ detail, revised = false }: { detail: CandidateDetail; revised?: boolean }) {
   const [activeTab, setActiveTab] = useState('summary')
-  const tabs = [['summary', '계약·검토 정보'], ['source', '원천 사건'], ['payment', '지급·귀속'], ['schedule', '지급 스케줄'], ['effects', '후속 처리']] as const
+  const tabs = [['summary', '계약 및 검토 정보'], ['source', '원천 사건'], ['payment', '지급 및 귀속'], ['schedule', '지급 스케줄'], ['effects', '후속 처리']] as const
   const c = detail.candidate ?? {}
   const reasons = c.reviewReasons ?? []
   const policies = detail.policyCandidates ?? []

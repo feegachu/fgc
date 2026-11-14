@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test('지급 안내의 다음은 저장·검증 통과·확정 완료 전까지 잠기고 이유를 보여준다', async ({ page }) => {
+test('지급 안내의 다음은 저장 및 검증 통과 및 확정 완료 전까지 잠기고 이유를 보여준다', async ({ page }) => {
   const contract = { contractId: 3, contractNo: 'C-003', contractDate: '2026-07-01' }
   const item = { commissionItemId: 1, itemName: '기본수수료', cashflowType: 'PAYMENT' }
   const header = { scheduleHeaderId: 5, activeYn: true, paymentStage: 'GA_TO_FC', scheduleRegime: 'CURRENT', schedulePurpose: 'OPERATIONAL', status: 'CONFIRMED' }
@@ -115,7 +115,7 @@ test('지급 등록 비교 안내는 앞 3개 행을 강조하고 안내 카드�
 })
 
 for (const sourceBusinessKey of ['SCHEDULE-LINE-GA_TO_FC-7', 'GA-202607-L7']) {
-test(`계약별 지급 초안 복원·수정은 기존 식별키를 유지한다: ${sourceBusinessKey}`, async ({ page }) => {
+test(`계약별 지급 초안 복원 및 수정은 기존 식별키를 유지한다: ${sourceBusinessKey}`, async ({ page }) => {
   const contract = { contractId: 3, contractNo: 'C-003', productName: '가상 상품', contractDate: '2026-07-01' }
   const item = { commissionItemId: 1, itemCode: 'BASE_COMMISSION', itemName: '기본수수료', cashflowType: 'PAYMENT' }
   const header = { scheduleHeaderId: 5, activeYn: true, paymentStage: 'GA_TO_FC', scheduleRegime: 'CURRENT', schedulePurpose: 'OPERATIONAL', status: 'CONFIRMED' }
@@ -163,7 +163,7 @@ test(`계약별 지급 초안 복원·수정은 기존 식별키를 유지한다
 }
 
 for (const lostResponse of [false, true]) {
-test(`선택한 행만 저장하고 캐시 재진입·응답 유실을 복구한다: ${lostResponse}`, async ({ page }) => {
+test(`선택한 행만 저장하고 캐시 재진입 및 응답 유실을 복구한다: ${lostResponse}`, async ({ page }) => {
   const contract = { contractId: 3, contractNo: 'C-003', contractDate: '2026-07-01' }
   const item = { commissionItemId: 1, itemCode: 'BASE_COMMISSION', itemName: '기본수수료', cashflowType: 'PAYMENT' }
   const header = { scheduleHeaderId: 5, activeYn: true, paymentStage: 'GA_TO_FC', scheduleRegime: 'CURRENT', schedulePurpose: 'OPERATIONAL', status: 'CONFIRMED' }

@@ -29,7 +29,7 @@ function ContractBranch({ contract, criteria, contractPage, active, selectedJour
       <button data-guide-feature="ledger.contract-tree.button-1" type="button" className="ledger-contract-toggle" aria-label={`${contract.contractNo} ${open ? '접기' : '펼치기'}`} onClick={() => setOpen(!open)}>
         <span className="material-symbols-rounded" aria-hidden="true">{open ? 'expand_more' : 'chevron_right'}</span>
       </button>
-      <button data-guide-feature="ledger.contract-tree.button-2" type="button" className="ledger-contract-select" title={`${contract.contractNo} · ${contract.agentName ?? '계약 연결 없음'} · 분개 ${contract.journalCount}건`} onClick={() => { setOpen(true); onSelect(contract.contractId) }}>
+      <button data-guide-feature="ledger.contract-tree.button-2" type="button" className="ledger-contract-select" title={`${contract.contractNo} ${contract.agentName ?? '계약 연결 없음'} 분개 ${contract.journalCount}건`} onClick={() => { setOpen(true); onSelect(contract.contractId) }}>
         <span className="ledger-contract-name"><span className="material-symbols-rounded" aria-hidden="true">{contract.contractId === 0 ? 'folder' : 'description'}</span><strong>{contract.contractNo}</strong></span>
         <span className="ledger-contract-meta"><span>{contract.contractId === 0 ? '계약 연결 없음' : contract.agentName ?? '설계사 미등록'}</span><small>분개 {int(contract.journalCount)}건</small></span>
       </button>
@@ -40,7 +40,7 @@ function ContractBranch({ contract, criteria, contractPage, active, selectedJour
       {query.data?.journals.content.map(entry => <li role="treeitem" key={entry.journalHeaderId} aria-selected={active && selectedJournal === String(entry.journalHeaderId)}>
         <button data-guide-feature="ledger.contract-tree.button-4" type="button" className="ledger-journal-select" aria-current={active && selectedJournal === String(entry.journalHeaderId) ? 'true' : undefined}
           title={entry.journalNo} onClick={() => onSelect(contract.contractId, entry.journalHeaderId)}>
-          <span>{date(entry.journalDate).slice(5)} · {shortType(entry.journalType)}</span><small>#{entry.journalNo.split('-').at(-1)}</small>
+          <span>{date(entry.journalDate).slice(5)}  {shortType(entry.journalType)}</span><small>#{entry.journalNo.split('-').at(-1)}</small>
         </button>
       </li>)}
       {(query.data?.journals.totalPages ?? 0) > 1 && <li role="none" className="ledger-tree-paging">

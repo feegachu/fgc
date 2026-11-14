@@ -128,8 +128,8 @@ public class PaymentJournalCorrectionService {
 
     private FgcBusinessException invalid(String field) {
         String reason = switch (field) {
-            case "paymentCorrectionSource" -> "기표된 지급은 기존 계약·수령인·수수료 항목을 유지하고 금액 또는 귀속일을 수정하세요.";
-            case "paymentCorrectionAttribution" -> "기존 원장의 계약·수령인·항목과 지급 귀속이 다릅니다. 원장 정정에서 귀속 정보를 확인하세요.";
+            case "paymentCorrectionSource" -> "기표된 지급은 기존 계약, 수령인 및 수수료 항목을 유지하고 금액 또는 귀속일을 수정하세요.";
+            case "paymentCorrectionAttribution" -> "기존 원장의 계약, 수령인 및 항목과 지급 귀속이 다릅니다. 원장 정정에서 귀속 정보를 확인하세요.";
             case "paymentCorrectionAmount" -> "정정할 지급 금액은 0원보다 큰 원 단위 금액이어야 합니다.";
             default -> "수정할 지급 건과 원장 연결 정보를 확인하세요.";
         };

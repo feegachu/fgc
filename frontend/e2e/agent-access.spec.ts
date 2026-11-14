@@ -57,7 +57,7 @@ async function agentFixture(page: Page, commission = 300000, insurers = [{ insur
   return unexpected
 }
 
-test('AGENT 첫 화면은 포트폴리오이고 본인 계약 목록은 전체 설계사·조직·관리자 API를 호출하지 않는다', async ({ page }) => {
+test('AGENT 첫 화면은 포트폴리오이고 본인 계약 목록은 전체 설계사, 조직 및 관리자 API를 호출하지 않는다', async ({ page }) => {
   const unexpected = await agentFixture(page)
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto('./')
@@ -192,7 +192,7 @@ test('설계사 계약 화면은 보라색의 짧은 탭과 이후 UI로 고정�
   expect(width).toBeLessThanOrEqual(140)
   await expect(tab).toHaveCSS('color', 'rgb(81, 58, 149)')
   await expect(page.locator('.contract-history-panel-header h3')).toHaveCSS('color', 'rgb(81, 58, 149)')
-  await expect(page.getByRole('group', { name: '계약/지급 화면 이전·이후 비교' })).toHaveCount(0)
+  await expect(page.getByRole('group', { name: '계약/지급 화면 이전 및 이후 비교' })).toHaveCount(0)
   await page.screenshot({ path: info.outputPath('agent-contract-after.png'), fullPage: true })
   await expect(page.locator('.contract-history-compact')).toBeVisible()
   await expect(page.getByRole('link', { name: '지급 등록', exact: true })).toHaveCount(0)

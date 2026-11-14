@@ -90,7 +90,7 @@ it.each(['route', 'target'])('late success cannot navigate after %s changes', as
 it('unknown regime stays visible as REVIEW_REQUIRED and does not allow generation', () => {
   const { update } = mount()
   update({ policy: { selection: { resolution: { status: 'REVIEW_REQUIRED', reasonCode: 'UNKNOWN_REGIME' } } } })
-  expect(screen.getByRole('heading', { name: '적용 체계·정책 검토 필요' })).toBeVisible()
+  expect(screen.getByRole('heading', { name: '적용 체계 및 정책 검토 필요' })).toBeVisible()
   enterReason(); submit()
   expect(generatePreview).not.toHaveBeenCalled()
 })

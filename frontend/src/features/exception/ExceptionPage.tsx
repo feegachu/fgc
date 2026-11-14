@@ -37,7 +37,7 @@ import {
 } from './api'
 import type { ExceptionCase, ExceptionFilters, ExceptionOptions } from './api'
 import { severityTone, statusOptions, statusTone, typeTone } from './rules'
-import { exceptionSummaryCards, exceptionSummaryDescription, sourceReference } from './labels'
+import { exceptionHistoryActionLabel, exceptionHistoryEvidence, exceptionHistoryReason, exceptionListTitle, exceptionSummaryCards, exceptionSummaryDescription, sourceReference } from './labels'
 import { paymentDeletedReason } from '../audit/labels'
 import { dashboardSummaryQueryOptions } from '../dashboard/api'
 
@@ -113,7 +113,7 @@ export function ExceptionPage() {
     : selected?.status === 'NEW' ? '먼저 검토 시작을 저장하거나 담당자를 배정하세요.'
     : !selected?.assigneeLoginId ? '검토 시작을 저장해 담당자를 지정하세요.'
     : !ownReview ? `${selected.assigneeLoginId} 담당자가 검토중입니다. 담당자만 처리할 수 있습니다.`
-    : paymentCorrection && !user?.canProcess ? '수수료 지급 건을 등록·수정할 권한이 없습니다.'
+    : paymentCorrection && !user?.canProcess ? '수수료 지급 건을 등록 및 수정할 권한이 없습니다.'
     : !canCorrect ? '이 예외에 연결된 원인 수정 화면이 없습니다.' : ''
   async function processException() {
     if (!canCorrect || !selected) return
@@ -215,7 +215,7 @@ export function ExceptionPage() {
       sortKey: 'title',
       sortable: true,
       cellClassName: 'exception-title-cell exception-disclosure-cell',
-      render: (row) => <Disclosure preview={rateText(row.title ?? '-')} />,
+      render: (row) => <Disclosure preview={rateText(exceptionListTitle(row))} />,
     },
     {
       key: 'status',
@@ -383,7 +383,7 @@ export function ExceptionPage() {
                 </>
               )}
             </section>
-          <Modal open={Boolean(selected)} title={`예외 상세 · ${selected?.contractNo ?? selectedId ?? ''}`}
+          <Modal open={Boolean(selected)} title={`예외 상세 ${selected?.contractNo ?? selectedId ?? ''}`}
             className="modal-large exception-detail-modal" onClose={closeDetail} closeOnEscape={!processing}
             headerActions={<div className="exception-detail-help" ref={setHelpContainer} />}
             footer={<>
@@ -402,7 +402,7 @@ export function ExceptionPage() {
                   <div className="surface-body">{selected && <ExceptionDetail item={selected} />}</div>
                 </section>
                 <section data-guide-feature="features.exception.exception-page.section-4" className="surface" data-guide-target="exception.action">
-                  <div className="surface-header"><span className="surface-title">담당 배정 · 검토</span></div>
+                  <div className="surface-header"><span className="surface-title">담당 배정 및 검토</span></div>
                   <div className="surface-body">{selected && <ActionPanel key={selected.exceptionCaseId} item={selected} helpContainer={helpContainer} />}</div>
                 </section>
                 {selected && canHandle && ownReview && !correctionOpen && <ReviewPanel key={`review-${selected.exceptionCaseId}`} item={selected} />}
@@ -494,14 +494,14 @@ function History({ item }: { item: ExceptionCase }) {
       {actions.map((action) => (
         <li className="exception-history-item" key={action.actionSeq}>
           <strong>
-            {action.actionSeq}. {action.actionTypeLabel}
+            {action.actionSeq}. {exceptionHistoryActionLabel(action)}
           </strong>
           <span className="text-secondary">
             {' '}
             , {action.fromStatusLabel} → {action.toStatusLabel}
           </span>
-          <p className="exception-history-reason">{paymentDeletedReason(action.reason) ?? action.reason}</p>
-          {action.evidenceRef && <p className="text-secondary exception-occurrence-meta">증빙: {action.evidenceRef}</p>}
+          <p className="exception-history-reason">{paymentDeletedReason(action.reason) ?? exceptionHistoryReason(action.reason)}</p>
+          {exceptionHistoryEvidence(action.evidenceRef) && <p className="text-secondary exception-occurrence-meta">증빙: {exceptionHistoryEvidence(action.evidenceRef)}</p>}
           <small className="text-secondary">
             {action.actionByLoginId}, {dateTime(action.actionAt)}
           </small>

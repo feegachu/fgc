@@ -402,7 +402,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
 
     private static void requireSource(Long contractId, Long commissionItemId, LocalDate month, BigDecimal amount) {
         if (contractId == null || commissionItemId == null || month == null || amount == null) {
-            throw new IllegalStateException("대사 원자행의 계약·항목·기준월·금액은 필수입니다.");
+            throw new IllegalStateException("대사 원자행의 계약, 항목, 기준월 및 금액은 필수입니다.");
         }
     }
 

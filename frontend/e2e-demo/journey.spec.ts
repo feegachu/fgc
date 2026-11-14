@@ -15,7 +15,7 @@ import {
 
 const month = '2026-07'
 
-test('계약 등록·수정 → 스케줄 재생성·확정', async ({ page }, info) => {
+test('계약 등록 및 수정 → 스케줄 재생성 및 확정', async ({ page }, info) => {
   await login(page)
   const seed = await api(page, '/contracts?contractNo=FGC-FGL01-202607-0001&page=1&size=20')
   const original = await api(page, `/contracts/${seed.content[0].contractId}`)
@@ -205,7 +205,7 @@ test('한도 초과 거절 → 예외함 조치 → CAP 계산근거', async ({ 
   expect(new URL(page.url()).searchParams.get('capCheckId')).toBe(String(exception.capCheckId))
 })
 
-test('월 검증 생성·실행·8개 조건·GA_ADMIN 확정', async ({ page }) => {
+test('월 검증 생성 및 실행 및 8개 조건 및 GA_ADMIN 확정', async ({ page }) => {
   await login(page, 'settle01', '/validation-runs?month=2026-07')
   const created = responseFor(page, '/validation-runs')
   await page.getByRole('button', { name: '실행 생성' }).click()
@@ -263,10 +263,10 @@ test('월 검증 생성·실행·8개 조건·GA_ADMIN 확정', async ({ page })
     await detail.getByRole('button', { name: '처리 저장', exact: true }).click()
     expect((await successful(started)).toStatus).toBe('IN_REVIEW')
 
-    await detail.getByLabel('검토 메모 · 종결 근거').fill('격리 데모에서 검출 근거를 검토했으며 이 검증의 추가 지급은 승인하지 않음')
-    await detail.getByLabel('근거 문서·관리번호').fill(`E2E-418-${item.exceptionCaseId}`)
+    await detail.getByLabel('검토 메모 및 종결 근거').fill('격리 데모에서 검출 근거를 검토했으며 이 검증의 추가 지급은 승인하지 않음')
+    await detail.getByLabel('근거 문서 및 관리번호').fill(`E2E-418-${item.exceptionCaseId}`)
     const rejected = responseFor(page, `/exceptions/${item.exceptionCaseId}/actions`)
-    await detail.getByRole('button', { name: '근거 확인 · 반려 종결' }).click()
+    await detail.getByRole('button', { name: '근거 확인 후 반려 종결' }).click()
     expect((await successful(rejected)).toStatus).toBe('REJECTED')
     await expect(detail.getByText('반려', { exact: true })).toBeVisible()
     await detail.getByRole('button', { name: '창 닫기' }).click()
@@ -275,7 +275,7 @@ test('월 검증 생성·실행·8개 조건·GA_ADMIN 확정', async ({ page })
   expect(ready.passed, JSON.stringify(ready.conditions)).toBe(true)
   await login(page, 'gaadmin', `/validation-runs/${run.validationRunId}?month=2026-07`)
   await expect(conditions).toHaveCount(8)
-  await expect(conditions.locator('.vrun-checklist-label > span')).toHaveText(Array(8).fill(' · 통과'))
+  await expect(conditions.locator('.vrun-checklist-label > span')).toHaveText(Array(8).fill(' 통과'))
   await expect(page.getByText('8개 조건 모두 통과', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '확정', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: '확정', exact: true }).click()
@@ -322,7 +322,7 @@ test('원장 역분개 → 원본 상태와 반대 분개 확인', async ({ page
   await login(page)
   await completeMonthly(page)
   await page.goto('journals?ledgerView=all&month=2026-07&from=2026-07-01&to=2026-07-31&searched=true')
-  const table = page.getByRole('table', { name: '분개별 차변·대변 내역' })
+  const table = page.getByRole('table', { name: '분개별 차변 및 대변 내역' })
   const row = table.locator('tbody tr').filter({ hasText: '기표됨' }).first()
   await row.getByRole('button').first().click()
   await expect(page).toHaveURL(/evidence=\d+/)

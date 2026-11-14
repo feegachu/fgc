@@ -40,7 +40,7 @@ export function JournalRepostModal({ detail, allowed, onClose, onComplete, recon
       journalDate: detail.journalDate!, description: detail.description?.trim() || `${detail.journalNo} 지급 기록 정정`,
       lines: lines.map(line => ({ ...line, debitAmount: Number(line.debitAmount), creditAmount: Number(line.creditAmount) })) }),
     meta: { errorToast: false },
-    onSuccess: () => { clear(); toast('원장을 역분개·재기표하고 지급 기록에 반영했습니다.', 'success'); void invalidateJournalCorrectionQueries(client); onClose(); onComplete?.() },
+    onSuccess: () => { clear(); toast('원장을 역분개 및 재기표하고 지급 기록에 반영했습니다.', 'success'); void invalidateJournalCorrectionQueries(client); onClose(); onComplete?.() },
     onError: error => {
       if (!(error instanceof ApiError) || error.status >= 500 || error.status === 409) {
         setUncertain(true); void invalidateJournalCorrectionQueries(client)
@@ -56,11 +56,11 @@ export function JournalRepostModal({ detail, allowed, onClose, onComplete, recon
       footer={<><Button data-guide-feature="ledger.repost.close" variant="secondary" disabled={mutation.isPending} onClick={close}>닫기</Button>
         <Button data-guide-feature="ledger.repost.submit" disabled={!allowed || !detail.journalHeaderId || !detail.journalDate || Boolean(invalid) || !reason.trim() || !lines.length || lines.some(line => !line.accountCode) || !accounts.isSuccess || uncertain}
           loading={mutation.isPending} onClick={() => mutation.mutate()}>등록</Button></>}>
-      <p>원분개 {detail.journalNo} · {detail.contractNo} · {won(detail.debitTotal)}</p>
+      <p>원분개 {detail.journalNo}  {detail.contractNo}  {won(detail.debitTotal)}</p>
       {reconciliationSummary && <p className="guidance guidance-neutral">{reconciliationSummary}</p>}
       <div className="data-table-viewport"><table className="data-table ledger-entry-table journal-repost-table" data-guide-feature="ledger.repost.table">
-        <caption className="visually-hidden">원분개 · 역분개 · 신규 재기표</caption>
-        <thead><tr><th>분개일 · 분개번호</th><th>계정과목</th><th>적요</th><th className="text-right">차변</th><th className="text-right">대변</th></tr></thead>
+        <caption className="visually-hidden">원분개, 역분개 및 신규 재기표</caption>
+        <thead><tr><th>분개일 및 분개번호</th><th>계정과목</th><th>적요</th><th className="text-right">차변</th><th className="text-right">대변</th></tr></thead>
         {[{ label: '원분개', journalNo: detail.journalNo, reversal: false },
           { label: '역분개', journalNo: numbers.data?.reversalJournalNo, reversal: true }].map(group =>
           <tbody key={group.label}>{original.map((line, index) => {

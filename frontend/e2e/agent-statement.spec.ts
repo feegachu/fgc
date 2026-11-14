@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 for (const width of [320, 375, 768]) {
-  test(`${width}px 명세 요약에서 긴 금액·안내·배지가 잘리지 않고 읽을 수 있다`, async ({ page }) => {
+  test(`${width}px 명세 요약에서 긴 금액, 안내 및 배지가 잘리지 않고 읽을 수 있다`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await page.route('**/api/v1/**', async (route) => {
       const path = new URL(route.request().url()).pathname
@@ -26,6 +26,8 @@ for (const width of [320, 375, 768]) {
     await page.goto('agent/statements?month=2026-07')
     const summary = page.getByRole('region', { name: '유형별 요약' })
     await expect(summary.locator('.kpi-card')).toHaveCount(4)
+    await expect(summary).not.toContainText(/\d+건/)
+    await expect(summary).toContainText('지급 귀속월')
     await expect(summary.getByRole('region', { name: '조정', exact: true })).toContainText('-9,999,999,999,999')
     await expect(summary.locator('.kpi-value .visually-hidden')).toHaveCount(0)
     await page.evaluate(() => document.fonts.ready)

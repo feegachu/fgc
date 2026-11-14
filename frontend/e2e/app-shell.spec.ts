@@ -158,7 +158,7 @@ test('unknown route and keyboard month cancellation', async ({ page }) => {
 
 test.describe('탭 경계 정렬', () => {
   test.use({ deviceScaleFactor: 1.25 })
-  test('125% 배율에서도 탭을 통째로 맞추고 이동·리사이즈 후 닫기 버튼이 잘리지 않는다', async ({ page }) => {
+  test('125% 배율에서도 탭을 통째로 맞추고 이동 및 리사이즈 후 닫기 버튼이 잘리지 않는다', async ({ page }) => {
     test.setTimeout(60000)
     await session(page, 'SYSTEM_ADMIN')
     await page.setViewportSize({ width: 1536, height: 864 })

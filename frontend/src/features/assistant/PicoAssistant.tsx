@@ -616,7 +616,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                           <b>피코</b>
                           <span>합성 질문 시연</span>
                         </div>
-                        <p>{entry.result.text.replace('[합성 시연 · API/AI 미연결] ', '')}</p>
+                        <p>{entry.result.text.replace('[합성 시연 API/AI 미연결] ', '')}</p>
                         {!isCurrentResponse(entry.result, currentContext) && (
                           <p className="pico-stale">이전 시연 상황의 응답입니다.</p>
                         )}

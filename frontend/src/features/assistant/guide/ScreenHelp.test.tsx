@@ -43,8 +43,8 @@ it('strict-mode help only explains, preserves input and restores focus on Escape
   </main></MemoryRouter></StrictMode>)
   await user.click(screen.getByRole('button', { name: '도움말' }))
   expect(document.querySelector('.payment-guide-mascot')).toHaveAttribute('src', guideMascot)
-  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
-  await user.click(screen.getByRole('button', { name: '설명 확인 · 다음' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 후 다음' })).toBeEnabled())
+  await user.click(screen.getByRole('button', { name: '설명 확인 후 다음' }))
   expect(write).not.toHaveBeenCalled()
   await user.keyboard('{Escape}')
   expect(screen.queryByRole('region', { name: '보험계약 목록 도움말' })).not.toBeInTheDocument()
@@ -66,7 +66,7 @@ it('an adapter failure is reported as a system error and a restart really retrie
   expect(document.body).not.toHaveTextContent('ADAPTER_FAILED')
   expect(screen.queryByRole('button', { name: '다시 찾기' })).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: '다시 시작' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toHaveFocus())
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 후 다음' })).toHaveFocus())
   expect(screen.queryByText(/시스템 오류가 발생했습니다/)).not.toBeInTheDocument()
 })
 it('a restart leaves focus alone when the user moved outside the panel meanwhile', async () => {
@@ -79,7 +79,7 @@ it('a restart leaves focus alone when the user moved outside the panel meanwhile
   await userEvent.click(await screen.findByRole('button', { name: '다시 시작' }))
   screen.getByLabelText('바깥 입력').focus()
   act(() => release())
-  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 후 다음' })).toBeEnabled())
   expect(screen.getByLabelText('바깥 입력')).toHaveFocus()
 })
 it('FilterBar forwards the target to its actual form', () => {
@@ -97,7 +97,7 @@ it('Escape closes only the help inside a dialog and keeps the draft', async () =
     <form data-guide-target="policy.editor"><input aria-label="정책명" defaultValue="draft" /><button data-guide-target="policy.save">저장</button></form>
   </div>)
   await user.click(screen.getByRole('button', { name: '도움말' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 후 다음' })).toBeEnabled())
   await user.keyboard('{Escape}')
   expect(screen.getByRole('dialog')).toBeVisible()
   expect(screen.getByLabelText('정책명')).toHaveValue('draft')
@@ -116,9 +116,9 @@ it('registered tab URL changes preserve the active help session', async () => {
   }
   render(<MemoryRouter><Contract /></MemoryRouter>)
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
-  await userEvent.click(screen.getByRole('button', { name: '설명 확인 · 다음' }))
-  await waitFor(() => expect(screen.getByText('화면 사용법 · 2/2')).toBeVisible())
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 후 다음' })).toBeEnabled())
+  await userEvent.click(screen.getByRole('button', { name: '설명 확인 후 다음' }))
+  await waitFor(() => expect(screen.getByText('화면 사용법 2/2')).toBeVisible())
   expect(screen.getByRole('button', { name: '스케줄' })).toHaveAttribute('aria-selected', 'true')
 })
 
@@ -137,10 +137,10 @@ it('withdraws completion after a changed input and offers a fresh guide', async 
   await userEvent.click(screen.getByRole('button', { name: '다음' }))
   expect(await screen.findByText('실행 완료')).toBeVisible()
   act(() => guide.update('run:2', true))
-  expect(await screen.findByText('실행 결과 변경 · 다시 확인')).toBeVisible()
+  expect(await screen.findByText('실행 결과가 바뀌었습니다. 다시 확인하세요')).toBeVisible()
   expect(screen.queryByText('실행 완료')).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: '다시 시작' }))
-  await waitFor(() => expect(screen.getByText('실행 가이드 · 1/2')).toBeVisible())
+  await waitFor(() => expect(screen.getByText('실행 가이드 1/2')).toBeVisible())
 })
 
 it('replaying completed help preserves values and never clicks the registered write button', async () => {
@@ -151,11 +151,11 @@ it('replaying completed help preserves values and never clicks the registered wr
     <button data-guide-target="contract.new" onClick={write}>신규 등록</button>
   </main>)
   await user.click(screen.getByRole('button', { name: '도움말' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
-  await user.click(screen.getByRole('button', { name: '설명 확인 · 다음' }))
-  await user.click(screen.getByRole('button', { name: '설명 확인 · 다음' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 후 다음' })).toBeEnabled())
+  await user.click(screen.getByRole('button', { name: '설명 확인 후 다음' }))
+  await user.click(screen.getByRole('button', { name: '설명 확인 후 다음' }))
   await user.click(await screen.findByRole('button', { name: '다시 보기' }))
-  expect(await screen.findByText('화면 사용법 · 1/2')).toBeVisible()
+  expect(await screen.findByText('화면 사용법 1/2')).toBeVisible()
   expect(screen.getByLabelText('검색 값')).toHaveValue('keep')
   expect(write).not.toHaveBeenCalled()
 })
@@ -179,11 +179,11 @@ it('suspends the background card when a dialog is portalled outside main', async
 it('withdraws a highlight when a target becomes hidden through style changes', async () => {
   render(<main id="main-content"><ScreenHelp screenId="CONT-W01" /><section data-guide-target="contract.filters" /></main>)
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 후 다음' })).toBeEnabled())
   act(() => { document.querySelector<HTMLElement>('[data-guide-target="contract.filters"]')!.style.display = 'none' })
   expect(await screen.findByText(/안내 대상이 숨겨지거나/)).toBeVisible()
   expect(document.body).not.toHaveTextContent('TARGET_CHANGED')
-  expect(screen.queryByRole('button', { name: '설명 확인 · 다음' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '설명 확인 후 다음' })).not.toBeInTheDocument()
 })
 it.each(['CONT-W01', 'VRUN-W01', 'RECO-W01', 'EXCP-W01'])('%s reader help finishes with read-only targets and no saved result', async (screenId) => {
   const steps = definitions.find(entry => entry.screenId === screenId && entry.variant === 'reader')!.steps
@@ -193,8 +193,8 @@ it.each(['CONT-W01', 'VRUN-W01', 'RECO-W01', 'EXCP-W01'])('%s reader help finish
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
   for (const step of steps) {
     await screen.findByText(step.instruction)
-    await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
-    await userEvent.click(screen.getByRole('button', { name: '설명 확인 · 다음' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 후 다음' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: '설명 확인 후 다음' }))
   }
   expect(await screen.findByText('화면 사용법 안내 완료')).toBeVisible()
 })
@@ -215,7 +215,7 @@ it('recovers after a duplicate is removed without changing input or writing', as
   expect(await screen.findByText(/안내 대상이 여러 곳/)).toBeVisible()
   act(() => screen.getByTestId('duplicate').remove())
   await userEvent.click(screen.getByRole('button', { name: '다시 찾기' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toHaveFocus())
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 후 다음' })).toHaveFocus())
   expect(screen.getByLabelText('보존 검색')).toHaveValue('keep')
   expect(write).not.toHaveBeenCalled()
   await userEvent.click(screen.getByRole('button', { name: '종료' }))
@@ -232,7 +232,7 @@ it('keeps a folded card away from a top-left target and preserves input through 
     <section data-guide-target="contract.filters"><input aria-label="접기 입력" defaultValue="draft" /></section>
   </main>)
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 후 다음' })).toBeEnabled())
   await userEvent.click(screen.getByRole('button', { name: '접기' }))
   const card = screen.getByRole('region', { name: '보험계약 목록 도움말' })
   await waitFor(() => expect(card).toHaveStyle({ top: '140px', bottom: 'auto' }))
@@ -254,14 +254,14 @@ it.each([['EXCP-W01', 'selected'], ['RPT-W02', 'entryKey'], ['LEDG-W01', 'select
   }
   render(<MemoryRouter initialEntries={['/?month=2026-07']}><Page /></MemoryRouter>)
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 후 다음' })).toBeEnabled())
   const hasSecondStep = definitions.find(entry => entry.screenId === screenId && !entry.variant)!.steps.length > 1
-  if (hasSecondStep) await userEvent.click(screen.getByRole('button', { name: '설명 확인 · 다음' }))
-  const step = (await screen.findByText(hasSecondStep ? /화면 사용법 · 2\// : /화면 사용법 · 1\//)).textContent
+  if (hasSecondStep) await userEvent.click(screen.getByRole('button', { name: '설명 확인 후 다음' }))
+  const step = (await screen.findByText(hasSecondStep ? /화면 사용법 2\// : /화면 사용법 1\//)).textContent
   await userEvent.click(screen.getByRole('button', { name: '행 선택' }))
-  expect(screen.getByText(step!)).toBeVisible()
+  expect(screen.getByText(step!.replace(/\s+/g, ' ').trim())).toBeVisible()
   await userEvent.click(screen.getByRole('button', { name: '월 변경' }))
-  expect(screen.queryByRole('button', { name: '설명 확인 · 다음' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '설명 확인 후 다음' })).not.toBeInTheDocument()
 })
 
 it('resets reconciliation completion when a different run is selected in the same month', async () => {
@@ -299,12 +299,12 @@ it.each(['COMPLETED', 'FAILED'])('validation %s follows the right branch and nev
   const next = () => screen.getByRole('button', { name: '다음' })
   for (let i = 0; i < 2; i++) { await waitFor(() => expect(next()).toBeEnabled()); await userEvent.click(next()) }
   if (status === 'FAILED') {
-    expect(screen.getByText('실행 가이드 · 3/5')).toBeVisible()
+    expect(screen.getByText('실행 가이드 3/5')).toBeVisible()
     await userEvent.click(next())
     expect(await screen.findByText('신규 실행 절차 안내 완료')).toBeVisible()
     expect(screen.queryByText('확정 완료')).not.toBeInTheDocument()
   } else {
-    expect(screen.getByText('실행 가이드 · 4/5')).toBeVisible()
+    expect(screen.getByText('실행 가이드 4/5')).toBeVisible()
     await userEvent.click(next())
     expect(next()).toBeDisabled()
     expect(screen.queryByText('확정 완료')).not.toBeInTheDocument()

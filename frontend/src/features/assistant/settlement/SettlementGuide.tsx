@@ -271,7 +271,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         const batch = readBatchPaymentGuide()
         if (!batch?.ready || !batch.paymentIds.length) throw new Error('선택한 지급 건을 모두 확정한 뒤 월 통합검증으로 이동하세요.')
         if (batch.contractId !== next.contractId || batch.month !== next.month || batch.stage !== next.stage)
-          throw new Error('계약·정산월·지급단계가 현재 안내 대상과 다릅니다.')
+          throw new Error('계약, 정산월 및 지급단계가 현재 안내 대상과 다릅니다.')
         const payments = await Promise.all(batch.paymentIds.map(paymentId => readPayment(String(paymentId), signal)))
         if (payments.some(payment => payment.status !== 'CONFIRMED' || payment.paymentStage !== next.stage ||
           payment.settlementMonth?.slice(0, 7) !== next.month || !payment.attributions?.length ||
@@ -509,7 +509,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         </header>
         {!collapsed && (
           <p>
-            {month} · {(selection?.stage ?? stage) === 'GA_TO_FC' ? 'GA → 설계사' : '보험사 → GA'} ·{' '}
+            {month}  {(selection?.stage ?? stage) === 'GA_TO_FC' ? 'GA → 설계사' : '보험사 → GA'}  {' '}
             {contractLabel || '새 업무'}
           </p>
         )}
@@ -553,7 +553,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
           </>
         ) : (
           <>
-            <p>{decision ? `${STEPS.indexOf(decision.step) + 1}/9 · ${titles[STEPS.indexOf(decision.step)]}` : ''}</p>
+            <p>{decision ? `${STEPS.indexOf(decision.step) + 1}/9 ${titles[STEPS.indexOf(decision.step)]}` : ''}</p>
             {detailedPayment && walkthrough.step ? (
               <section aria-label="지급 초안 세부 안내" aria-live="polite">
                 <small>입력 안내 {walkthrough.index + 1}/{walkthrough.total}</small>
@@ -565,7 +565,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
                 <div className="settlement-guide-actions">
                   <button disabled={busy || walkthrough.index === 0} onClick={walkthrough.previous}>이전 설명</button>
                   {walkthrough.step.id === 'save' ? (
-                    <button disabled={busy || !walkthrough.ready || !walkthrough.saved} onClick={() => void show(selection!)}>저장 결과 확인 · 다음 업무</button>
+                    <button disabled={busy || !walkthrough.ready || !walkthrough.saved} onClick={() => void show(selection!)}>저장 결과 확인 후 다음 업무</button>
                   ) : <button disabled={busy || !walkthrough.ready} onClick={walkthrough.next}>확인하고 다음 설명</button>}
                 </div>
               </section>
@@ -584,10 +584,10 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
               </section>
             ) : <p>{decision?.reason}</p>}
             {detailedWorkflow && explanation.last && <p role="status">{decision?.reason}</p>}
-            {contextMismatch && <p role="status">선택한 계약·스케줄·정산월과 현재 화면이 다릅니다. 기존 대상으로 돌아가거나 안내를 종료하고 새로 시작하세요.</p>}
+            {contextMismatch && <p role="status">선택한 계약, 스케줄 및 정산월과 현재 화면이 다릅니다. 기존 대상으로 돌아가거나 안내를 종료하고 새로 시작하세요.</p>}
             {busy && <p role="status">최신 결과를 확인하고 있습니다.</p>}
             {!detailedPayment && !detailedWorkflow && !busy && (snapshot?.status === 'PAUSED' || snapshot?.status === 'ERROR') ? (
-              <p role="status">안내 대상을 확인하지 못했거나 화면·입력이 바뀌었습니다. 현재 결과로 다시 확인하세요.</p>
+              <p role="status">안내 대상을 확인하지 못했거나 화면 및 입력이 바뀌었습니다. 현재 결과로 다시 확인하세요.</p>
             ) : null}
             {snapshot?.status === 'COMPLETED' ? (
               <strong>전체 업무 안내 완료</strong>
@@ -634,7 +634,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
                     정정 지급으로 이어서 안내
                   </button>
                   <button disabled={busy} onClick={() => revisit(`/validation-runs?month=${selection.month}`)}>
-                    새 월 검증 선택·생성
+                    새 월 검증 선택 및 생성
                   </button>
                   <button disabled={busy} onClick={() => revisit(destinations(selection)['validation.execute'].path)}>
                     월 검증 다시 확인
@@ -659,7 +659,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         )}
         {error && <p role="alert">{error}</p>}
         {!collapsed && (
-          <small>안내는 저장·실행·확정을 대신하지 않습니다. 종료해도 저장된 업무 데이터는 남습니다.</small>
+          <small>안내는 저장, 실행 및 확정을 대신하지 않습니다. 종료해도 저장된 업무 데이터는 남습니다.</small>
         )}
       </aside>
       <Modal
@@ -716,7 +716,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
             width="32"
             height="32"
           />
-          <span className="screen-step-count">전체 업무 가이드{decision && ` · ${guideStageNumber}/9`}</span>
+          <span className="screen-step-count">전체 업무 가이드{decision && ` ${guideStageNumber}/9`}</span>
           {selection && (
             <Button variant="ghost" onClick={() => setCollapsed((value) => !value)}>
               {collapsed ? '펼치기' : '접기'}
@@ -726,7 +726,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         </header>
         {!collapsed && !detailedPayment && !detailedWorkflow && (
           <p>
-            {month} · {selection.stage === 'GA_TO_FC' ? 'GA → 설계사' : '보험사 → GA'} ·{' '}
+            {month}  {selection.stage === 'GA_TO_FC' ? 'GA → 설계사' : '보험사 → GA'}  {' '}
             {contractLabel || '새 업무'}
           </p>
         )}
@@ -739,7 +739,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
 
             {detailedPayment && walkthrough.step ? (
               <section aria-label="지급 초안 세부 안내" aria-live="polite">
-                <GuideStepContent step={walkthrough.step} index={walkthrough.index} total={walkthrough.total} group={`지급 등록 · ${walkthrough.index + 1}/${walkthrough.total}`} />
+                <GuideStepContent step={walkthrough.step} index={walkthrough.index} total={walkthrough.total} group={`지급 등록 ${walkthrough.index + 1}/${walkthrough.total}`} />
                 {!walkthrough.target && walkthrough.message && <p role="status">{walkthrough.message}</p>}
                 {walkthrough.status === 'PAUSED' && <Button variant="secondary" onClick={walkthrough.retry}>다시 찾기</Button>}
                 <div className="payment-guide-actions">
@@ -753,7 +753,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
               <section aria-label="업무 세부 안내" aria-live="polite">
                 <GuideStepContent step={demoNumberStep ? { ...explanation.step, concise: true,
                   instruction: '빈 계약번호에는 기존 데모 번호의 다음 번호를 채웁니다.',
-                  interaction: '번호를 확인하고 다음을 누르세요.' } : explanation.step} index={explanation.index} total={explanation.total} group={`${guideGroup} · ${explanation.index + 1}/${explanation.total}`} />
+                  interaction: '번호를 확인하고 다음을 누르세요.' } : explanation.step} index={explanation.index} total={explanation.total} group={`${guideGroup} ${explanation.index + 1}/${explanation.total}`} />
                 {demoNumberStep && demoNumber.pending && <p role="status">다음 데모 계약번호를 불러오고 있습니다.</p>}
                 {demoNumberStep && demoNumber.error && <div><p role="alert">{demoNumber.error}</p><Button variant="secondary" onClick={demoNumber.retry}>번호 다시 불러오기</Button></div>}
                 {validationPlayback.error && <p role="alert">{validationPlayback.error}</p>}
@@ -768,10 +768,10 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
               </section>
             ) : <p>{decision?.reason}</p>}
             {progressNotice && !busy && (detailedPayment || detailedWorkflow && explanation.last) && <p role="status">{progressNotice}</p>}
-            {contextMismatch && <p role="status">선택한 계약·스케줄·정산월과 현재 화면이 다릅니다. 기존 대상으로 돌아가거나 안내를 종료하고 새로 시작하세요.</p>}
+            {contextMismatch && <p role="status">선택한 계약, 스케줄 및 정산월과 현재 화면이 다릅니다. 기존 대상으로 돌아가거나 안내를 종료하고 새로 시작하세요.</p>}
             {busy && <p role="status">현재 서버 결과를 확인하고 있습니다.</p>}
             {!detailedPayment && !detailedWorkflow && !busy && (snapshot?.status === 'PAUSED' || snapshot?.status === 'ERROR') ? (
-              <p role="status">안내 대상을 확인하지 못했거나 화면·입력이 바뀌었습니다. 현재 결과로 다시 확인하세요.</p>
+              <p role="status">안내 대상을 확인하지 못했거나 화면 및 입력이 바뀌었습니다. 현재 결과로 다시 확인하세요.</p>
             ) : null}
             {snapshot?.status === 'COMPLETED' ? (
               <strong>전체 업무 안내 완료</strong>
@@ -804,7 +804,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         )}
         {error && <p role="alert">{error}</p>}
         {!collapsed && !detailedPayment && !detailedWorkflow && (
-          <small>안내는 저장·실행·확정을 대신하지 않습니다. 종료해도 저장된 업무 데이터는 남습니다.</small>
+          <small>안내는 저장, 실행 및 확정을 대신하지 않습니다. 종료해도 저장된 업무 데이터는 남습니다.</small>
         )}
       </aside>, guideDialog ?? document.body)}
       <Modal

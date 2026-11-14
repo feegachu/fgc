@@ -110,7 +110,7 @@ function pendingRequests<T>(isMainNavigation: (request: T) => boolean) {
   }
 }
 
-plainTest('문서 이동 후 이전 요청은 기다리지 않고 새 문서·하위 프레임 요청은 기다린다', () => {
+plainTest('문서 이동 후 이전 요청은 기다리지 않고 새 문서 및 하위 프레임 요청은 기다린다', () => {
   const tracker = pendingRequests<{ main?: boolean }>((request) => request.main === true)
   const oldFetch = {}, navigation = { main: true }, currentFetch = {}, iframe = {}
   tracker.started(oldFetch)
@@ -354,7 +354,7 @@ function transferTable(visits: Visit[]) {
   )
   return [
     '실서버 시험은 Vite 개발 서버를 쓴다. JS, CSS는 번들 전 크기이고 같은 역할이 이미 받은 파일은 0이다.',
-    '합격선이 아니라 기록이다(KB). 배포본 크기는 빌드 산출물로 따로 잰다. 본문 수신 중 이동·취소되거나 측정에 실패한 요청은 미측정 건수로 표시하며 0바이트로 판정하지 않는다.',
+    '합격선이 아니라 기록이다(KB). 배포본 크기는 빌드 산출물로 따로 잰다. 본문 수신 중 이동 및 취소되거나 측정에 실패한 요청은 미측정 건수로 표시하며 0바이트로 판정하지 않는다.',
     '',
     '역할 | 라우트 | 요청 수 | 미측정 요청 수 | JS | CSS | 글꼴 | 이미지 | API | 가장 큰 API 응답 | 콘솔 오류',
     '--- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---',

@@ -96,7 +96,7 @@ export function ContractPaymentGates({
             </span>
             <div>
               <div className="transaction-gate-label">
-                {index + 1}. {step.label} ·{' '}
+                {index + 1}. {step.label}  {' '}
                 {step.state === 'fail'
                   ? '확인 필요'
                   : index === 3 || index === 4

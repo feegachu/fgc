@@ -1,3 +1,13 @@
+/** 화면 문구의 가운데점을 나열 표현이나 공백으로 정리한다. */
+export function withoutMiddleDots(value: string) {
+  return value
+    .replace(/[\p{L}\p{N}%]+(?:·[\p{L}\p{N}%]+)+/gu, (list) => {
+      const items = list.split('·')
+      return `${items.slice(0, -1).join(', ')} 및 ${items.at(-1)}`
+    })
+    .replace(/[ \t]*·[ \t]*/g, ' ')
+}
+
 const blockedActions: Record<string, string> = {
   '지급 확정 불가': '지급을 확정할 수 없습니다',
   '스케줄 확정 불가': '스케줄을 확정할 수 없습니다',
@@ -21,15 +31,13 @@ const blockedActions: Record<string, string> = {
 /** Presentation only. Stored messages and API values remain unchanged. */
 export function screenMessage(value?: string | null) {
   if (!value || /^\s*[—-]\s*$/.test(value)) return '-'
-  return value
+  return withoutMiddleDots(value)
     .replace(/^실제 지급 없음\s*—\s*예상\s*([\d,]+)원 지급 건 미발견$/, '실제 지급 누락 (예상 $1원)')
     .replace(/^(.+?)(?: — |, )/, (_, lead: string) =>
       blockedActions[lead] ? `${blockedActions[lead]}. ` : `${lead}, `,
     )
     .replace(/\bINSURER_TO_GA\b/g, '보험회사→GA')
     .replace(/\bGA_TO_FC\b/g, 'GA→설계사')
-    .replace(/(?<=\S)·(?=\S)/g, '/')
-    .replace(/\s*·\s*/g, ', ')
     .replace(/\s*—\s*/g, ', ')
 }
 
@@ -56,4 +64,20 @@ export function monthText(value?: string | null) {
   const match = value?.match(/^(\d{4})-(\d{2})(?:-|$)/)
   if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) return '-'
   return `${match[1]}년 ${Number(match[2])}월`
+}
+
+
+const demoEvidenceLabels: Record<string, string> = {
+  'SYNTHETIC:FILMING:SETTLEMENT_SUPPORT': '시연용 정착지원금 지급 근거',
+  'SYNTHETIC:FILMING:APPROVED_COMMON_COST': '시연용 공통비 지급 승인 근거',
+  'SYNTHETIC:FILMING:OCTOBER_WARNING:INDIVIDUAL_AGREEMENT': '시연용 개별 약정 지급 근거',
+  'SYNTHETIC:OCTOBER_DEMO': '10월 시연용 지급 근거',
+}
+
+/** 알려진 시연 증빙만 화면에서 풀어 쓴다. 입력 및 저장 값은 그대로 유지한다. */
+export function paymentEvidenceText(value: string) {
+  if (Object.hasOwn(demoEvidenceLabels, value)) return demoEvidenceLabels[value]
+  if (/^SYNTHETIC:FILMING:EXTERNAL_PAYMENT_RECORD_ERROR:\d+$/.test(value)) return '시연용 실제 송금액 확인 및 지급 기록 정정 근거'
+  const paid = /^SYNTHETIC:FILMING:EXTERNAL_ALREADY_PAID:(\d{4}-\d{2})$/.exec(value)
+  return paid ? `${monthText(paid[1])} 시연용 지급 완료 확인 근거` : value
 }

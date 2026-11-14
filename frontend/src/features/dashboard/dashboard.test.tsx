@@ -367,7 +367,7 @@ describe('DASH-W01 업무 대시보드', () => {
     await within(region).findByRole('button', { name: '강동지사 수수료 상세 보기' })
     await actions.click(within(region).getByRole('button', { name: '설계사' }))
     await actions.click(within(region).getByRole('button', { name: '강동지사 설계사 상세 보기' }))
-    const dialog = await screen.findByRole('dialog', { name: '강동지사 · 설계사 상세' })
+    const dialog = await screen.findByRole('dialog', { name: '강동지사 설계사 상세' })
     expect(await within(dialog).findByText('상세-1')).toBeInTheDocument()
     expect(callsTo('/branch-details').at(-1)).toBe('/api/v1/dashboard/branch-details?month=2026-07&organizationId=11&metric=AGENTS&page=1')
     await actions.click(within(dialog).getByRole('button', { name: '2' }))

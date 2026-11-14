@@ -54,7 +54,7 @@ export function ContractPaymentCapPanel({ rows, pending }: { rows: Row[]; pendin
                   {preview.resultStatusLabel ?? '확인 필요'}
                 </StatusBadge>
                 {!common && preview.resultStatus !== 'NOT_APPLICABLE' && <small>
-                  한도 {won(preview.limitAmount)} · 사용률 {usageRate(preview.usagePct)}%
+                  한도 {won(preview.limitAmount)}  사용률 {usageRate(preview.usagePct)}%
                 </small>}
                 {preview.applicabilityReason && <small>{rateText(preview.applicabilityReason)}</small>}
               </div>)}

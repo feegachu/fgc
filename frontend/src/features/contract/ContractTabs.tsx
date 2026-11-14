@@ -300,7 +300,7 @@ function SchedulesTab({ id }: { id: string }) {
   return (
     <>
       <PanelHeading title="예상 스케줄" legacy>
-        지급단계별 운영·예정 스케줄과 회차를 조회합니다.
+        지급단계별 운영 및 예정 스케줄과 회차를 조회합니다.
       </PanelHeading>
       <div className="contract-tab-body">
         <div className="contract-detail-schedule-stages">
@@ -330,7 +330,7 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
                     : '생성된 스케줄이 없습니다.'}
                 </p>
                 {!revised && data.headers?.[0]?.schedulePurpose === 'SIMULATION' && (
-                  <p>예정 결과 · 지급 확정 대상이 아닙니다.</p>
+                  <p>예정 결과이며 지급 확정 대상이 아닙니다.</p>
                 )}
               </div>
             </header>
@@ -339,7 +339,7 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
               .map((header) => (
                 <p key={header.scheduleHeaderId}>
                   <Link data-guide-feature="contract.schedule.preview-detail" to={returnLink(`/schedules/${header.scheduleHeaderId}`, `${location.pathname}${location.search}`)}>
-                    예상 스케줄 v{header.scheduleVersionNo} · {header.installmentCount}회차 상세 보기
+                    예상 스케줄 v{header.scheduleVersionNo}  {header.installmentCount}회차 상세 보기
                   </Link>
                 </p>
               ))}
@@ -467,13 +467,13 @@ const arbitrageColumns: TableColumn<ContractArbitrageCheck>[] = [
     key: 'planned',
     label: (
       <>
-        지급예정액·계산 기준{' '}
+        지급예정액 및 계산 기준{' '}
         <EvidenceLink icon="help" label="지급예정액 상한 설명">
           {UPPER_BOUND_NOTE}
         </EvidenceLink>
       </>
     ),
-    labelText: '지급예정액·계산 기준',
+    labelText: '지급예정액 및 계산 기준',
     align: 'number',
     render: (row) => {
       const basis = plannedBasisPresentation(row.plannedCommissionBasis)
