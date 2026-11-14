@@ -26,14 +26,14 @@ export function AnimatedRunChecklist({ completed, data, error, retry, onPresente
   useEffect(() => {
     if (next === undefined) return
     const timer = window.setTimeout(() => setRevealed(previous => [...previous, next]),
-      window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 0 : 650)
+      window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 0 : 520)
     return () => window.clearTimeout(timer)
   }, [next])
   const allShown = CONDITIONS.every((_item, index) => eligible.includes(index + 1) && revealed.includes(index + 1))
   useEffect(() => {
     if (!allShown || !onPresented) return
     // The last revealed check still needs to finish drawing before completion is announced.
-    const timer = window.setTimeout(onPresented, window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 0 : 650)
+    const timer = window.setTimeout(onPresented, window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 0 : 520)
     return () => window.clearTimeout(timer)
   }, [allShown, onPresented])
   return <section data-guide-feature="features.validation.validation-run-detail-page.section-7" className="surface" aria-labelledby="vrun-checklist-title" data-guide-checklist-ready={allShown}>
