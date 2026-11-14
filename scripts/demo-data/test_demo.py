@@ -20,7 +20,7 @@ import load_filming_demo as loader
 
 def options(root, action='backup', environment='local'):
     return Namespace(environment=environment, action=action, state=root / 'state', backups=root / 'backups',
-                     files=root / 'files', accounts=root / 'accounts.json', seed=20261112, snapshot='latest')
+                     files=root / 'files', accounts=root / 'accounts.json', seed=20261112, snapshot='latest', variant='full')
 
 
 class SnapshotSafetyTest(unittest.TestCase):

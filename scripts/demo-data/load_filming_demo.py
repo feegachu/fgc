@@ -11,6 +11,8 @@
 --verify-manifest <prepared.json>으로 시작 백업을 별도 DB에 복제해 처리/재검증/마감을 검증한다.
 검증 결과 파일은 보존하고 임시 검증 서버와 복제 DB는 종료 후 삭제한다.
 외부 AI 호출은 하지 않는다. 계정 파일은 기존 로더와 같은 형식이다.
+--variant compact는 10월 지급 누락 처리 사례를 빼고 정상 계약을 절반 수준으로 줄인다.
+기본 full 버전과 상태 이력·나머지 예외 시나리오는 유지한다.
 """
 import copy
 import base64
@@ -305,8 +307,30 @@ NON_LIFE = ('STD-NL-A', 'STD-P-N-101', 'STD-P-N-102')
 PREMIUMS = (45000, 65000, 85000, 110000, 140000, 180000)
 
 
+def portfolio_offsets(month, variant='full'):
+    if variant == 'full':
+        return range(MONTH_COUNTS[month])
+    # 5~6월 생명/손해 각 4건의 상태 이력용 계약 8건은 보존한다.
+    protected = {(mon, n) for mon in (5, 6) for n in range(4)}
+    normal = [(mon, n) for mon, count in MONTH_COUNTS.items() for n in range(count)
+              if (mon, n) not in protected]
+    selected = protected | set(normal[::2])
+    return [n for n in range(MONTH_COUNTS[month]) if (month, n) in selected]
+
+
+def october_open_count(manifest):
+    return 4 if manifest.get('includeMissingPayment', True) else 3
+
+
 class FilmingOctoberDemo(OctoberDemo):
     recovery_status = 'CANCELLED'
+    variant = 'full'
+
+    def __init__(self, db, base, accounts, variant='full'):
+        require(variant in ('full', 'compact'), '지원하지 않는 시연 버전입니다')
+        super().__init__(db, base, accounts)
+        self.variant = variant
+        self.manifest.update(variant=variant, includeMissingPayment=variant == 'full')
 
     def register(self, *args, **kwargs):
         if args[0] == 'MISSING_INSURER':
@@ -332,7 +356,7 @@ class FilmingOctoberDemo(OctoberDemo):
                 body = self.body(contract, stage, line,
                     950000 if scenario == 'AMOUNT_DIFFERENCE' and base_fc else None)
                 spec = {'body': body, 'expectedAmount': int(line['expectedAmount'])}
-                if scenario == 'CAP_PAYMENT' and base_fc:
+                if scenario == 'CAP_PAYMENT' and base_fc and self.variant == 'full':
                     self.manifest['payments']['missingAgent'] = spec
                     continue
                 if scenario == 'AMOUNT_DIFFERENCE':
@@ -355,7 +379,7 @@ class FilmingOctoberDemo(OctoberDemo):
 
     def register_portfolio_month(self, mon):
         rows = self.manifest.setdefault('sonPortfolio', {'agentCode': 'A-FC-001', 'contracts': [], 'statusEvents': []})['contracts']
-        for n in range(MONTH_COUNTS[mon]):
+        for n in portfolio_offsets(mon, self.variant):
             non_life = n % 2 == 1
             products = NON_LIFE if non_life else LIFE
             product = products[(mon + n // 2) % len(products)]
@@ -390,9 +414,6 @@ class FilmingOctoberDemo(OctoberDemo):
                 self.manifest['sonPortfolio']['statusEvents'].append({'contractNo': row['contractNo'], 'status': target})
         manifest = super().prepare(normal_per_month, cap_detection)
         manifest['reconciliationScenarios'] = [
-            {'key': 'CAP_PAYMENT', 'reason': 'ACTUAL_MISSING', 'stage': 'GA_TO_FC',
-             'expectedAmount': manifest['payments']['missingAgent']['expectedAmount'], 'actualAmount': 0,
-             'correction': '정상 예정액으로 지급 등록 및 확정'},
             {'key': 'RECOVERY', 'reason': 'INVALID_CONTRACT_PAYMENT', 'stage': 'GA_TO_FC',
              'expectedAmount': 0, 'actualAmount': manifest['payments']['recovery']['body']['amount'],
              'correction': '환수액 계산 및 PDF 발행 후 차감 확정과 환수 대사 반영'},
@@ -402,6 +423,14 @@ class FilmingOctoberDemo(OctoberDemo):
              'correction': '원분개 역분개 후 정상 금액 재기표'},
         ]
         manifest['expected']['note'] = '정상 예정액 미지급, 청약철회 기지급, 지급 금액 차이를 각각 한 건씩 검출한다.'
+        if self.variant == 'full':
+            manifest['reconciliationScenarios'].insert(0,
+                {'key': 'CAP_PAYMENT', 'reason': 'ACTUAL_MISSING', 'stage': 'GA_TO_FC',
+                 'expectedAmount': manifest['payments']['missingAgent']['expectedAmount'], 'actualAmount': 0,
+                 'correction': '정상 예정액으로 지급 등록 및 확정'})
+        else:
+            manifest['expected'].update(afterValidation=3,
+                note='청약철회 기지급과 지급 금액 차이를 각각 한 건씩 검출한다. 지급 누락 사례는 정상 지급한다.')
         return manifest
 
 
@@ -498,6 +527,8 @@ def prepare_payment_cap(demo):
     require(len(cases) == 1 and cases[0]['type'] == 'CAP_VIOLATION', f'정착지원금 한도 예외가 다릅니다: {cases}')
     demo.manifest['capExceptionId'] = cases[0]['exceptionCaseId']
     demo.manifest['expected']['note'] = '정착지원금 감액, 정상 예정액 미지급 등록, 청약철회 환수, 95만원 기록의 역분개와 65만원 재기표 후 재검증한다.'
+    if not demo.manifest.get('includeMissingPayment', True):
+        demo.manifest['expected']['note'] = '정착지원금 감액, 청약철회 환수, 95만원 기록의 역분개와 65만원 재기표 후 재검증한다.'
 
 
 def prepare_october_arbitrage(demo):
@@ -515,7 +546,7 @@ def prepare_october_arbitrage(demo):
     demo.manifest['octoberArbitrage'] = {'contractId': contract['contractId'], 'contractNo': contract['contractNo'],
         'paymentCycle': 'MONTHLY', 'monitoringOnly': True,
         'note': '초기 월납 대비 선지급 수수료 비중이 큰 검토대상. 미처리 업무에서 제외한다.'}
-    demo.manifest['expected']['afterValidation'] = 4
+    demo.manifest['expected']['afterValidation'] = october_open_count(demo.manifest)
     require(not demo.open_cases(), '차익거래 후보는 월 검증에서 처음 검출되어야 합니다')
 
 
@@ -652,6 +683,20 @@ def recover(demo, manifest):
     return {'candidateId': candidate, 'deductionIds': deductions, 'amount': total}
 
 
+def expected_october_cases(manifest):
+    numbers = {key: contract['contractNo'] for key, contract in manifest['contracts'].items()}
+    expected = Counter({('CAP_VIOLATION', 'CAP_LIMIT_VIOLATION', numbers[manifest.get('capContractKey', 'CAP_PAYMENT')]): 1,
+        ('RECONCILIATION_MISMATCH', 'ACTUAL_MISSING', numbers['CAP_PAYMENT']): 1,
+        ('RECONCILIATION_MISMATCH', 'ACTUAL_MISSING', numbers['MISSING_INSURER']): 1,
+        ('RECONCILIATION_MISMATCH', 'AMOUNT_DIFFERENCE', numbers['AMOUNT_DIFFERENCE']): 1})
+    if manifest.get('scenarioVersion') in ('OCTOBER_PAYMENT_WORKFLOW_V3', 'OCTOBER_PAYMENT_WORKFLOW_V4'):
+        del expected[('RECONCILIATION_MISMATCH', 'ACTUAL_MISSING', numbers['MISSING_INSURER'])]
+        expected[('RECONCILIATION_MISMATCH', 'INVALID_CONTRACT_PAYMENT', numbers['RECOVERY'])] = 1
+    if not manifest.get('includeMissingPayment', True):
+        del expected[('RECONCILIATION_MISMATCH', 'ACTUAL_MISSING', numbers['CAP_PAYMENT'])]
+    return expected
+
+
 def verify(demo, manifest, already_completed=False):
     if 'masterChecksums' in manifest:
         require(master_snapshot(demo.db) == manifest['masterChecksums'], '검증 시작 마스터가 시드와 다릅니다')
@@ -668,13 +713,7 @@ def verify(demo, manifest, already_completed=False):
     print('10월 검출:', json.dumps([(r['type'], r.get('reasonCode'), r.get('contractNo')) for r in detected], ensure_ascii=False), flush=True)
     numbers = {key: contract['contractNo'] for key, contract in manifest['contracts'].items()}
     workflow_v3 = manifest.get('scenarioVersion') in ('OCTOBER_PAYMENT_WORKFLOW_V3', 'OCTOBER_PAYMENT_WORKFLOW_V4')
-    expected = Counter({('CAP_VIOLATION', 'CAP_LIMIT_VIOLATION', numbers[manifest.get('capContractKey', 'CAP_PAYMENT')]): 1,
-        ('RECONCILIATION_MISMATCH', 'ACTUAL_MISSING', numbers['CAP_PAYMENT']): 1,
-        ('RECONCILIATION_MISMATCH', 'ACTUAL_MISSING', numbers['MISSING_INSURER']): 1,
-        ('RECONCILIATION_MISMATCH', 'AMOUNT_DIFFERENCE', numbers['AMOUNT_DIFFERENCE']): 1})
-    if workflow_v3:
-        del expected[('RECONCILIATION_MISMATCH', 'ACTUAL_MISSING', numbers['MISSING_INSURER'])]
-        expected[('RECONCILIATION_MISMATCH', 'INVALID_CONTRACT_PAYMENT', numbers['RECOVERY'])] = 1
+    expected = expected_october_cases(manifest)
     require(Counter((r['type'], r.get('reasonCode'), r.get('contractNo')) for r in detected) == expected,
             '요청한 시나리오 외 예외가 생겼거나 필요한 예외가 누락됐습니다')
     checklist = demo.s.ok('GET', f'/api/v1/validation-runs/{run}/finalize-checklist')
@@ -700,7 +739,7 @@ def verify(demo, manifest, already_completed=False):
     else:
         correct(demo, cap, manifest['payments']['cap'], manifest['payments']['cap']['expectedAmount'])
     corrections = [('AMOUNT_DIFFERENCE', 'difference')] if workflow_v3 else [('MISSING_INSURER', 'missing'), ('AMOUNT_DIFFERENCE', 'difference')]
-    if manifest.get('scenarioVersion') == 'OCTOBER_PAYMENT_WORKFLOW_V4':
+    if manifest.get('scenarioVersion') == 'OCTOBER_PAYMENT_WORKFLOW_V4' and manifest.get('includeMissingPayment', True):
         corrections.insert(0, ('CAP_PAYMENT', 'missingAgent'))
     for label, key in corrections:
         cases = demo.open_cases()
@@ -748,7 +787,7 @@ def verify_saved_demo(args):
         demo = OctoberDemo(db, f'http://127.0.0.1:{args.port}', accounts)
         if 'octoberWarning' in manifest:
             before = demo.s.ok('GET', '/api/v1/dashboard/summary?month=2026-10')
-            expected_open = 4
+            expected_open = october_open_count(manifest)
             require(before['capViolation'] == 1 and before['capWarning'] == 1 and before['openException'] == expected_open,
                 f'10월 시작 카드가 다릅니다: {before}')
         all_october = demo.loader.pages('/api/v1/exceptions?status=&validationMonth=2026-10-01')
@@ -810,7 +849,9 @@ def main():
     parser.add_argument('--base', default='http://localhost:8081', help='IntelliJ에서 실행한 로컬 API')
     parser.add_argument('--database', default='fgc', help='해당 API가 사용하는 Docker DB')
     parser.add_argument('--container', default='fgc-db')
-    parser.add_argument('--normal-per-month', type=int, default=20)
+    parser.add_argument('--variant', choices=('full', 'compact'), default='full',
+                        help='full: 기존 시연, compact: 10월 지급 누락 제외 + 정상 계약 절반')
+    parser.add_argument('--normal-per-month', type=int, help='월 일반 정상 계약 수 (full: 20, compact: 10)')
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--verify-manifest', help='시연 시작 백업을 복제해 정정부터 11월 검증까지 확인')
     parser.add_argument('--port', type=int, default=18084, help='복제 검증 서버 포트')
@@ -819,16 +860,20 @@ def main():
     if args.verify_manifest:
         verify_saved_demo(args)
         return
+    if args.normal_per_month is None:
+        args.normal_per_month = 10 if args.variant == 'compact' else 20
     require(urlparse(args.base).hostname in ('localhost', '127.0.0.1'), '로컬 Docker DB와 연결된 API만 지원합니다')
     require(1 <= args.normal_per_month <= 200, '월 정상 계약 수는 1~200이어야 합니다')
     seed = args.seed if args.seed is not None else random.SystemRandom().randrange(2**32)
     accounts = json.loads(Path(args.accounts).read_text(encoding='utf-8-sig'))[args.env]['accounts']
     db = Database(args.database, args.container, allow_existing=True)
     output = ROOT / 'output/october-demo' / db.name
+    if args.variant == 'compact':
+        output /= 'compact'
     output.mkdir(parents=True, exist_ok=True)
     require(db.sql('SELECT count(*) FROM fgc.validation_run') == '0',
         '이미 적재된 DB입니다. 기존 데이터를 보존하기 위해 중단합니다. 새 시드 DB에서 실행하세요.')
-    demo = FilmingOctoberDemo(db, args.base, accounts)
+    demo = FilmingOctoberDemo(db, args.base, accounts, args.variant)
     masters = master_snapshot(db)
     # 새 시드 DB의 계약/지급 예시만 비우며 기준정보와 정책은 보존한다.
     db.sql('BEGIN; TRUNCATE fgc.insurance_contract, fgc.commission_transaction, '
@@ -843,10 +888,11 @@ def main():
     print('10월 통합검증 실행', flush=True)
     demo.execute('2026-10')
     counts = Counter(row['type'] for row in demo.open_cases())
-    require(counts == {'CAP_VIOLATION': 1, 'RECONCILIATION_MISMATCH': 3}, f'10월 예외 구성이 다릅니다: {counts}')
+    expected_open = october_open_count(demo.manifest)
+    require(counts == {'CAP_VIOLATION': 1, 'RECONCILIATION_MISMATCH': expected_open - 1}, f'10월 예외 구성이 다릅니다: {counts}')
     dashboard = demo.s.ok('GET', '/api/v1/dashboard/summary?month=2026-10')
     require(dashboard['capViolation'] == 1 and dashboard['capWarning'] == 1
-        and dashboard['arbitrageCandidate'] == 1 and dashboard['openException'] == 4,
+        and dashboard['arbitrageCandidate'] == 1 and dashboard['openException'] == expected_open,
         f'10월 한도 카드 확인 실패: {dashboard}')
     require(db.sql("SELECT count(*) FROM fgc.validation_run WHERE validation_month>='2026-11-01'") == '0',
         '11월은 실행 전이어야 합니다')
@@ -855,7 +901,7 @@ def main():
         initialState='OCTOBER_COMPLETED_NOVEMBER_NOT_RUN')
     (output / 'prepared.json').write_text(json.dumps(demo.manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     db.backup(output / 'filming-start.dump')
-    print(f'준비 완료: {output}\n계약 {len(demo.manifest["contracts"])}건 / 10월 미처리 4건 / 11월 예상 {plan}', flush=True)
+    print(f'준비 완료: {output}\n계약 {len(demo.manifest["contracts"])}건 / 10월 미처리 {expected_open}건 / 11월 예상 {plan}', flush=True)
 
 
 if __name__ == '__main__':

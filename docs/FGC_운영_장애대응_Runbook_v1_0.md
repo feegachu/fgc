@@ -1373,6 +1373,19 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 | 현재 상태 백업 | `.\scripts\demo-data\demo.ps1 backup` | `bash scripts/demo-data/demo.sh backup` |
 | 마지막 백업 복원 | `.\scripts\demo-data\demo.ps1 restore` | `bash scripts/demo-data/demo.sh restore` |
 
+기존 데이터 구성은 기본 `--variant full`로 유지한다. 짧은 시연용 `--variant compact`를 선택하면 10월 실제 지급 누락 건은 정상 지급해 해당 처리 과정을 제외하고, 정착지원금 한도 초과·청약철회 환수·지급 금액 차이 3건만 미처리로 준비한다. 11월 검출 시나리오는 유지한다. 일반 정상 계약은 월 20건에서 10건으로, 설계사 포트폴리오 중 상태 이력용 8건을 제외한 정상 계약은 31건에서 16건으로 줄인다(홀수 올림). 기본 seed `20261112` 기준 전체 계약은 기존 151건에서 86건으로 줄며, 정상 계약은 131건에서 66건이다. 상태 이력·예외·모니터링 계약은 보존한다.
+
+```bash
+# 신한 EC2: 같은 커밋의 소스/API를 배포한 뒤 저장소 루트에서 실행한다.
+# 기존 서버 데이터는 이 명령을 실행할 때 교체된다. 교체 전/후 DB와 PDF는 자동 백업한다.
+bash scripts/demo-data/demo.sh rebuild --variant compact
+
+# 기존 구성을 다시 생성할 때
+bash scripts/demo-data/demo.sh rebuild --variant full
+```
+
+로컬에서는 `.\scripts\demo-data\demo.ps1 rebuild --variant compact`를 사용한다. compact 적재 산출물은 `output/october-demo/fgc/compact/`에 저장하여 기존 full 산출물을 덮어쓰지 않는다. 기존 full 백업(예: `20261113_105603_c699e0`)은 삭제하지 않고 폴더 경로로 지정해 복원한다. 복원에는 `--variant`가 필요 없다. 적재 후 `latest`는 바뀌므로 버전별 백업 경로를 각각 기록한다. 로더 직접 실행 시에도 `--variant compact`를 지원하며, `--normal-per-month`를 지정하면 버전의 월 기본 정상 계약 수보다 우선한다.
+
 - 로컬: Docker Desktop 실행, Java 21과 Python 준비. IntelliJ FgcApplication과 DB 콘솔 연결을 중지한 뒤 명령을 실행하고 완료 후 FgcApplication을 다시 실행한다. IntelliJ datasource는 `127.0.0.1:5433/fgc`다. 적재용 임시 서버는 스크립트가 켜고 끈다. PDF 위치를 바꿨다면 `--files "실제 FGC_STORAGE_ROOT"`를 모든 명령에 동일하게 추가한다.
 - EC2: 기존 신한 배포 상태(`~/fgc-stg/.env`, `release.env`, `compose.yaml`)와 동일 커밋의 API 이미지/소스가 필요하다. Git pull만으로 이미지가 갱신되지는 않는다. Docker Compose, Python 3가 필요하다. web/api 중지·재기동은 자동이며 배포와 데이터 작업이 동시에 실행되지 않도록 같은 배포 잠금을 사용한다. 시연 설정(기준월 10월, 일일 자동 배치 중지)은 `filming.override.yaml`에 저장하고 이후 신한 배포에도 반영한다.
 - 최초 적재에서 계정 파일이 없으면 settle01·gaadmin 비밀번호를 화면에 표시하지 않고 입력받는다. 로컬은 `~/.fgc-local-accounts.json`, EC2는 `~/.fgc-shinhan-accounts.json`을 사용하며 기존 파일도 그대로 사용한다. 계정 파일의 BOM은 허용한다.
