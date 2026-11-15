@@ -1359,3 +1359,15 @@ describe('FUN-087 guide card and spotlight', () => {
     expect(screen.getByRole('button', { name: '도움말' })).toHaveFocus()
   })
 })
+
+
+it('시연 증빙은 한글로 보여 주고 수수료 항목은 이름만 표시한다', async () => {
+  draftResponse = { ...saved, evidenceRef: 'SYNTHETIC:FILMING:SETTLEMENT_SUPPORT' }
+  const { user } = mount('/app/transactions/new?month=2026-07&id=77')
+  expect(await screen.findByDisplayValue('시연용 정착지원금 지급 근거')).toBeInTheDocument()
+  await waitFor(() => expect(screen.getByRole('combobox', { name: /수수료 항목/ })).toHaveValue('기본 수수료'))
+  expect(screen.queryByDisplayValue('기본 수수료 (BASE)')).not.toBeInTheDocument()
+  await user.click(button('btn-save'))
+  await waitFor(() => expect(writes()).toHaveLength(1))
+  expect(writes()[0][1]?.body).toMatchObject({ evidenceRef: 'SYNTHETIC:FILMING:SETTLEMENT_SUPPORT', commissionItemId: 1 })
+})

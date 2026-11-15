@@ -55,7 +55,7 @@ export const columns: TableColumn<ArbitrageRow>[] = [
   },
   {
     key: 'planned',
-    label: '지급예정액·계산 기준',
+    label: '지급예정액 및 계산 기준',
     sortKey: 'plannedCommissionAmount',
     sortable: true,
     width: '12rem',

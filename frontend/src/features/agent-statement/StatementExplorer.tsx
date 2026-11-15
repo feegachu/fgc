@@ -68,7 +68,7 @@ export function StatementExplorer({
                   </span>
                 </span>
                 <span className="ast-muted">
-                  {row.agentCode} · {row.organizationName}
+                  {row.agentCode}  {row.organizationName}
                 </span>
                 <span className="ast-agent-card-metric">
                   <span>명세 연결 계약</span>
@@ -79,10 +79,10 @@ export function StatementExplorer({
                   <strong>{won(row.paymentAmount)}</strong>
                 </span>
                 <span className="ast-agent-card-extra">
-                  보류 {won(row.heldAmount)} · 조정 {won(row.adjustmentAmount)}
+                  보류 {won(row.heldAmount)}  조정 {won(row.adjustmentAmount)}
                   <br />
                   환수 계산 {won(row.clawbackAmount)}
-                  {row.missingAmountCount > 0 && ` · 금액 미확인 ${row.missingAmountCount}건`}
+                  {row.missingAmountCount > 0 && ` 금액 미확인 ${row.missingAmountCount}건`}
                 </span>
               </button>
             ))}

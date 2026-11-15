@@ -90,35 +90,35 @@ export function RecoveryChecklistModal({ item, payments, onClose }: { item: Exce
   const due = today()
   const items = useCommissionItems(`${due.slice(0, 7)}-01`, current && recoveryAmount > 0)
   const clawbackItem = items.data?.find(entry => entry.itemCode === 'CLAWBACK' && entry.cashflowType === 'DEDUCTION')
-  const calculationRef = `환수 계산 v${calculation?.calculationVersion} · 원지급 ${payment?.commissionTransactionId}`
+  const calculationRef = `환수 계산 v${calculation?.calculationVersion} 원지급 ${payment?.commissionTransactionId}`
   const draft: Payment | undefined = current && payment && recoveryAmount > 0 && clawbackItem?.commissionItemId ? {
     sourceType: SOURCE_TYPE, sourceBusinessKey: businessKey, contractId: item.contractId, agentId: payment.agentId,
     commissionItemId: clawbackItem.commissionItemId, commissionItemCode: clawbackItem.itemCode, commissionItemName: clawbackItem.itemName,
     amount: recoveryAmount, cashflowType: 'DEDUCTION', paymentStage: payment.paymentStage, scheduledPaymentDate: due,
-    settlementMonth: `${due.slice(0, 7)}-01`, evidenceRef: calculationRef, note: `비유효 계약 지급분 환수 · 예외 ${item.exceptionCaseId} · 원 지급 ${payment.commissionTransactionId}`,
+    settlementMonth: `${due.slice(0, 7)}-01`, evidenceRef: calculationRef, note: `비유효 계약 지급분 환수 예외 ${item.exceptionCaseId} 원 지급 ${payment.commissionTransactionId}`,
     attributions: [{ contractId: item.contractId, attributionDate: due, amount: recoveryAmount, attributionMethod: 'DIRECT',
       inclusionDecisionStatus: 'INCLUDED', inclusionDecisionReason: '비유효 계약 지급분 환수', allocationBasis: 'DIRECT', evidenceRef: calculationRef }],
   } : undefined
   return <>
-    <Modal open title="비유효 계약 지급 · 환수 점검" onClose={onClose} closeOnBackdrop={false}
+    <Modal open title="비유효 계약 지급 환수 점검" onClose={onClose} closeOnBackdrop={false}
       footer={<><Button data-guide-feature="exception.recovery.recheck" disabled={!deductionDone || !user?.canProcess || recheck.isPending}
-        loading={recheck.isPending} onClick={() => { if (saved?.commissionTransactionId) recheck.mutate(saved.commissionTransactionId) }}>재대사 · 해결</Button>
+        loading={recheck.isPending} onClick={() => { if (saved?.commissionTransactionId) recheck.mutate(saved.commissionTransactionId) }}>재대사 후 해결</Button>
         <Button data-guide-feature="exception.recovery.close" variant="secondary" disabled={recheck.isPending} onClick={onClose}>닫기</Button></>}>
-      <p>{item.contractNo} · {item.agentName}{payment ? ` · 원지급 ${won(payment.amount)}` : ''}</p>
+      <p>{item.contractNo}  {item.agentName}{payment ? ` 원지급 ${won(payment.amount)}` : ''}</p>
       <p>계약 상태 변경 후 지급된 금액의 환수 근거를 확인하고 차감으로 등록하세요. 원지급 기록은 보존합니다.</p>
       {candidates.error && <p role="alert">{errorText(candidates.error)}</p>}
       {candidates.isPending && <p role="status">환수 대상을 불러오는 중입니다.</p>}
       {rows.length > 1 && <Field label="환수 기준 사건"><select data-guide-feature="exception.recovery.candidate" className="select-control" value={candidateId} onChange={event => setCandidateId(event.target.value)}>
-        <option value="">계약 상태 변경 사건을 선택하세요</option>{rows.map(row => <option key={row.candidateId} value={row.candidateId}>{date(row.eventDate)} · {row.agentName} · 후보 {row.candidateId}</option>)}
+        <option value="">계약 상태 변경 사건을 선택하세요</option>{rows.map(row => <option key={row.candidateId} value={row.candidateId}>{date(row.eventDate)}  {row.agentName}  후보 {row.candidateId}</option>)}
       </select></Field>}
       {candidates.isSuccess && !rows.length && <p>이 계약의 상태 변경 환수 후보가 없습니다. 계약 상태이력과 환수 후보 생성 여부를 확인하세요.</p>}
       {payments.length > 1 && <Field label="환수할 원지급"><select data-guide-feature="exception.recovery.payment" className="select-control" value={String(payment?.commissionTransactionId ?? '')} onChange={event => setSelectedPayment(event.target.value)}>
-        {payments.map(row => <option key={row.commissionTransactionId} value={row.commissionTransactionId}>지급 {row.commissionTransactionId} · {row.commissionItemName} · {won(row.amount)}</option>)}
+        {payments.map(row => <option key={row.commissionTransactionId} value={row.commissionTransactionId}>지급 {row.commissionTransactionId}  {row.commissionItemName}  {won(row.amount)}</option>)}
       </select></Field>}
       <ol className="exception-recovery-checklist">
-        <li><strong>{current ? '✓' : '1.'} 환수액 계산 · PDF 출력</strong><p>{notice ? `PDF 발행 완료 · ${notice.documentNo}` : current && recoveryAmount > 0 ? '환수액 계산 완료 · PDF는 필요할 때 출력하세요.' : '적용 정책으로 환수액을 계산하세요.'}</p>
-          <Button data-guide-feature="exception.recovery.calculate" variant="secondary" disabled={!detail.data} onClick={() => setStep('calculation')}>환수액 계산 · PDF 열기</Button></li>
-        <li><strong>{deductionDone ? '✓' : '2.'} 환수액만큼 차감 등록 · 확정</strong><p>{deductionDone ? `차감 ${saved?.commissionTransactionId}번 · ${won(saved?.amount)} 확정` : current && recoveryAmount > 0 ? `이 지급 건의 환수액 ${won(recoveryAmount)}` : '이 지급 건의 환수액을 먼저 계산하세요.'}</p>
+        <li><strong>{current ? '✓' : '1.'} 환수액 계산 및 PDF 출력</strong><p>{notice ? `PDF 발행 완료 ${notice.documentNo}` : current && recoveryAmount > 0 ? '환수액 계산 완료. PDF는 필요할 때 출력하세요.' : '적용 정책으로 환수액을 계산하세요.'}</p>
+          <Button data-guide-feature="exception.recovery.calculate" variant="secondary" disabled={!detail.data} onClick={() => setStep('calculation')}>환수액 계산 및 PDF 열기</Button></li>
+        <li><strong>{deductionDone ? '✓' : '2.'} 환수액만큼 차감 등록 및 확정</strong><p>{deductionDone ? `차감 ${saved?.commissionTransactionId}번 ${won(saved?.amount)} 확정` : current && recoveryAmount > 0 ? `이 지급 건의 환수액 ${won(recoveryAmount)}` : '이 지급 건의 환수액을 먼저 계산하세요.'}</p>
           <Button data-guide-feature="exception.recovery.deduction" variant="secondary" disabled={!draft || deduction.isPending || deduction.isError || saved?.status === 'CONFIRMED' || !user?.canProcess}
             onClick={() => setStep('deduction')}>수수료 지급 차감 등록</Button></li>
       </ol>
@@ -132,15 +132,15 @@ export function RecoveryChecklistModal({ item, payments, onClose }: { item: Exce
       {deductionDone && <p role="status">차감이 확정됐습니다. 재대사로 환수 근거를 확인하고 예외를 해결하세요.</p>}
       {saved?.status === 'CONFIRMED' && !deductionDone && <p role="alert">확정한 차감 금액이 현재 환수 계산과 다릅니다. 차감 건과 계산 결과를 확인하세요.</p>}
     </Modal>
-    {step === 'calculation' && scopedDetail && <Modal open title="환수액 계산 · PDF 출력" className="modal-large" onClose={closeStep} closeOnBackdrop={false}
+    {step === 'calculation' && scopedDetail && <Modal open title="환수액 계산 및 PDF 출력" className="modal-large" onClose={closeStep} closeOnBackdrop={false}
       footer={<><div ref={setPdfHost} /><Button data-guide-feature="exception.recovery.calculation-close" variant="secondary" onClick={closeStep}>점검목록으로</Button></>}>
-      <p>{item.contractNo} · {item.agentName}{payment ? ` · 원지급 ${won(payment.amount)}` : ''}</p>
+      <p>{item.contractNo}  {item.agentName}{payment ? ` 원지급 ${won(payment.amount)}` : ''}</p>
       <ClawbackActionPlacement.Provider value={{ revised: false, calculation: null, document: pdfHost, roleCode: user?.roleCode }}>
         <ClawbackCalculation detail={scopedDetail} itemName={id => payments.find(p => p.commissionItemId === id)?.commissionItemName ?? '수수료'} unsavedScope={scope} />
         <ClawbackDocuments detail={scopedDetail} roleCode={user?.roleCode} refreshing={detail.isFetching} onRefresh={() => detail.refetch()} compact originalPaymentId={payment?.commissionTransactionId} />
       </ClawbackActionPlacement.Provider>
     </Modal>}
-    {step === 'deduction' && draft && <Modal open title="수수료 지급 · 환수 차감 등록" className="modal-large" onClose={closeStep} closeOnBackdrop={false}
+    {step === 'deduction' && draft && <Modal open title="수수료 지급 및 환수 차감 등록" className="modal-large exception-payment-modal" onClose={closeStep} closeOnBackdrop={false}
       footer={<Button data-guide-feature="exception.recovery.deduction-close" variant="secondary" onClick={closeStep}>점검목록으로</Button>}>
       <Suspense fallback={<p role="status">차감 입력 화면을 불러오는 중입니다.</p>}><TransactionForm key={`${businessKey}:${saved?.commissionTransactionId ?? 'new'}`}
         entry={{ contractId: String(item.contractId), cashflowType: 'DEDUCTION' }} initialId={saved?.commissionTransactionId ? String(saved.commissionTransactionId) : null}

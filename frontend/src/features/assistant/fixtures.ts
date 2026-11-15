@@ -84,7 +84,7 @@ export function readPaymentFixture(scenario: PaymentScenario, context: Assistant
       {
         sourceId: 'payment-guide-v1',
         sourceType: 'GUIDE',
-        title: '지급 처리 가이드 · 합성 시연',
+        title: '지급 처리 가이드 합성 시연',
         version: '1.0',
         entityId: null,
       },
@@ -117,7 +117,7 @@ export function readPaymentFixture(scenario: PaymentScenario, context: Assistant
       const required = ['contractId', 'settlementMonth', 'paymentStage'] as const
       const missing = required.filter((slot) => !context[slot])
       if (missing.length) {
-        clarify(missing, '예상 수수료를 확인할 계약·정산월·지급단계를 선택하세요.')
+        clarify(missing, '예상 수수료를 확인할 계약, 정산월 및 지급단계를 선택하세요.')
         break
       }
       const calc = calculation('EXPECTED_COMMISSION', scenario, context, now)
@@ -197,7 +197,7 @@ export function readPaymentFixture(scenario: PaymentScenario, context: Assistant
       result.calculations.push(calc)
       clarify(
         [...calc.missingInputs],
-        '15만원으로 대체할 초안인지 추가 지급인지, 전체 귀속·근거를 확인하세요. 금액만으로 지급 가능 여부를 계산하지 않습니다.',
+        '15만원으로 대체할 초안인지 추가 지급인지, 전체 귀속 및 근거를 확인하세요. 금액만으로 지급 가능 여부를 계산하지 않습니다.',
       )
       break
     }
@@ -232,7 +232,7 @@ export function readPaymentFixture(scenario: PaymentScenario, context: Assistant
     case 'PAY-09':
       clarify(['intent'], '정책 수정, 지급 초안 수정, 확정 지급 정정 중 어떤 업무인가요?')
       result.clarification!.options = [
-        { optionId: 'policy-edit', label: '정책 수정 · 지원 범위 확인' },
+        { optionId: 'policy-edit', label: '정책 수정 지원 범위 확인' },
         { optionId: 'draft-edit', label: '지급 초안 수정' },
         { optionId: 'confirmed-correction', label: '확정 지급 정정' },
       ]
@@ -247,7 +247,7 @@ export function readPaymentFixture(scenario: PaymentScenario, context: Assistant
       result.calculations.push(calc)
       result.outcome = 'NO_SUPPORTED_WORKFLOW'
       result.text =
-        '4년·7년 회차 매핑 검증 전에는 월 지급액을 추천하지 않습니다. 총액을 48·84로 나눠 대체하지 않습니다.'
+        '4년 및 7년 회차 매핑 검증 전에는 월 지급액을 추천하지 않습니다. 총액을 48 및 84로 나눠 대체하지 않습니다.'
       break
     }
     case 'PAY-12': {
@@ -256,10 +256,10 @@ export function readPaymentFixture(scenario: PaymentScenario, context: Assistant
       calc.validity.expiresAt = new Date(now).toISOString()
       result.calculations.push(calc)
       result.outcome = 'PRECONDITION_REQUIRED'
-      result.text = '지급 또는 정책이 변경된 상황의 합성 예시입니다. 이전 추천을 폐기하고 재조회·재계산하세요.'
+      result.text = '지급 또는 정책이 변경된 상황의 합성 예시입니다. 이전 추천을 폐기하고 재조회 및 재계산하세요.'
       break
     }
   }
-  result.text = `[합성 시연 · API/AI 미연결] ${result.text}`
+  result.text = `[합성 시연 API/AI 미연결] ${result.text}`
   return result
 }

@@ -1,3 +1,4 @@
+import { screenMessage, withoutMiddleDots } from '../../lib/screenText'
 import type { ExceptionSearchResult } from './api'
 
 type ExceptionType = NonNullable<NonNullable<ExceptionSearchResult['summary']>[number]['type']>
@@ -56,4 +57,41 @@ export function exceptionSummaryDescription(type?: string) {
   return type && Object.hasOwn(summaryDescriptions, type)
     ? summaryDescriptions[type as ExceptionType]
     : summaryDescriptions.OTHER
+}
+
+// 자동 정정 이력에 저장된 연결 키는 감사·추적용으로 보존하고 화면에서는 제외한다.
+const correctionKey = String.raw`(?:JCG-\d+-[a-zA-Z0-9]+|EXCP-(?:SCHEDULE-|RECOVERY-)?\d+)`
+const internalEvidence = new RegExp(`^${correctionKey}$`)
+const correctionReference = new RegExp(`^((?:원장 정정|스케줄(?:·| 및 )계약 정정) 후 재대사 일치 확인) \\(${correctionKey}, 대사 \\d+\\)`)
+
+const recoveryConfirmation = /^원지급 \d+번의 환수 차감 ([\d,]+(?:\.\d+)?)원 확정 확인(?: |$)/
+
+export function exceptionHistoryActionLabel(action: { reason?: string | null; actionTypeLabel?: string }) {
+  return recoveryConfirmation.test(action.reason ?? '') ? '환수 차감 확정' : action.actionTypeLabel
+}
+
+export function exceptionHistoryReason(reason?: string | null) {
+  const recovery = recoveryConfirmation.exec(reason ?? '')
+  if (recovery) {
+    const amount = Number(recovery[1].replaceAll(',', '')).toLocaleString('ko-KR', { maximumFractionDigits: 20 })
+    return `환수액 ${amount}원을 수수료에서 차감하고 확정했습니다.`
+  }
+  return reason == null ? reason : withoutMiddleDots(reason.replace(correctionReference, '$1'))
+}
+
+export function exceptionHistoryEvidence(evidence?: string | null) {
+  const normalized = evidence && withoutMiddleDots(evidence)
+  const calculation = /^환수 계산 v(\d+) 원지급 \d+ 차감 (?:CLAWBACK-RECOVERY|EXCP-RECOVERY):[\d:]+$/.exec(normalized ?? '')
+  if (calculation) return `환수 계산 결과 (${calculation[1]}차)`
+  const notice = /^환수 통지서 (.+) 차감 (?:CLAWBACK-RECOVERY|EXCP-RECOVERY):[\d:]+$/.exec(normalized ?? '')
+  if (notice) return `환수 통지서 ${notice[1]}`
+  return evidence && !internalEvidence.test(evidence.trim()) ? evidence : null
+}
+
+
+export function exceptionListTitle(item: { type?: string; title?: string; reasonLabel?: string }) {
+  const title = screenMessage(item.title)
+  return withoutMiddleDots(item.type === 'RECONCILIATION_MISMATCH' && item.reasonLabel
+    ? title.replace(/^대사 불일치(?=,|$)/, () => item.reasonLabel!)
+    : title)
 }

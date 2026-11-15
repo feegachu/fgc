@@ -218,7 +218,7 @@ public class AcquisitionCostCheckService {
             case OFFERING_NOT_UNIQUE -> "계약일을 포함하는 판매버전이 하나가 아닙니다.";
             case NOT_APPLICABLE -> "판매개시일과 기초서류가 분급 적용례를 충족하지 않아 적용 대상이 아닙니다.";
             case CURRENT_BUT_ELIGIBLE -> "적용례를 충족하는데 현행 체계로 등록돼 있습니다.";
-            case REGIME_NOT_ELIGIBLE -> "4년·7년 체계로 등록됐지만 적용례를 충족하지 않습니다.";
+            case REGIME_NOT_ELIGIBLE -> "4년 및 7년 체계로 등록됐지만 적용례를 충족하지 않습니다.";
             case FOUR_YEAR_AFTER_SPECIAL_PERIOD -> "4년 특례 종료 뒤의 판매개시 또는 계약이라 적용 체계를 확정할 수 없습니다.";
             case SEVEN_YEAR_IN_SPECIAL_PERIOD -> "4년 특례 기간에 7년 체계로 등록돼 있습니다.";
             case RULESET_MISSING -> "적용할 분급 규칙이 없습니다.";

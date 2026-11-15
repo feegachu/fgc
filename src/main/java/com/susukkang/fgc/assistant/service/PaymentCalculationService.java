@@ -78,7 +78,7 @@ public class PaymentCalculationService {
     private PaymentCalculationSnapshot hypotheticalCandidate(PaymentCalculationRequest request) {
             var checked=candidates.calculate(request);
             var blockers=checked.blockers().stream().map(row->new PaymentCalculationSnapshot.Reason(row.code(),row.message(),string(row.contractId()),null)).toList();
-            return new PaymentCalculationSnapshot(UUID.randomUUID().toString(),request.kind().name(),request.mode().name(),checked.confirmable()?CALCULATED:REVIEW_REQUIRED,request.clientRevision(),false,true,"HYPOTHETICAL","KRW",null,Map.of(),Map.of(),checked.capPreview().stream().map(this::preview).toList(),checked.confirmable(),blockers,List.of(),basis(null,List.of(),List.of()),new PaymentCalculationSnapshot.Recommendation(false,null,null,"가상 후보입니다. 원본을 변경하지 않았으며 직접 저장·사전검증·확정해야 합니다.",List.of("ACTUAL_PRECHECK_REQUIRED")),OffsetDateTime.now(java.time.ZoneOffset.UTC),null);
+            return new PaymentCalculationSnapshot(UUID.randomUUID().toString(),request.kind().name(),request.mode().name(),checked.confirmable()?CALCULATED:REVIEW_REQUIRED,request.clientRevision(),false,true,"HYPOTHETICAL","KRW",null,Map.of(),Map.of(),checked.capPreview().stream().map(this::preview).toList(),checked.confirmable(),blockers,List.of(),basis(null,List.of(),List.of()),new PaymentCalculationSnapshot.Recommendation(false,null,null,"가상 후보입니다. 원본을 변경하지 않았으며 직접 저장, 사전검증 및 확정해야 합니다.",List.of("ACTUAL_PRECHECK_REQUIRED")),OffsetDateTime.now(java.time.ZoneOffset.UTC),null);
     }
 
     private long existingPaymentId(PaymentCalculationRequest request) {

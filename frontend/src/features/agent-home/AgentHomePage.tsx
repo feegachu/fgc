@@ -257,7 +257,7 @@ function Snapshot({
             zero={expected === 0}
             unit="원"
             footer={
-              <span>{`${commission?.month ?? month} 기준 · 보류 ${int(commission?.held?.amount ?? 0)}원 · 환수 계산 ${int(commission?.clawback?.amount ?? 0)}원`}</span>
+              <span>{`${commission?.month ?? month} 기준 보류 ${int(commission?.held?.amount ?? 0)}원 환수 계산 ${int(commission?.clawback?.amount ?? 0)}원`}</span>
             }
           />
         </Link>

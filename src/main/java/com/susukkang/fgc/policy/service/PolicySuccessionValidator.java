@@ -29,7 +29,7 @@ public class PolicySuccessionValidator {
                             && coversScope(rule.commissionItemId(), oldRule.commissionItemId()))
                     .map(rule -> new long[]{rule.elapsedMonthFrom(), rule.elapsedMonthTo()}).toList();
             if (!coversRange(oldRule.elapsedMonthFrom(), oldRule.elapsedMonthTo(), intervals)) {
-                throw incomplete("clawbackRules", "승계본에 기존 환수 규칙의 대상·경과월 구간이 빠져 있습니다.");
+                throw incomplete("clawbackRules", "승계본에 기존 환수 규칙의 대상 및 경과월 구간이 빠져 있습니다.");
             }
         }
         for (CommissionRuleDraft oldRule : previous.commissionRules()) {
@@ -37,12 +37,12 @@ public class PolicySuccessionValidator {
                     .filter(rule -> coversCommissionScope(rule, oldRule))
                     .map(rule -> new long[]{rule.installmentFrom(), rule.installmentTo()}).toList();
             if (!coversRange(oldRule.installmentFrom(), oldRule.installmentTo(), intervals)) {
-                throw incomplete("commissionRules", "승계본에 기존 ACTIVE 수수료 규칙의 적용 범위·항목·회차가 빠져 있습니다.");
+                throw incomplete("commissionRules", "승계본에 기존 ACTIVE 수수료 규칙의 적용 범위, 항목 및 회차가 빠져 있습니다.");
             }
         }
         for (FeeRegimeRuleDraft oldRule : previous.feeRegimeRules()) {
             if (!coversFeeRule(oldRule, replacement.feeRegimeRules())) {
-                throw incomplete("feeRegimeRules", "승계본에 기존 ACTIVE 분급 규칙의 판매일·기초서류 적용 범위가 빠져 있습니다.");
+                throw incomplete("feeRegimeRules", "승계본에 기존 ACTIVE 분급 규칙의 판매일 및 기초서류 적용 범위가 빠져 있습니다.");
             }
         }
     }

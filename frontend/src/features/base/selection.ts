@@ -33,7 +33,7 @@ export function entityLabel<K extends EntityKind>(kind: K, option: Entities[K]):
   if (kind === 'products')
     return coded(`${row.productName ?? ''}, ${row.offeringVersion ?? ''}`, row.insurerProductCode)
   if (kind === 'contracts') return `${row.contractNo ?? ''}, ${row.productName ?? ''}`
-  return coded(row.itemName, row.itemCode)
+  return String(row.itemName ?? '수수료 항목')
 }
 
 export function useEntityChoices<K extends EntityKind>(

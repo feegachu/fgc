@@ -239,7 +239,7 @@ public class ClawbackNoticeDocumentService {
         return switch (newStatus) {
             case "LAPSED" -> "계약 실효";
             case "TERMINATED" -> "계약 해지";
-            case "CANCELLED" -> "청약 철회·취소";
+            case "CANCELLED" -> "청약 철회 및 취소";
             default -> "계약 상태 변경(" + newStatus + ")";
         };
     }

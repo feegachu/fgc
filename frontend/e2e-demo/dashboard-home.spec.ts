@@ -77,7 +77,7 @@ test('FUN-080 home: 지점 인원과 상세는 하위 팀을 포함하며 계약
   const branch = region.getByRole('button', { name: '강동지사 설계사 상세 보기' })
   await expect(branch.locator('strong')).toHaveText(`${agents.length}명`)
   await branch.click()
-  const dialog = page.getByRole('dialog', { name: '강동지사 · 설계사 상세' })
+  const dialog = page.getByRole('dialog', { name: '강동지사 설계사 상세' })
   const rows = dialog.getByRole('table', { name: '강동지사 설계사 상세 내역' }).locator('tbody tr')
   await expect(rows).toHaveCount(Math.min(agents.length, 10))
   for (const [index, agent] of agents.slice(0, 10).entries()) {
@@ -89,7 +89,7 @@ test('FUN-080 home: 지점 인원과 상세는 하위 팀을 포함하며 계약
 
   await region.getByRole('button', { name: '계약', exact: true }).click()
   await region.getByRole('button', { name: '강동지사 계약 상세 보기' }).click()
-  const contractDialog = page.getByRole('dialog', { name: '강동지사 · 계약 상세' })
+  const contractDialog = page.getByRole('dialog', { name: '강동지사 계약 상세' })
   const contractLink = contractDialog.getByRole('link').first()
   await expect(contractLink).toHaveAttribute('href', /^\/contracts\/\d+\?month=2026-07$/)
   const contractNo = await contractLink.innerText()

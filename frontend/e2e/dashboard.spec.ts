@@ -153,7 +153,7 @@ for (const [width, height] of [[1440, 900], [1280, 720], [390, 1000]]) {
   })
 }
 
-test('지점 차트는 도움말 단계에서만 3초마다 바뀌고 접기·상세에서는 멈춘다', async ({ page }) => {
+test('지점 차트는 도움말 단계에서만 3초마다 바뀌고 접기 및 상세에서는 멈춘다', async ({ page }) => {
   test.setTimeout(60_000)
   await page.setViewportSize({ width: 1440, height: 900 })
   await session(page)
@@ -176,7 +176,7 @@ test('지점 차트는 도움말 단계에서만 3초마다 바뀌고 접기·�
   await page.getByRole('button', { name: '가상지점 01 설계사 상세 보기' }).click()
   await expect(guide).toHaveCount(0)
   await page.waitForTimeout(3200)
-  await expect(page.getByRole('dialog', { name: '가상지점 01 · 설계사 상세' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: '가상지점 01 설계사 상세' })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(guide).toBeVisible()
   await guide.getByRole('button', { name: '다음', exact: true }).click()
@@ -243,7 +243,7 @@ test('지표와 막대는 키보드로 선택하고 지점 상세 페이지를 �
   const request = page.waitForRequest('**/dashboard/branch-details?month=2026-07&organizationId=1&metric=AGENTS&page=1')
   await page.keyboard.press('Enter')
   await request
-  const dialog = page.getByRole('dialog', { name: '가상지점 01 · 설계사 상세' })
+  const dialog = page.getByRole('dialog', { name: '가상지점 01 설계사 상세' })
   await expect(dialog.getByText('설계사-1')).toBeVisible()
   await dialog.getByRole('button', { name: '2', exact: true }).click()
   await expect(dialog.getByText('설계사-2')).toBeVisible()
@@ -262,7 +262,7 @@ test('지점이 많은 모바일 화면도 페이지가 가로로 넘치지 않�
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0)
   await region.getByRole('button', { name: '설계사', exact: true }).click()
   await region.getByRole('button', { name: '가상지점 01 설계사 상세 보기' }).click()
-  const dialog = page.getByRole('dialog', { name: '가상지점 01 · 설계사 상세' })
+  const dialog = page.getByRole('dialog', { name: '가상지점 01 설계사 상세' })
   await expect(dialog.getByText('설계사-1')).toBeVisible()
   const bounds = await dialog.boundingBox()
   expect(bounds!.x).toBeGreaterThanOrEqual(0)

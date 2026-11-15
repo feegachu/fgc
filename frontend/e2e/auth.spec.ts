@@ -56,7 +56,7 @@ async function login(page: Page) {
 }
 
 for (const role of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN']) {
-  test(`${role}: 로그인 후 사용자·역할·메뉴를 표시한다`, async ({ page }) => {
+  test(`${role}: 로그인 후 사용자, 역할 및 메뉴를 표시한다`, async ({ page }) => {
     await authFixture(page, role)
     await page.goto('login')
     await login(page)
@@ -192,7 +192,7 @@ test('두 탭이 동시에 열려도 refresh를 한 번에 하나씩 보내 둘 
   expect(most).toBe(1)
 })
 
-test('두 브라우저의 중복 로그인: A 안내·경로 보존, B 정상, A 재로그인 복귀', async ({ browser, baseURL }) => {
+test('두 브라우저의 중복 로그인: A 안내 및 경로 보존, B 정상, A 재로그인 복귀', async ({ browser, baseURL }) => {
   const a = await browser.newContext({ baseURL })
   const b = await browser.newContext({ baseURL })
   try {
@@ -218,7 +218,7 @@ test('두 브라우저의 중복 로그인: A 안내·경로 보존, B 정상, A
   }
 })
 
-test('로그인 PC·모바일 화면과 비밀번호 토글', async ({ page }, testInfo) => {
+test('로그인 PC 및 모바일 화면과 비밀번호 토글', async ({ page }, testInfo) => {
   await authFixture(page)
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto('login')

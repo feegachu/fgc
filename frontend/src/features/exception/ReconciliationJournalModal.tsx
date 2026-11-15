@@ -28,7 +28,7 @@ export function ReconciliationJournalModal({ item, payments, paymentJournalIds, 
   const journal = detail.data
   const eligible = journal?.status === 'POSTED' && journal.journalType !== 'REVERSAL' && !journal.reversedByJournalHeaderId
   return <>
-    <Modal open title="검증원장 · 지급 기록 정정" className="modal-large" onClose={onClose}
+    <Modal open title="검증원장 지급 기록 정정" className="modal-large" onClose={onClose}
       closeOnBackdrop={false} footer={<>
         <DisabledButtonHint disabled={!canReverse || !eligible} reason={!canReverse ? '원장 정정 권한이 없습니다.' : '정정 가능한 기표 원장이 없습니다.'}>
           <Button data-guide-feature="features.exception.reconciliation-journal.correction" disabled={!canReverse || !eligible}
@@ -37,12 +37,12 @@ export function ReconciliationJournalModal({ item, payments, paymentJournalIds, 
         <Button data-guide-feature="features.exception.reconciliation-journal.close" variant="secondary" onClick={onClose}>닫기</Button>
       </>}>
       <div className="ledger-react-page">
-      <p>{item.contractNo} · {item.title}</p>
-      <p className="guidance guidance-neutral">기록 오류는 기존 지급 원장을 역분개하고 올바른 금액으로 재기표하세요. 실제로 덜 주거나 더 줬다면 추가 송금·반환을 확인한 뒤 정정하세요.</p>
+      <p>{item.contractNo}  {item.title}</p>
+      <p className="guidance guidance-neutral">기록 오류는 기존 지급 원장을 역분개하고 올바른 금액으로 재기표하세요. 실제로 덜 주거나 더 줬다면 추가 송금 및 반환을 확인한 뒤 정정하세요.</p>
       {payments.length > 1 && <Field label="정정할 지급 건"><select className="select-control" value={paymentId}
         data-guide-feature="features.exception.reconciliation-journal.payment" onChange={event => setSelectedId(event.target.value)}>
         {payments.map(payment => <option key={payment.commissionTransactionId} value={payment.commissionTransactionId}>
-          지급 {payment.commissionTransactionId} · {payment.commissionItemName ?? payment.commissionItemCode} · {won(payment.amount)}
+          지급 {payment.commissionTransactionId}  {payment.commissionItemName ?? payment.commissionItemCode}  {won(payment.amount)}
         </option>)}
       </select></Field>}
       {!journalId && <p role="status">이 지급 건에 연결된 정정 가능한 기표 원장이 없습니다. 지급 상태와 원장 생성 여부를 확인하세요.</p>}

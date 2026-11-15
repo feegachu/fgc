@@ -1,6 +1,6 @@
 import { test, expect, login, completeMonthly, password, responseFor, successful } from './fixtures'
 
-test('로그인 4개 역할·대시보드·사용자·메뉴·로그아웃', async ({ browser, baseURL }) => {
+test('로그인 4개 역할, 대시보드, 사용자, 메뉴 및 로그아웃', async ({ browser, baseURL }) => {
   for (const [account, userName, roleName, auditMenu] of [
     ['admin', '시스템관리자', '시스템관리자', true],
     ['gaadmin', 'GA관리자', 'GA관리자', false],
@@ -35,7 +35,7 @@ test('로그인 4개 역할·대시보드·사용자·메뉴·로그아웃', asy
   }
 })
 
-test('비로그인 지급 등록 딥링크 → 로그인 → 쿼리·해시 복원', async ({ page }) => {
+test('비로그인 지급 등록 딥링크 → 로그인 → 쿼리 및 해시 복원', async ({ page }) => {
   const route = '/transactions/new?month=2026-07&status=ACTIVE#form'
   await page.goto(route.slice(1))
   await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
@@ -68,7 +68,7 @@ test('중복 로그인은 이전 브라우저를 차단하고 재로그인 후 �
   }
 })
 
-test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·API 대조', async ({ page }, info) => {
+test('AUDT A1–A5 목록, 필터, 페이지 및 키보드 선택, 새로고침 및 API 대조', async ({ page }, info) => {
   await login(page)
   await completeMonthly(page)
   await login(page, 'audit01')
@@ -131,7 +131,7 @@ test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·AP
   await info.attach('react-audit', { body: await page.screenshot(), contentType: 'image/png' })
 })
 
-test('AUDT A6 SETTLEMENT 메뉴 숨김·화면 403·API 403', async ({ page }) => {
+test('AUDT A6 SETTLEMENT 메뉴 숨김 및 화면 403 및 API 403', async ({ page }) => {
   await login(page, 'settle01', '/audit-logs?month=2026-07')
   await expect(page.getByRole('heading', { name: '권한 없음' })).toBeVisible()
   await expect(page.getByRole('main')).not.toContainText('FGC-AUTH-003')
@@ -148,7 +148,7 @@ test('AUDT A6 SETTLEMENT 메뉴 숨김·화면 403·API 403', async ({ page }) =
   expect((await denied.json()).error.code).toBe('FGC-AUTH-003')
 })
 
-test('COMPLIANCE 스케줄 확정 버튼 비활성·지급 등록 403', async ({ page }) => {
+test('COMPLIANCE 스케줄 확정 버튼 비활성 및 지급 등록 403', async ({ page }) => {
   await login(page)
   await completeMonthly(page)
   await page.context().clearCookies()

@@ -152,7 +152,7 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
     paymentJournalIds={context.data.paymentJournalIds ?? {}} onChanged={async () => { await context.refetch() }} onClose={onClose} />
   if (context.data?.correctionTarget === 'RECOVERY') return <RecoveryChecklistModal item={item} payments={context.data.payments} onClose={onClose} />
   return <>
-    <Modal open title={manualReview ? '스케줄 밖 지급 근거 검토' : externalInsurer ? '보험사 지급기준·한도 검토' : sourceCorrection ? expectedMissing ? `계약 상세 · ${item.contractNo ?? '-'}` : invalidContract ? '계약 상태·예상 스케줄 확인' : '예상 스케줄 확인·재생성' : '수수료 지급 건 등록·수정'} className="modal-large exception-payment-modal"
+    <Modal open title={manualReview ? '스케줄 밖 지급 근거 검토' : externalInsurer ? '보험사 지급기준 및 한도 검토' : sourceCorrection ? expectedMissing ? `계약 상세 ${item.contractNo ?? '-'}` : invalidContract ? '계약 상태 및 예상 스케줄 확인' : '예상 스케줄 확인 및 재생성' : '수수료 지급 건 등록 및 수정'} className="modal-large exception-payment-modal"
       onClose={close} closeOnBackdrop={false} closeOnEscape={!pending}
       footer={<>
         {expectedMissing && sourceCorrection && <div ref={setScheduleActions} />}
@@ -164,24 +164,24 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
       {context.error && <p role="alert" className="field-error">{errorText(context.error)}</p>}
       {context.data && <>
         {manualReview ? <ReviewPanel item={item} onClosed={onClose} initialEvidence={item.contractNo} /> : sourceCorrection ? <section data-guide-feature="features.exception.schedule-correction" className="exception-schedule-correction">
-          <p className="exception-correction-source">{insurer ? '보험회사→GA' : 'GA→설계사'} · {context.data.scheduledBasis ? '예상 스케줄 기준 한도 검증' : '예상·실제 대사'}</p>
+          <p className="exception-correction-source">{insurer ? '보험회사→GA' : 'GA→설계사'}  {context.data.scheduledBasis ? '예상 스케줄 기준 한도 검증' : '예상 및 실제 대사'}</p>
           {context.data.scheduledBasis && <><div className="exception-schedule-amounts">
             <div><span>예상 지급계획</span><strong>{won(context.data.capBasis?.capCheck?.includedAmount)}</strong></div>
             <div><span>1,200% 한도</span><strong>{won(context.data.capBasis?.capCheck?.limitAmount)}</strong></div>
             <div><span>초과 금액</span><strong>{won(Math.max(0, Number(context.data.capBasis?.capCheck?.includedAmount ?? 0) - Number(context.data.capBasis?.capCheck?.limitAmount ?? 0)))}</strong></div>
           </div>
-          <ul className="exception-schedule-breakdown">{basisGroups.map(([name, group]) => <li key={name}><span>{name} · {group.count}회</span><strong>{won(group.amount)}</strong></li>)}</ul></>}
+          <ul className="exception-schedule-breakdown">{basisGroups.map(([name, group]) => <li key={name}><span>{name}  {group.count}회</span><strong>{won(group.amount)}</strong></li>)}</ul></>}
           <p>{invalidContract ? '지급일 기준 비유효 계약으로 검출됐습니다. 계약 상태와 지급 근거를 먼저 확인하세요. 예상 0원만으로 스케줄 누락이라고 판단할 수 없습니다.'
             : externalInsurer ? '보험사 지급기준과 계산근거를 대조하세요. 기존 정책으로 스케줄을 재생성해도 한도 초과가 해소되지 않습니다. 보험사 시정 요청 또는 FGC 원천 입력 정정을 검토하고 GA관리자에게 배정하세요.'
             : context.data.scheduledBasis ? '수수료 규칙과 예상 스케줄을 확인하세요. 원천 오류가 확인되면 정정 후 스케줄을 재생성하고 재검증하세요.'
-            : '예상 금액이 없습니다. 계약의 스케줄 생성 대상 여부와 적용 정책을 확인하고 예상 스케줄을 생성·재생성한 뒤 재대사하세요.'}</p>
+            : '예상 금액이 없습니다. 계약의 스케줄 생성 대상 여부와 적용 정책을 확인하고 예상 스케줄을 생성 및 재생성한 뒤 재대사하세요.'}</p>
           <div className="exception-schedule-links">
             {invalidContract && context.data.contractLink && <Link data-guide-feature="features.exception.schedule-correction.contract" className="button" to={context.data.contractLink}>계약 상태 확인</Link>}
             {context.data.policyLink && <Link data-guide-feature="features.exception.schedule-correction.policy" className="button" to={context.data.policyLink}>적용 수수료 규칙 확인</Link>}
             {context.data.scheduleLink && (context.data.scheduledBasis || !item.contractId) && <Link data-guide-feature="features.exception.payment-correction.schedule" className="button button-secondary" to={context.data.scheduleLink}>예상 스케줄 확인</Link>}
           </div>
           {message && <p role="status" className="exception-correction-result">{message}</p>}
-          {item.contractId && <Suspense fallback={<p role="status">계약·스케줄을 불러오는 중입니다.</p>}><ScheduleCorrectionPanel
+          {item.contractId && <Suspense fallback={<p role="status">계약 및 스케줄을 불러오는 중입니다.</p>}><ScheduleCorrectionPanel
             contractId={item.contractId} exceptionId={item.exceptionCaseId!}
             readOnly={Boolean(externalInsurer)}
             actionContainer={expectedMissing ? scheduleActions : undefined}
@@ -192,15 +192,15 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
           /></Suspense>}
           {externalInsurer && <ReviewPanel item={item} onClosed={onClose} />}
         </section> : <>
-        {item.type === 'CAP_VIOLATION' && <section data-guide-feature="features.exception.payment-correction.cap-overage" className="guidance guidance-neutral">
-          <strong className="guidance-title">{excess > 0 ? `한도 초과 · 최소 ${won(excess)} 줄여야 합니다.` : '검출 당시 한도 초과 내역'}</strong>
+        {item.type === 'CAP_VIOLATION' && <section data-guide-feature="features.exception.payment-correction.cap-overage" className="guidance guidance-neutral exception-cap-overage">
+          <strong className="guidance-title">{excess > 0 ? `한도 초과 최소 ${won(excess)} 줄여야 합니다.` : '검출 당시 한도 초과 내역'}</strong>
           {item.description && <p className="guidance-copy">{rateText(item.description)}</p>}
           <p className="guidance-copy">지급액과 귀속금액을 함께 조정한 뒤 사전검증을 다시 실행하세요.</p>
         </section>}
         {missingActual && insurer && <label className="checkbox-label"><input data-guide-feature="features.exception.payment-correction.receipt-confirmed" type="checkbox" checked={receiptConfirmed}
-          onChange={event => { setReceiptConfirmed(event.target.checked); useUnsavedWorkStore.getState().mark(scope + 'workflow', event.target.checked) }} />보험사 명세·입금 확인 완료</label>}
+          onChange={event => { setReceiptConfirmed(event.target.checked); useUnsavedWorkStore.getState().mark(scope + 'workflow', event.target.checked) }} />보험사 명세 및 입금 확인 완료</label>}
         {!context.data.scheduledBasis && ['CAP_WARNING', 'CAP_VIOLATION', 'CAP_REVIEW_REQUIRED'].includes(item.type ?? '') && payment && <section data-guide-feature="features.exception.payment-correction.defer-guide" className="exception-correction-workflow">
-          <Field label="감액·이연 구분"><select data-guide-feature="features.exception.payment-correction.planned-action" className="select-control" value={plannedAction} disabled={pending} onChange={event => { setPlannedAction(event.target.value); useUnsavedWorkStore.getState().mark(scope + 'workflow', true) }}>
+          <Field label="감액 및 이연 구분"><select data-guide-feature="features.exception.payment-correction.planned-action" className="select-control" value={plannedAction} disabled={pending} onChange={event => { setPlannedAction(event.target.value); useUnsavedWorkStore.getState().mark(scope + 'workflow', true) }}>
             <option value="">변경 내용으로 자동 판단</option><option value="REDUCE">초과분 감액</option><option value="DEFER">초과분을 2차년도 이후로 이연</option>
           </select></Field>
           {plannedAction === 'DEFER' && <Field label="초과분 지급 예정일" required helper={`현재 지급액을 잔여 한도 이내로 줄이세요. 차액은 ${context.data.deferrableFrom ?? '계약 2차년도'} 이후 지급 초안으로 분리하며 지금 확정하지 않습니다.`}>
@@ -208,28 +208,28 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
           </Field>}
         </section>}
         {amountDifference && <section data-guide-feature="features.exception.payment-correction.amount-guide" className="exception-correction-workflow">
-          <h3>금액 부족·초과 정정</h3>
-          <p>기존 지급 건의 전체 금액을 정정합니다. 저장 시 연결된 원장을 역분개·재기표하고 재대사합니다. 차액을 별도 지급 건으로 추가하면 중복 지급으로 검출될 수 있습니다.</p>
+          <h3>금액 부족 및 초과 정정</h3>
+          <p>기존 지급 건의 전체 금액을 정정합니다. 저장 시 연결된 원장을 역분개 및 재기표하고 재대사합니다. 차액을 별도 지급 건으로 추가하면 중복 지급으로 검출될 수 있습니다.</p>
           <Field label="처리 구분" required><select data-guide-feature="features.exception.payment-correction.mode" className="select-control" value={correctionMode} disabled={pending}
             onChange={event => { setCorrectionMode(event.target.value); useUnsavedWorkStore.getState().mark(scope + 'workflow', true) }}>
             <option value="">처리 구분을 선택하세요</option>
-            <option value="RECORD_ONLY">기록만 잘못된 경우 · 기록 오류 정정</option>
-            <option value="SETTLEMENT_COMPLETED">실제 지급액이 다른 경우 · 추가 송금 또는 반환 완료</option>
+            <option value="RECORD_ONLY">기록만 잘못된 경우 기록 오류 정정</option>
+            <option value="SETTLEMENT_COMPLETED">실제 지급액이 다른 경우 추가 송금 또는 반환 완료</option>
           </select></Field>
-          {correctionMode === 'SETTLEMENT_COMPLETED' && <Field label="추가 송금·반환 증빙" required helper="실제 부족분의 추가 송금 또는 초과분의 반환을 먼저 처리한 뒤 증빙 번호나 링크를 입력하세요.">
+          {correctionMode === 'SETTLEMENT_COMPLETED' && <Field label="추가 송금 및 반환 증빙" required helper="실제 부족분의 추가 송금 또는 초과분의 반환을 먼저 처리한 뒤 증빙 번호나 링크를 입력하세요.">
             <input data-guide-feature="features.exception.payment-correction.settlement-evidence" value={settlementEvidence} maxLength={500} disabled={pending}
               onChange={event => { setSettlementEvidence(event.target.value); useUnsavedWorkStore.getState().mark(scope + 'workflow', true) }} />
           </Field>}
           {payment?.journalHeaderId && <Link data-guide-feature="features.exception.payment-correction.journal" to={`/journals?selected=${payment.journalHeaderId}`}>연결된 원장 확인</Link>}
         </section>}
         {context.data.capBasis && <details className="exception-payment-basis">
-          <summary data-guide-feature="features.exception.payment-correction.basis">검출 당시 실제 산입액 · {won(context.data.capBasis.capCheck?.includedAmount)}</summary>
-          <ul>{basisGroups.map(([name, group]) => <li key={name}>{name} {group.count}건 · {won(group.amount)}</li>)}</ul>
+          <summary data-guide-feature="features.exception.payment-correction.basis">검출 당시 실제 산입액 {won(context.data.capBasis.capCheck?.includedAmount)}</summary>
+          <ul>{basisGroups.map(([name, group]) => <li key={name}>{name} {group.count}건 {won(group.amount)}</li>)}</ul>
         </details>}
         <Field label="수정할 지급 건">
           <select data-guide-feature="features.exception.payment-correction.payment" className="select-control" value={id} disabled={mutation.isPending} onChange={event => choose(event.target.value)}>
             {context.data.payments.map(p => <option key={p.commissionTransactionId} value={p.commissionTransactionId}>
-              지급 {p.commissionTransactionId} · {p.commissionItemName ?? p.commissionItemCode} · {won(p.amount)} · {p.settlementMonth?.slice(0, 7)}
+              지급 {p.commissionTransactionId}  {p.commissionItemName ?? p.commissionItemCode}  {won(p.amount)}  {p.settlementMonth?.slice(0, 7)}
             </option>)}
             {canRegister && <option value="new">누락 지급 신규 등록</option>}
           </select>

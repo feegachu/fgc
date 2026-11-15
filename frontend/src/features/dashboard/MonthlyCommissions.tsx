@@ -27,7 +27,7 @@ export function MonthlyCommissions({ month, replay = 0 }: { month: string; repla
           월별 수수료
         </h2>
       </header>
-      <p className="dashboard-commissions-basis">{monthText(month)} · 확정 지급 기준</p>
+      <p className="dashboard-commissions-basis">{monthText(month)}  확정 지급 기준</p>
       <div key={replay}>
         {query.isError ? (
           <RegionError

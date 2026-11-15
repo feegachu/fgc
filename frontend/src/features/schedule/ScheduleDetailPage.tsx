@@ -121,10 +121,10 @@ function ScheduleDetailView({ id }: { id: string }) {
       reasons.push(header.confirmBlockedReason === 'SCHEDULE_NOT_ACTIVE_PLANNED'
         ? '사용 중인 예정 상태의 스케줄만 확정할 수 있습니다.'
         : header.confirmBlockedReason === 'FGC-IMPL-SCHEDULE_PREVIEW_ONLY'
-          ? '4년·7년 예상 스케줄은 지급 확정 대상이 아닙니다.'
+          ? '4년 및 7년 예상 스케줄은 지급 확정 대상이 아닙니다.'
           : '확정할 수 없는 상태입니다.')
     }
-    if (previewOnly) reasons.push('4년·7년 예상 스케줄은 지급 확정 대상이 아닙니다.')
+    if (previewOnly) reasons.push('4년 및 7년 예상 스케줄은 지급 확정 대상이 아닙니다.')
     if (!canProcess) reasons.push('확정과 재생성은 정산담당자와 시스템관리자만 할 수 있습니다.')
     if (header.activeYn !== true) reasons.push('사용 중인 버전이 아닙니다.')
     if (header.status === 'CONFIRMED') reasons.push('이미 확정된 스케줄입니다.')
@@ -284,7 +284,7 @@ function ScheduleDetailView({ id }: { id: string }) {
           />
         </fieldset>
       )}
-      {previewOnly && header && <p role="status">정책 정의 {header.installmentCount ?? '-'}회차 · {header.lineCount ?? '-'}행. 실제 정책 구간만 표시하며 빈 회차를 추가하지 않습니다.</p>}
+      {previewOnly && header && <p role="status">정책 정의 {header.installmentCount ?? '-'}회차 {header.lineCount ?? '-'}행. 실제 정책 구간만 표시하며 빈 회차를 추가하지 않습니다.</p>}
 
 
       {header && (

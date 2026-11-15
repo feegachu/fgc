@@ -34,7 +34,7 @@ for (const viewport of [{ width: 1365, height: 768 }, { width: 390, height: 844 
     })
     await page.goto('/exceptions?selected=11')
     await page.getByRole('button', { name: '예외 건 처리', exact: true }).click()
-    const modal = page.getByRole('dialog', { name: '검증원장 · 지급 기록 정정' })
+    const modal = page.getByRole('dialog', { name: '검증원장 지급 기록 정정' })
     const correction = modal.locator('.modal-footer').getByRole('button', { name: '역분개 + 재기표', exact: true })
     await expect(correction).toBeEnabled()
     await expect(correction).toBeInViewport({ ratio: 1 })
@@ -44,7 +44,7 @@ for (const viewport of [{ width: 1365, height: 768 }, { width: 390, height: 844 
     await page.screenshot({ path: testInfo.outputPath('journal-correction-footer.png') })
     await correction.click()
     const editor = page.getByRole('dialog', { name: '역분개 + 재기표', exact: true })
-    const journalTable = editor.getByRole('table', { name: '원분개 · 역분개 · 신규 재기표' })
+    const journalTable = editor.getByRole('table', { name: '원분개, 역분개 및 신규 재기표' })
     await expect(journalTable.locator('tbody tr')).toHaveCount(6)
     await expect(journalTable.locator('tbody').first().getByText('JV-2026-10-0095')).toBeVisible()
     await expect(editor.getByText('JV-2026-10-0097')).toBeVisible()
@@ -75,7 +75,7 @@ async function openPaymentCorrection(page: Page, scenario: { type: string; recon
   await page.getByRole('button', { name: '예외 건 처리', exact: true }).click()
 }
 
-test('두 지급 분개를 같은 모달에서 비교하고 고른 건만 역분개·재대사한다', async ({ page }) => {
+test('두 지급 분개를 같은 모달에서 비교하고 고른 건만 역분개 및 재대사한다', async ({ page }) => {
   const updatedAt = '2026-11-09T09:00:00+09:00'
   const payments = [225, 226].map((id, index) => ({ commissionTransactionId: id, amount: 80000, status: 'CONFIRMED',
     sourceBusinessKey: `GA-202611-L837${index ? '-2' : ''}`, updatedAt }))
@@ -84,7 +84,7 @@ test('두 지급 분개를 같은 모달에서 비교하고 고른 건만 역분
     if (path.endsWith('/payment-correction')) return { payments, paymentJournalIds: { '225': 90, '226': 91 }, reconciliationResultType: 'DUPLICATE' }
     if (path.endsWith('/cancel-duplicate')) {
       submissions.push(body)
-      return { resolved: true, message: '중복 지급 기록을 역분개·취소하고 재대사 일치를 확인했습니다.' }
+      return { resolved: true, message: '중복 지급 기록을 역분개 및 취소하고 재대사 일치를 확인했습니다.' }
     }
     if (/\/journals\/(90|91)$/.test(path)) {
       const id = Number(path.split('/').at(-1))
@@ -93,10 +93,10 @@ test('두 지급 분개를 같은 모달에서 비교하고 고른 건만 역분
         lines: [{ lineNo: 1, accountName: '지급비용', debitAmount: 80000 }, { lineNo: 2, accountName: '지급채무', creditAmount: 80000 }] }
     }
   })
-  const modal = page.getByRole('dialog', { name: '검증원장 · 중복 지급' })
-  const table = modal.getByRole('table', { name: '분개별 차변·대변 내역' })
+  const modal = page.getByRole('dialog', { name: '검증원장 중복 지급' })
+  const table = modal.getByRole('table', { name: '분개별 차변 및 대변 내역' })
   await expect(table.locator('tbody tr')).toHaveCount(4)
-  const reverse = modal.getByRole('button', { name: '역분개 · 재대사' })
+  const reverse = modal.getByRole('button', { name: '역분개 후 재대사' })
   await expect(reverse).toBeDisabled()
   await table.getByRole('button', { name: 'JV-2026-11-0091' }).click()
   await expect(table.getByRole('button', { name: 'JV-2026-11-0090' })).toHaveAttribute('aria-pressed', 'false')
@@ -111,10 +111,10 @@ test('두 지급 분개를 같은 모달에서 비교하고 고른 건만 역분
 
 test('한도 초과 안내가 전체 너비를 쓰고 실제 초과액을 표시한다', async ({ page }) => {
   await openPaymentCorrection(page, { type: 'CAP_VIOLATION',
-    description: '지급단계 GA_TO_FC · 기준일 2026-11-05 · 한도액 960,000원 · 산입액 1,012,000원 · 잔여 -52,000원 · 사용률 105.416667% · 초과액 52,000원' },
+    description: '지급단계 GA_TO_FC 기준일 2026-11-05 한도액 960,000원 산입액 1,012,000원 잔여 -52,000원 사용률 105.416667% 초과액 52,000원' },
   path => path.endsWith('/payment-correction') ? { payments: [], capBasis: { capCheck: { includedAmount: 1012000, limitAmount: 960000 } } } : undefined)
-  const modal = page.getByRole('dialog', { name: '수수료 지급 건 등록·수정' })
-  const heading = modal.getByText('한도 초과 · 최소 52,000원 줄여야 합니다.', { exact: true })
+  const modal = page.getByRole('dialog', { name: '수수료 지급 건 등록 및 수정' })
+  const heading = modal.getByText('한도 초과 최소 52,000원 줄여야 합니다.', { exact: true })
   await expect(heading).toBeVisible()
   expect(await readTextLines(heading)).toBe(1)
   await expect(modal.getByText(/지급단계 GA→설계사.*사용률 105\.4%/)).toBeVisible()
@@ -124,9 +124,9 @@ test('지급 누락 모달은 안내와 별도 재대사 버튼 없이 대사 �
   await openPaymentCorrection(page, { type: 'RECONCILIATION_MISMATCH', reconciliationResultType: 'ACTUAL_MISSING' },
     path => path.endsWith('/payment-correction') ? { payments: [], reconciliationResultType: 'ACTUAL_MISSING', canRegisterPayment: false,
       remainingIssues: [{ resultId: 42, expectedAmount: 22000, actualAmount: 0, differenceAmount: -22000, resultLabel: '실제 없음(누락)' }] } : undefined)
-  const modal = page.getByRole('dialog', { name: '수수료 지급 건 등록·수정' })
+  const modal = page.getByRole('dialog', { name: '수수료 지급 건 등록 및 수정' })
   const table = modal.getByRole('table', { name: '현재 대사 금액 비교' })
   await expect(table.locator('tbody tr')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
-  await expect(modal.getByText('누락 지급 등록 · 재대사')).toHaveCount(0)
+  await expect(modal.getByText('누락 지급 등록 재대사')).toHaveCount(0)
   await expect(modal.getByRole('button', { name: '재대사', exact: true })).toHaveCount(0)
 })

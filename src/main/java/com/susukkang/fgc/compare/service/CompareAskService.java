@@ -81,7 +81,7 @@ public class CompareAskService {
     static final String OUT_OF_SCOPE = "이 챗봇은 비교 결과와 수수료 기본 용어(1,200% 룰, 이월, 환수, 순수령액, 협회 등급)만 안내해 드려요. 다른 질문은 담당자에게 문의해 주세요.";
     static final String INTRO = "저는 상품 비교 결과(참고 순위)와 수수료 기본 용어(1,200% 룰, 이월, 환수, 순수령액, 협회 등급)를 설명해 드리는 피코 AI예요. 순위가 왜 그렇게 나왔는지, 두 상품의 차이가 무엇인지 물어보세요.";
     static final String FALLBACK = "지금은 질문에 맞는 답변을 만들지 못했어요. 아래 연관 질문 버튼이나 근거 보기를 이용해 주세요.";
-    static final String PERSONAL_INFO = "주민등록번호·연락처·이메일 같은 고객 개인정보는 입력하지 말아 주세요. 상품 비교 결과와 수수료 용어만 답해 드려요.";
+    static final String PERSONAL_INFO = "주민등록번호, 연락처 및 이메일 같은 고객 개인정보는 입력하지 말아 주세요. 상품 비교 결과와 수수료 용어만 답해 드려요.";
 
     static final int MAX_LENGTH = 600;
     /** 한 질문에서 모델이 부를 수 있는 도구 호출 수. 넘으면 도구를 끄고 답을 받는다. */

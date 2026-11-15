@@ -76,7 +76,7 @@ public class PolicyWriteService {
         return executeOnce(idempotencyKey, userId, "CREATE", draft, () -> {
             draftValidator.validate(draft);
             if (draft.expectedUpdatedAt() != null || hasChildIds(draft)) {
-                throw invalid("expectedUpdatedAt", "최초 생성에는 기존 버전·자식 식별자를 지정할 수 없습니다.");
+                throw invalid("expectedUpdatedAt", "최초 생성에는 기존 버전 및 자식 식별자를 지정할 수 없습니다.");
             }
             validateReferences(draft);
             writeRepository.lockPolicyCode(draft.policyCode());
@@ -123,10 +123,10 @@ public class PolicyWriteService {
             }
             PolicyVersion source = lockPolicy(id);
             if (!Set.of(PolicyStatus.APPROVED, PolicyStatus.ACTIVE, PolicyStatus.RETIRED).contains(source.getStatus())) {
-                throw stateConflict("승인·활성·종료 버전만 새 초안으로 복제할 수 있습니다.");
+                throw stateConflict("승인, 활성 및 종료 버전만 새 초안으로 복제할 수 있습니다.");
             }
             if (writeRepository.hasUnsupportedChildren(id)) {
-                throw invalid(FIELD_POLICY_TYPE, "이 유형의 전용 규칙 작성·복제는 아직 지원하지 않습니다.");
+                throw invalid(FIELD_POLICY_TYPE, "이 유형의 전용 규칙 작성 및 복제는 아직 지원하지 않습니다.");
             }
             writeRepository.lockPolicyCode(source.getPolicyCode());
             int version = writeRepository.nextVersion(source.getPolicyCode());
@@ -173,7 +173,7 @@ public class PolicyWriteService {
         if (previousVersions.size() > 1) throw stateConflict("같은 코드의 ACTIVE가 여러 개이므로 승계 기준을 확정할 수 없습니다.");
         OffsetDateTime activatedAt = OffsetDateTime.now(policyClock);
         if (!previousVersions.isEmpty() && !policy.getEffectiveFrom().isAfter(activatedAt.toLocalDate())) {
-            throw invalid("effectiveFrom", "새 정책은 한국시간 기준 내일 이후 계약부터 적용해야 합니다. 과거·당일 소급 교체는 허용하지 않습니다.");
+            throw invalid("effectiveFrom", "새 정책은 한국시간 기준 내일 이후 계약부터 적용해야 합니다. 과거 및 당일 소급 교체는 허용하지 않습니다.");
         }
         PolicyDraft replacement = writeRepository.readDraft(policy);
         for (PolicyVersion previous : previousVersions) {
@@ -420,7 +420,7 @@ public class PolicyWriteService {
     private PolicyWriteResult executeOnce(String key, Long userId, String operation, Object request,
                                          Supplier<PolicyWriteResult> work) {
         if (key == null || !key.matches("[A-Za-z0-9._:-]{1,100}")) {
-            throw invalid("Idempotency-Key", "멱등키는 1~100자의 영문·숫자·._:- 형식이어야 합니다.");
+            throw invalid("Idempotency-Key", "멱등키는 1~100자의 영문 및 숫자 ._:- 형식이어야 합니다.");
         }
         String hash = requestHash(request);
         if (!writeRepository.tryLockRequest(key)) {

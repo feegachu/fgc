@@ -143,7 +143,7 @@ export function AcquisitionCostResult({ check }: { check: AcquisitionCheck }) {
             두 한도는 같은 기준금액과 각각 비교하며 서로 차감하지 않습니다. 월 상한과 유지 자격은 이 검증에 들어 있지 않습니다.
           </p>
           <p className="field-helper">
-            이 결과는 회차 확정이나 지급 가능을 뜻하지 않습니다. 4년·7년 회차는 결과와 관계없이 확정할 수 없습니다.
+            이 결과는 회차 확정이나 지급 가능을 뜻하지 않습니다. 4년 및 7년 회차는 결과와 관계없이 확정할 수 없습니다.
           </p>
         </>
       )}

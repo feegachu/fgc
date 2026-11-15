@@ -27,7 +27,7 @@ export default defineConfig({
           try {
             const html = await server.transformIndexHtml(
               path,
-              `<!doctype html><html lang="ko"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>${preview.title} · FGC</title></head><body><div id="root"></div><script type="module" src="/src/previews/${preview.entry}.tsx"></script></body></html>`,
+              `<!doctype html><html lang="ko"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>${preview.title} FGC</title></head><body><div id="root"></div><script type="module" src="/src/previews/${preview.entry}.tsx"></script></body></html>`,
             )
             res.setHeader('Content-Type', 'text/html; charset=utf-8')
             res.end(html)

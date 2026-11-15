@@ -64,7 +64,7 @@ public class AgentHomeService {
     private static final Set<String> INSURER_TYPES = Set.of("ALL", "LIFE", "NON_LIFE");
     private static final Map<String, String> CATEGORY_LABEL = Map.of(
             "HEALTH_PROTECTION", "건강보장", "TERM_PROTECTION", "정기보장",
-            "LONG_TERM_NONLIFE", "장기손해", "SAVINGS", "연금·저축");
+            "LONG_TERM_NONLIFE", "장기손해", "SAVINGS", "연금 및 저축");
 
     private final AgentHomeRepository repository;
     private final AgentStatementRepository statementRepository;

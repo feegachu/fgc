@@ -36,7 +36,7 @@ test('화면 도움말에서 지급 입력 영역을 확인해도 저장 요청�
 })
 
 for (const width of [1440, 390]) {
-  test(`수정 후 지급 도움말은 저장 없이 입력·귀속·검증·확정을 설명한다 (${width})`, async ({ page }) => {
+  test(`수정 후 지급 도움말은 저장 없이 입력, 귀속, 검증 및 확정을 설명한다 (${width})`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 })
     const fixture = await installApi(page)
     await page.goto('transactions/new?amount=0&month=2026-07')
@@ -295,7 +295,7 @@ async function installApi(
   }
 }
 
-test('지급 목록 도움말은 신규 등록과 수정·삭제까지 세 단계로 안내한다', async ({ page }) => {
+test('지급 목록 도움말은 신규 등록과 수정 및 삭제까지 세 단계로 안내한다', async ({ page }) => {
   const fixture = await installApi(page, { initialDraft: {
     commissionTransactionId: 101, status: 'DRAFT', sourceBusinessKey: 'HELP-DRAFT',
     sourceType: 'GA_MANUAL_PAYMENT', paymentStage: 'GA_TO_FC', amount: 1000, settlementMonth: '2026-07-01',
@@ -303,7 +303,7 @@ test('지급 목록 도움말은 신규 등록과 수정·삭제까지 세 단�
   await page.goto('transactions?month=2026-07')
   await expect(page.getByRole('button', { name: 'HELP-DRAFT 삭제', exact: true })).toBeVisible()
   const titles = await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 3)
-  expect(titles).toEqual(['지급 상태와 금액', '신규 지급 등록', '지급 수정·삭제'])
+  expect(titles).toEqual(['지급 상태와 금액', '신규 지급 등록', '지급 수정 및 삭제'])
   expect(fixture.requests.filter(request => /POST|PUT|PATCH|DELETE/.test(request.method) && !request.path.includes('/auth/'))).toEqual([])
 })
 

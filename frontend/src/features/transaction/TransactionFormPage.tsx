@@ -1,3 +1,4 @@
+import { paymentEvidenceText } from '../../lib/screenText'
 import { ContractPaymentForm } from './ContractPaymentForm'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import { isWonAmount } from '../assistant/guards'
@@ -803,7 +804,7 @@ export function TransactionForm({
                   disabled={inputDisabled}
                   source={itemQuery.source}
                   selected={items.find((row) => String(row.commissionItemId) === form.commissionItemId)}
-                  placeholder="수수료 항목 이름/코드 검색"
+                  placeholder="수수료 항목 이름 검색"
                   onSelect={(commissionItemId, row) => {
                     itemQuery.remember(row)
                     changeForm({ commissionItemId })
@@ -849,7 +850,7 @@ export function TransactionForm({
                   data-guide-target="payment.evidence"
                   maxLength={200}
                   placeholder="문서번호, 링크"
-                  value={form.evidenceRef}
+                  value={paymentEvidenceText(form.evidenceRef)}
                   disabled={inputDisabled}
                   onChange={(event) => changeForm({ evidenceRef: event.target.value })}
                 />

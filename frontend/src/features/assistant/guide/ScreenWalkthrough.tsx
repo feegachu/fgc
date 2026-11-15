@@ -160,13 +160,13 @@ export function ScreenWalkthrough({ title, screenId, variant, steps, disabled, t
         style={{ maxHeight: 'min(560px, 65dvh)', overflowY: 'auto', ...position.card, visibility: playback.hidden ? 'hidden' : undefined }}>
         <header className="payment-guide-header">
           <img className="payment-guide-mascot" src={guideMascot} width="40" height="40" alt="" />
-          <span className="screen-step-count">화면 요소 안내{session.length > 0 && ` · ${index + 1}/${session.length}`}</span>
+          <span className="screen-step-count">화면 요소 안내{session.length > 0 && ` ${index + 1}/${session.length}`}</span>
           <Button variant="ghost" onClick={() => setFolded(!folded)}>{folded ? '펼치기' : '접기'}</Button>
           <Button variant="ghost" data-walkthrough-close onClick={close}>종료</Button>
         </header>
         {!folded && (step ? <>
           <GuideStepContent step={step} index={index} total={session.length}>
-            {!target && <p role="status">화면 구성이 바뀌어 이 요소가 숨겨졌습니다. 다음 설명을 보거나, 필요한 탭·상세를 연 뒤 도움말을 다시 열어 주세요.</p>}
+            {!target && <p role="status">화면 구성이 바뀌어 이 요소가 숨겨졌습니다. 다음 설명을 보거나, 필요한 탭 및 상세를 연 뒤 도움말을 다시 열어 주세요.</p>}
           </GuideStepContent>
           {playback.error && <p role="alert">{playback.error}</p>}
           {!step.concise && index === 0 && <p className="screen-step-context">현재 표시된 요소를 안내합니다. 다른 탭이나 상세에서도 도움말을 다시 열어 보세요.</p>}

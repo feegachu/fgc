@@ -159,14 +159,14 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false,
     <section
       data-guide-feature="clawback.documents"
       className="claw-evidence claw-documents"
-      aria-label="환수 PDF·발행 이력"
+      aria-label="환수 PDF 및 발행 이력"
     >
-      <h3 className="claw-evidence-title">환수 PDF·발행 이력</h3>
+      <h3 className="claw-evidence-title">환수 PDF 및 발행 이력</h3>
       <dl className="claw-detail-list">
         <div>
           <dt>발행 대상</dt>
           <dd>
-            {candidate?.contractNo ?? '자료 없음'} · {candidate?.agentName ?? '자료 없음'}
+            {candidate?.contractNo ?? '자료 없음'}  {candidate?.agentName ?? '자료 없음'}
           </dd>
         </div>
         <div>
@@ -177,9 +177,9 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false,
           </dd>
         </div>
         <div>
-          <dt>계산액 · 계산일</dt>
+          <dt>계산액 및 계산일</dt>
           <dd>
-            {calculation?.amount == null ? '자료 없음' : <Amount value={calculation.amount} />} ·{' '}
+            {calculation?.amount == null ? '자료 없음' : <Amount value={calculation.amount} />}  {' '}
             {dateTime(calculation?.calculatedAt)}
           </dd>
         </div>
@@ -204,7 +204,7 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false,
         >
           다시 조회
         </Button>
-        {roleCode === 'COMPLIANCE' && <p className="field-helper">발행 이력 조회·다운로드 권한입니다.</p>}
+        {roleCode === 'COMPLIANCE' && <p className="field-helper">발행 이력 조회 및 다운로드 권한입니다.</p>}
       </div>
       {issue.isError && (
         <div className="claw-document-message" role="alert">
@@ -214,7 +214,7 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false,
               : conflict
                 ? '현재 계산 결과와 근거가 발행 요청과 다릅니다. 다시 조회해 주세요.'
                 : isStatus(issue.error, 422)
-                  ? '발행에 필요한 계산·정책 근거를 확인해 주세요.'
+                  ? '발행에 필요한 계산 및 정책 근거를 확인해 주세요.'
                   : 'PDF 발행에 실패했습니다. 응답 유실 시 같은 요청으로 재시도합니다.'}
           </p>
           <QueryState error={issue.error} />
@@ -225,7 +225,7 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false,
       )}
       {issue.data && (
         <p role="status" className="claw-evidence-empty">
-          PDF 발행 완료: {issue.data.documentNo} · 발행본 v{issue.data.version} · 계산 결과 v
+          PDF 발행 완료: {issue.data.documentNo}  발행본 v{issue.data.version}  계산 결과 v
           {issue.data.calculationVersion}
         </p>
       )}
@@ -241,7 +241,7 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false,
         </div>
       ) : denied ? (
         <p role="alert" className="claw-evidence-empty">
-          문서를 조회·다운로드할 권한이 없습니다.
+          문서를 조회 및 다운로드할 권한이 없습니다.
         </p>
       ) : history.data?.content?.length ? (
         <DataTable

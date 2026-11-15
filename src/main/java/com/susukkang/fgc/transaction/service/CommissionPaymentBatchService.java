@@ -31,7 +31,7 @@ public class CommissionPaymentBatchService {
                     || payment.attributions().size() != 1
                     || !Objects.equals(first.contractId(), payment.attributions().get(0).contractId())) {
                 throw new FgcBusinessException(FgcErrorCode.COMMON_002, "payments", Map.of("field", "payments"),
-                        "같은 계약·지급단계·정산월의 지급 건만 함께 등록할 수 있습니다.");
+                        "같은 계약, 지급단계 및 정산월의 지급 건만 함께 등록할 수 있습니다.");
             }
         }
         var result = new ArrayList<CommissionPaymentResponse>();

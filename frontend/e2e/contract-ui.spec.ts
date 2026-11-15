@@ -24,7 +24,7 @@ const contract = {
   updatedAt: '2026-07-01T00:00:00.123456Z',
 }
 
-test('계약 안내는 날짜·보험사·상품 선택을 이어주고 입력과 버튼을 가리지 않는다', async ({ page }) => {
+test('계약 안내는 날짜, 보험사 및 상품 선택을 이어주고 입력과 버튼을 가리지 않는다', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await fixture(page)
   await page.goto('contracts/new?month=2026-07')
@@ -106,7 +106,7 @@ test('모바일 보험계약 목록 도움말도 단계마다 두 줄로 표시�
   await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 3)
 })
 
-test('수정 후 계약 목록은 상단을 유지하고 입력·탭별 상세 도움말도 끝까지 읽는다', async ({ page }) => {
+test('수정 후 계약 목록은 상단을 유지하고 입력 및 탭별 상세 도움말도 끝까지 읽는다', async ({ page }) => {
   test.setTimeout(60_000) // Three screens, including the intentionally slower spotlight transitions.
   await page.setViewportSize({ width: 1440, height: 1000 })
   await fixture(page, true, 1, 20)
@@ -192,7 +192,7 @@ test('도움말은 목록이 길어도 첫 프레임에 열리고 바로 닫거�
   await expect(page.getByRole('dialog')).toHaveCount(0)
   const previewStart = Date.now()
   await page.getByRole('button', { name: '도움말', exact: true }).click()
-  await expect(page.locator('.screen-step-count')).toHaveText('화면 요소 안내 · 1/3')
+  await expect(page.locator('.screen-step-count')).toHaveText('화면 요소 안내 1/3')
   console.log('Help preview ready after reopen', Date.now() - previewStart, 'ms')
   await expect(page.getByRole('region', { name: '보험계약 목록 도움말' })).toHaveCount(1)
 })
@@ -333,7 +333,7 @@ async function fixture(page: Page, canProcess = true, totalPages = 1, rowCount =
   })
 }
 
-test('계약 직접 진입·새로고침·두 스케줄·409 입력 보존·수정 취소를 검증한다', async ({ page }, testInfo) => {
+test('계약 직접 진입, 새로고침 및 두 스케줄 및 409 입력 보존 및 수정 취소를 검증한다', async ({ page }, testInfo) => {
   await fixture(page)
   await page.goto('contracts/1?tab=schedules')
   await expect(page.getByRole('tab', { name: '예상 스케줄' })).toHaveAttribute('aria-selected', 'true')
@@ -365,7 +365,7 @@ test('계약 직접 진입·새로고침·두 스케줄·409 입력 보존·수�
   await expect(page.getByRole('link', { name: '보험계약 수정', exact: true })).toHaveCount(0)
 })
 
-test('CONT-W03 상태 변경은 허용 전이·사유 입력·확인창을 거쳐 사건과 멱등키를 함께 보낸다', async ({
+test('CONT-W03 상태 변경은 허용 전이 및 사유 입력 및 확인창을 거쳐 사건과 멱등키를 함께 보낸다', async ({
   page,
 }, testInfo) => {
   await fixture(page)
@@ -434,7 +434,7 @@ test('없는 계약의 기존 오류와 COMPLIANCE의 폼 직접 진입 권한�
   await expect(page.getByRole('button', { name: /저장하고 예상 스케줄/ })).toHaveCount(0)
 })
 
-test('상세 값 정렬·한도 안내문 제거·지급 표 전체 열의 가시성을 유지한다', async ({ page }, testInfo) => {
+test('상세 값 정렬 및 한도 안내문 제거 및 지급 표 전체 열의 가시성을 유지한다', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 900, height: 1000 })
   await fixture(page)
   await page.goto('contracts/1')

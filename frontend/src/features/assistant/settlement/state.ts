@@ -148,7 +148,7 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     Number.isFinite(validationStartedAt) &&
     paymentChangedAt > validationStartedAt
   )
-    throw new Error('지급 변경 이전에 시작한 검증은 재사용할 수 없습니다. 새 월 검증을 생성·실행한 뒤 선택하세요.')
+    throw new Error('지급 변경 이전에 시작한 검증은 재사용할 수 없습니다. 새 월 검증을 생성 및 실행한 뒤 선택하세요.')
   if (!['COMPLETED', 'FINALIZED'].includes(run.status ?? ''))
     return at(
       'validation.execute',

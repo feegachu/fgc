@@ -39,7 +39,7 @@ function workflowInstructions(stage: SettlementStep, path: string, correctionPen
         review('contract.schedules', '계약의 스케줄을 선택하세요', '지급단계와 사용 중인 버전을 확인하고 회차 상세를 여세요. 결과가 없으면 원천과 생성 상태를 확인하세요.'),
       ]
       return [
-        step('schedule.header', '[aria-labelledby="schedule-header-title"]', '계약과 지급단계를 확인하세요', '현재 계약과 지급단계가 맞는지 확인하세요. 4년·7년 예정은 지급 확정 흐름과 연결하지 않습니다.'),
+        step('schedule.header', '[aria-labelledby="schedule-header-title"]', '계약과 지급단계를 확인하세요', '현재 계약과 지급단계가 맞는지 확인하세요. 4년 및 7년 예정은 지급 확정 흐름과 연결하지 않습니다.'),
         review('schedule.lines', '회차와 귀속일을 확인하세요', '회차별 지급 시점과 귀속일을 확인하세요. 일부 행만 보고 전체 회차를 확인한 것으로 판단하지 마세요.'),
         review('schedule.lines', '항목과 금액을 확인하세요', '회차별 수수료 항목과 예상 금액을 근거와 비교하세요. 예상 금액은 실제 지급 확정이 아닙니다.'),
         step('schedule.current', '[aria-labelledby="schedule-header-title"]', '사용 중인 스케줄을 확인하세요', '현재 버전과 사용 여부를 확인하세요. 확인 뒤 수수료 지급으로 이어갑니다.'),
@@ -48,15 +48,15 @@ function workflowInstructions(stage: SettlementStep, path: string, correctionPen
     case 'payment.precheck':
       if (path !== '/transactions/new') return [review('payment.results', '지급 상태를 확인하세요', '선택한 지급의 상태를 확인하고 아래 버튼으로 최신 결과를 조회하세요.')]
       return [
-      review('payment.scope', '저장한 지급 대상을 확인하세요', '정산월·지급단계·수령인이 맞는지 확인하세요. 입력을 수정했다면 다시 저장해야 합니다.'),
-      review('payment.attributions', '귀속과 합계를 확인하세요', '계약·귀속일·산입 여부와 합계를 확인하세요. 누락 증빙과 검토필요 항목을 처리하세요.'),
+      review('payment.scope', '저장한 지급 대상을 확인하세요', '정산월, 지급단계 및 수령인이 맞는지 확인하세요. 입력을 수정했다면 다시 저장해야 합니다.'),
+      review('payment.attributions', '귀속과 합계를 확인하세요', '계약, 귀속일 및 산입 여부와 합계를 확인하세요. 누락 증빙과 검토필요 항목을 처리하세요.'),
       review('payment.precheck', '사전검증을 실행하세요', '화면의 사전검증 버튼을 누르세요. 이 동작은 지급 확정이 아닙니다.'),
       review('payment.precheck.result', '사전검증 결과를 읽으세요', '한도와 차단 사유를 확인하세요. 통과 여부는 최신 결과로 다시 확인하며 차단 사유가 있으면 다음 업무로 넘어가지 않습니다.'),
     ]
     case 'payment.confirm':
       if (path !== '/transactions/new') return [review('payment.results', '확정된 지급을 확인하세요', '목록에서 지급 상태를 확인하세요. 아래 버튼으로 확정 결과를 조회한 뒤 월 검증으로 이동합니다.')]
       return [
-      review('payment.precheck.result', '최신 사전검증 결과를 확인하세요', '저장본과 일치하는 최신 결과인지 확인하세요. 값이 바뀌면 재저장·재검증이 필요합니다.'),
+      review('payment.precheck.result', '최신 사전검증 결과를 확인하세요', '저장본과 일치하는 최신 결과인지 확인하세요. 값이 바뀌면 재저장 및 재검증이 필요합니다.'),
       review('payment.attributions', '확정할 귀속을 확인하세요', '수령인과 계약별 금액을 다시 확인하세요. 확정 이후의 정정은 별도 절차가 필요합니다.'),
       review('payment.confirm', '직접 지급을 확정하세요', '확정 버튼을 누르고 확인창의 대상과 경고를 읽으세요. 확정한 뒤 아래 버튼으로 결과를 확인합니다.'),
     ]
@@ -67,18 +67,18 @@ function workflowInstructions(stage: SettlementStep, path: string, correctionPen
         review('validation.createSubmit', '새 실행을 생성하거나 기존 실행을 선택하세요', '실행 생성을 누르세요. 같은 월의 진행 중 실행이 있으면 목록에서 해당 실행을 여세요. 생성은 계산 완료가 아닙니다.'),
       ]
       return [
-        step('validation.header', '[aria-labelledby="vrun-header-title"]', '검증 실행을 확인하세요', '검증월과 실행 유형·회차를 확인하세요. 정정 이전에 시작한 실행을 재사용하면 안 됩니다.'),
+        step('validation.header', '[aria-labelledby="vrun-header-title"]', '검증 실행을 확인하세요', '검증월과 실행 유형 및 회차를 확인하세요. 정정 이전에 시작한 실행을 재사용하면 안 됩니다.'),
         review('validation.progress', '실행 상태를 확인하세요', '생성됨이면 실행 버튼을 누르세요. 실패한 실행은 신규 실행 절차를 따릅니다. 요청 수락은 계산 완료가 아닙니다.'),
         step('validation.targets', '[aria-labelledby="vrun-target-title"]', '검증 대상 계약을 확인하세요', '현재 계약이 선택된 대상인지 확인하세요. 대상에서 빠진 실행은 다음 업무에 연결하지 않습니다.'),
         review('validation.progress', '계산 완료를 기다리세요', '10단계 진행과 오류를 확인하세요. 계산 완료 후 아래 버튼으로 최신 결과를 조회합니다.'),
       ]
     case 'reconciliation.review': return [
-      step('reconciliation.month', `${target('reconciliation.filters')} input[type="month"]`, '대사 정산월을 확인하세요', '지급·월 검증과 같은 정산월인지 확인하세요.', true),
+      step('reconciliation.month', `${target('reconciliation.filters')} input[type="month"]`, '대사 정산월을 확인하세요', '지급 및 월 검증과 같은 정산월인지 확인하세요.', true),
       step('reconciliation.stage', '[data-guide-feature="features.reconciliation.reconciliation-page.select"]', '대사 지급단계를 확인하세요', '현재 업무의 지급단계와 동일하게 선택하세요.', true),
       step('reconciliation.insurer', '[data-guide-feature="features.reconciliation.reconciliation-page.select-2"]', '보험회사를 확인하세요', '계약의 보험회사를 선택하세요. 전체는 실행 이력 조회용입니다.'),
       review('reconciliation.execute', '대사를 실행하거나 기존 결과를 선택하세요', '필요한 경우 실제 대사 실행을 누르세요. 원래 건을 정정했다면 새 검증과 연결된 새 대사 결과를 사용하세요.'),
-      review('reconciliation.history', '실행 이력을 선택하세요', '검증 실행·기준월·지급단계가 맞는 실행의 결과를 선택하세요. 완료 전에는 기다리고 실패하면 원인을 확인하세요.'),
-      review('reconciliation.results', '일치·불일치를 확인하세요', '결과 건수와 불일치 유형을 확인하세요. 결과 확인 후 검증원장과 예외함 참조 안내로 이어갑니다.'),
+      review('reconciliation.history', '실행 이력을 선택하세요', '검증 실행, 기준월 및 지급단계가 맞는 실행의 결과를 선택하세요. 완료 전에는 기다리고 실패하면 원인을 확인하세요.'),
+      review('reconciliation.results', '일치 및 불일치를 확인하세요', '결과 건수와 불일치 유형을 확인하세요. 결과 확인 후 검증원장과 예외함 참조 안내로 이어갑니다.'),
     ]
     case 'ledger.review': return sharedSteps('LEDG-W01')
     case 'exception.resolve': return [step('exception.source', 'h1', '예외함에서 참조를 확인하세요', correctionPending

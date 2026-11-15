@@ -1,7 +1,7 @@
 import { test, expect, login, api, responseFor, successful, sql } from './fixtures'
 
 test.use({ video: 'off' })
-test('원천 지급 정정 → 재검증·재대사 → 역할 인계 후 최종 확정', async ({ page }, info) => {
+test('원천 지급 정정 → 재검증 및 재대사 → 역할 인계 후 최종 확정', async ({ page }, info) => {
   const errors: string[] = []
   const writes: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
@@ -104,7 +104,7 @@ test('원천 지급 정정 → 재검증·재대사 → 역할 인계 후 최종
   await page.getByRole('button', { name: '역분개 + 재기표', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '역분개 + 재기표', exact: true })
   await expect(dialog).toBeVisible()
-  const originalRows = dialog.getByRole('table', { name: '원분개 · 역분개 · 신규 재기표' }).locator('tbody').first()
+  const originalRows = dialog.getByRole('table', { name: '원분개, 역분개 및 신규 재기표' }).locator('tbody').first()
   await expect(originalRows.getByText(journal.journalNo, { exact: true })).toBeVisible()
   await dialog.getByRole('spinbutton', { name: '1행 차변', exact: true }).fill(String(amount))
   await dialog.getByRole('spinbutton', { name: '2행 대변', exact: true }).fill(String(amount))

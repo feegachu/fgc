@@ -182,9 +182,9 @@ export function ValidationRestartPanel({
       {status === 'FAILED' && (
         <p>
           이어서 처리할 지점: {state.data ? (state.data.checkpointAvailable ? '있음' : '없음') : state.isError ? '확인 불가' : '확인 중'}
-          {state.data?.completedCount != null && ` · 완료 대상: ${state.data.completedCount}`}
-          {state.data?.remainingCount != null && ` · 남은 대상: ${state.data.remainingCount}`}
-          {' · 실패 시각: '}
+          {state.data?.completedCount != null && ` 완료 대상: ${state.data.completedCount}`}
+          {state.data?.remainingCount != null && ` 남은 대상: ${state.data.remainingCount}`}
+          {' 실패 시각: '}
           {state.data?.failedAt
             ? new Date(state.data.failedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
             : '자료 없음'}

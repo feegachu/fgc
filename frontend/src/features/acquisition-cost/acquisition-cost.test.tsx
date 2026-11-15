@@ -267,7 +267,7 @@ describe('ACQC-W01 결과 표시', () => {
     expect(within(basis).getByText(/규정이 정한 고정값이 아니라/)).toBeInTheDocument()
     expect(within(basis).getByRole('table', { name: '제4-32조제7항 제외 후보' })).toHaveTextContent('EVD-1')
     expect(within(basis).getByRole('table', { name: '예정 회차 산입 내역' })).toHaveTextContent('기본 모집수수료')
-    expect(document.body.textContent).toContain('4년·7년 회차는 결과와 관계없이 확정할 수 없습니다')
+    expect(document.body.textContent).toContain('4년 및 7년 회차는 결과와 관계없이 확정할 수 없습니다')
   })
 
   it('자료 없음은 0원으로 보이지 않고 검토 필요와 적용 대상 아님을 구분한다', async () => {

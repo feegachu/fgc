@@ -264,7 +264,7 @@ describe('EXCP-W01 예외함', () => {
     expect(zero.querySelector('.kpi-value')).toHaveAttribute('data-zero', 'true')
   })
 
-  it('주의·차익거래는 대시보드 판정 건수를 표시하고 해당 월 전체 목록으로 연결한다', async () => {
+  it('주의 및 차익거래는 대시보드 판정 건수를 표시하고 해당 월 전체 목록으로 연결한다', async () => {
     monitoringResponse = { capWarning: 1, arbitrageCandidate: 1 }
     renderPage()
     const warning = await screen.findByRole('link', { name: '1,200% 주의 1건' })
@@ -317,7 +317,7 @@ describe('EXCP-W01 예외함', () => {
     expect(searchPaths().every((path) => !path.includes('sort='))).toBe(true)
   })
 
-  it('상세 원인·참조 컬럼은 헤더와 내용을 가운데 정렬한다', async () => {
+  it('상세 원인 및 참조 컬럼은 헤더와 내용을 가운데 정렬한다', async () => {
     renderPage()
     const list = await table()
     const headers = within(list).getAllByRole('columnheader')
@@ -392,7 +392,7 @@ describe('EXCP-W01 예외함', () => {
     await screen.findByText('4 / 4 페이지')
   })
 
-  it('요약 카드의 한글 설명을 눌러도 원본 유형과 미처리·월 조건으로 조회한다', async () => {
+  it('요약 카드의 한글 설명을 눌러도 원본 유형과 미처리 및 월 조건으로 조회한다', async () => {
     const { router, actions } = renderPage()
     const card = await screen.findByRole('link', { name: '1,200% 위반 1,234건' })
     expect(within(card).getByText('확정 위반 판정')).toBeInTheDocument()
@@ -437,7 +437,56 @@ describe('EXCP-W01 예외함', () => {
     expect(within(card).queryByText('FUTURE_TYPE')).not.toBeInTheDocument()
   })
 
-  it('행을 선택하면 상세·검출 증거의 사용률을 한 자리로 표시하고 처리 이력을 보여 준다', async () => {
+  it.each([
+    ['환수 계산 v1 원지급 3549 차감 CLAWBACK-RECOVERY:3549:112', '환수 계산 결과 (1차)'],
+    ['환수 계산 v1 · 원지급 3549 · 차감 EXCP-RECOVERY:373:3549:112', '환수 계산 결과 (1차)'],
+    ['환수 통지서 DOC-2026-01 차감 CLAWBACK-RECOVERY:3549:112', '환수 통지서 DOC-2026-01'],
+  ])('환수 처리 이력은 차감 금액과 증빙을 업무 문구로 표시한다 (%s)', async (evidenceRef, evidenceText) => {
+    searchResponse = () => search([{ ...baseCase, actions: [{ actionSeq: 1, actionTypeLabel: '재대사',
+      fromStatusLabel: '검토중', toStatusLabel: '해결',
+      reason: `원지급 3549번의 환수 차감 650000원 확정 확인 ${evidenceRef}`, evidenceRef }] }])
+    const { actions } = renderPage()
+    await actions.click(within(await table()).getByRole('button', { name: '11' }))
+    expect(await screen.findByText('환수액 650,000원을 수수료에서 차감하고 확정했습니다.')).toBeInTheDocument()
+    expect(screen.getByText('1. 환수 차감 확정')).toBeInTheDocument()
+    expect(screen.getByText(`증빙: ${evidenceText}`)).toBeInTheDocument()
+    expect(screen.queryByText(/CLAWBACK-RECOVERY|EXCP-RECOVERY|원지급 3549/)).not.toBeInTheDocument()
+  })
+
+  it('실제 저장된 대시 구분 제목도 상세 원인과 차액으로 표시한다', async () => {
+    searchResponse = () => search([{ ...baseCase, type: 'RECONCILIATION_MISMATCH',
+      title: '대사 불일치 — 차액 650,000원', reasonLabel: '비유효 계약 지급' }])
+    renderPage()
+    expect(within(await table()).getByText('비유효 계약 지급, 차액 650,000원')).toBeInTheDocument()
+  })
+
+  it.each(['비유효 계약 지급', '실제 지급 누락', '금액 차이'])(
+    '대사 예외 내용에는 상세 원인 %s와 차액을 표시한다', async (reasonLabel) => {
+      searchResponse = () => search([{ ...baseCase, type: 'RECONCILIATION_MISMATCH',
+        title: '대사 불일치, 차액 650,000원', reasonLabel }])
+      renderPage()
+      const list = within(await table())
+      expect(list.getByText(`${reasonLabel}, 차액 650,000원`)).toBeInTheDocument()
+      expect(list.queryByText('대사 불일치, 차액 650,000원')).not.toBeInTheDocument()
+    },
+  )
+
+  it.each(['JCG-3595-7aada2ace7524fd2b3d849f5b619302d', 'EXCP-11', 'EXCP-SCHEDULE-11', 'EXCP-RECOVERY-11'])(
+    '처리 이력의 내부 키 %s는 숨기고 입력 사유와 실제 증빙은 보존한다', async (key) => {
+      searchResponse = () => search([{ ...baseCase, actions: [
+        { actionSeq: 1, actionTypeLabel: '정정', reason: `원장 정정 후 재대사 일치 확인 (${key}, 대사 167) 지급 금액 정정`, evidenceRef: key },
+        { actionSeq: 2, actionTypeLabel: '의견', reason: '수기 확인 (대사 167)', evidenceRef: '정산 확인서 2026-11' },
+      ] }])
+      const { actions } = renderPage()
+      await actions.click(within(await table()).getByRole('button', { name: '11' }))
+      expect(await screen.findByText('원장 정정 후 재대사 일치 확인 지급 금액 정정')).toBeInTheDocument()
+      expect(screen.queryByText(new RegExp(key))).not.toBeInTheDocument()
+      expect(screen.getByText('수기 확인 (대사 167)')).toBeInTheDocument()
+      expect(screen.getByText('증빙: 정산 확인서 2026-11')).toBeInTheDocument()
+    },
+  )
+
+  it('행을 선택하면 상세 및 검출 증거의 사용률을 한 자리로 표시하고 처리 이력을 보여 준다', async () => {
     searchResponse = () =>
       search([
         {
@@ -603,11 +652,11 @@ describe('EXCP-W01 예외함', () => {
     }) as typeof apiClient.request)
     const { actions } = renderPage('/app/exceptions?selected=11')
     await actions.click(await screen.findByRole('button', { name: '예외 건 처리' }))
-    const checklist = within(await screen.findByRole('dialog', { name: '비유효 계약 지급 · 환수 점검' }))
-    expect(await checklist.findByText('환수액 계산 완료 · PDF는 필요할 때 출력하세요.')).toBeInTheDocument()
+    const checklist = within(await screen.findByRole('dialog', { name: '비유효 계약 지급 환수 점검' }))
+    expect(await checklist.findByText('환수액 계산 완료. PDF는 필요할 때 출력하세요.')).toBeInTheDocument()
     expect(checklist.getByText('이 지급 건의 환수액 12,000원')).toBeInTheDocument()
-    await actions.click(checklist.getByRole('button', { name: '환수액 계산 · PDF 열기' }))
-    const calculation = within(await screen.findByRole('dialog', { name: '환수액 계산 · PDF 출력' }))
+    await actions.click(checklist.getByRole('button', { name: '환수액 계산 및 PDF 열기' }))
+    const calculation = within(await screen.findByRole('dialog', { name: '환수액 계산 및 PDF 출력' }))
     expect(calculation.getByRole('form', { name: '환수액 계산' })).toBeInTheDocument()
     const pdf = calculation.getByRole('button', { name: 'PDF 출력하기' })
     expect(pdf).toBeEnabled()
@@ -616,13 +665,13 @@ describe('EXCP-W01 예외함', () => {
     const register = checklist.getByRole('button', { name: '수수료 지급 차감 등록' })
     await waitFor(() => expect(register).toBeEnabled())
     await actions.click(register)
-    const deduction = within(await screen.findByRole('dialog', { name: '수수료 지급 · 환수 차감 등록' }))
+    const deduction = within(await screen.findByRole('dialog', { name: '수수료 지급 및 환수 차감 등록' }))
     expect(await deduction.findByLabelText(/금액 \(원\)/)).toHaveValue(12000)
     expect(deduction.getByLabelText(/지급\/차감/)).toHaveValue('DEDUCTION')
     expect(deduction.getByLabelText('1번 귀속 내역 귀속금액')).toHaveValue(12000)
   })
 
-  it('금액 차이 예외는 해당 지급 원장을 모달로 열고 기존 역분개·재기표 절차로 연결한다', async () => {
+  it('금액 차이 예외는 해당 지급 원장을 모달로 열고 기존 역분개 및 재기표 절차로 연결한다', async () => {
     const mismatch: ExceptionCase = { ...baseCase, type: 'RECONCILIATION_MISMATCH', reconciliationResultType: 'AMOUNT_DIFFERENCE', title: '금액 차이 20,000원 — 예상 845,000 / 실제 825,000',
       status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }
     searchResponse = () => search([mismatch])
@@ -649,14 +698,14 @@ describe('EXCP-W01 예외함', () => {
     }
     const { actions } = renderPage('/app/exceptions?selected=11')
     await actions.click(await screen.findByRole('button', { name: '예외 건 처리' }))
-    const ledger = await screen.findByRole('dialog', { name: '검증원장 · 지급 기록 정정' })
-    expect(await within(ledger).findByRole('table', { name: '분개별 차변·대변 내역' })).toHaveTextContent('825,000')
+    const ledger = await screen.findByRole('dialog', { name: '검증원장 지급 기록 정정' })
+    expect(await within(ledger).findByRole('table', { name: '분개별 차변 및 대변 내역' })).toHaveTextContent('825,000')
     expect(within(ledger).queryByRole('button', { name: '사전검증' })).not.toBeInTheDocument()
     await actions.click(within(ledger).getByRole('button', { name: '역분개 + 재기표' }))
     const correction = within(await screen.findByRole('dialog', { name: /^역분개 \+ 재기표$/ }))
     expect(correction.getByText(mismatch.title!)).toBeInTheDocument()
     expect(await correction.findByText('JV-2026-07-0097')).toBeInTheDocument()
-    expect(correction.getByRole('table', { name: '원분개 · 역분개 · 신규 재기표' }).querySelectorAll('tbody tr')).toHaveLength(6)
+    expect(correction.getByRole('table', { name: '원분개, 역분개 및 신규 재기표' }).querySelectorAll('tbody tr')).toHaveLength(6)
     const debit = correction.getByLabelText('1행 차변')
     await actions.clear(debit); await actions.type(debit, '845000')
     const credit = correction.getByLabelText('2행 대변')
@@ -669,7 +718,7 @@ describe('EXCP-W01 예외함', () => {
 
   it.each([
     { resolved: true, mode: '' }, { resolved: false, mode: '' },
-  ])('지급 수정은 하단 검증·저장을 반영한다 ($resolved)', async ({ resolved, mode }) => {
+  ])('지급 수정은 하단 검증 및 저장을 반영한다 ($resolved)', async ({ resolved, mode }) => {
     searchResponse = () => search([{ ...baseCase, ...(mode ? { type: 'RECONCILIATION_MISMATCH' as const, reconciliationResultType: 'AMOUNT_DIFFERENCE' } : {}), status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }])
     let saved = false
     const payment = { commissionTransactionId: 77, sourceType: 'GA_MANUAL_PAYMENT', status: 'CONFIRMED',
@@ -703,7 +752,7 @@ describe('EXCP-W01 예외함', () => {
     }
     const { actions } = renderPage('/app/exceptions?selected=11')
     await actions.click(await screen.findByRole('button', { name: '예외 건 처리' }))
-    const dialog = await screen.findByRole('dialog', { name: '수수료 지급 건 등록·수정' })
+    const dialog = await screen.findByRole('dialog', { name: '수수료 지급 건 등록 및 수정' })
     const form = within(dialog)
     if (mode) {
       const choice = await form.findByLabelText(/처리 구분/)
@@ -712,7 +761,7 @@ describe('EXCP-W01 예외함', () => {
       await actions.selectOptions(choice, mode)
       if (mode === 'SETTLEMENT_COMPLETED') {
         expect(form.getByRole('button', { name: /^사전검증$/ })).toBeDisabled()
-        await actions.type(form.getByLabelText(/추가 송금·반환 증빙/), 'BANK-20000')
+        await actions.type(form.getByLabelText(/추가 송금 및 반환 증빙/), 'BANK-20000')
       }
     }
     const amount = await form.findByLabelText(/금액 \(원\)/)
@@ -730,7 +779,7 @@ describe('EXCP-W01 예외함', () => {
     await actions.click(preview)
     await waitFor(() => expect(save).toBeEnabled())
     await actions.click(save)
-    if (resolved) await waitFor(() => expect(screen.queryByRole('dialog', { name: '수수료 지급 건 등록·수정' })).not.toBeInTheDocument())
+    if (resolved) await waitFor(() => expect(screen.queryByRole('dialog', { name: '수수료 지급 건 등록 및 수정' })).not.toBeInTheDocument())
     else {
       const remaining = await form.findByRole('region', { name: '현재 대사 차이' })
       const comparison = within(remaining).getByRole('table', { name: '현재 대사 금액 비교' })
@@ -744,10 +793,10 @@ describe('EXCP-W01 예외함', () => {
   })
 
   it.each([
-    { type: 'CAP_VIOLATION' as const, reason: 'CAP_LIMIT_VIOLATION', target: 'SCHEDULE', scheduled: true, title: '보험사 지급기준·한도 검토' },
-    { type: 'RECONCILIATION_MISMATCH' as const, reason: 'EXPECTED_MISSING', target: 'SCHEDULE', scheduled: false, title: '계약 상세 · C-0001' },
-    { type: 'RECONCILIATION_MISMATCH' as const, reason: 'INVALID_CONTRACT_PAYMENT', target: 'CONTRACT', scheduled: false, title: '계약 상태·예상 스케줄 확인' },
-  ])('$reason 원인은 지급 편집 대신 스케줄·계약 확인과 재검증을 제공한다', async ({ type, reason, target, scheduled, title }) => {
+    { type: 'CAP_VIOLATION' as const, reason: 'CAP_LIMIT_VIOLATION', target: 'SCHEDULE', scheduled: true, title: '보험사 지급기준 및 한도 검토' },
+    { type: 'RECONCILIATION_MISMATCH' as const, reason: 'EXPECTED_MISSING', target: 'SCHEDULE', scheduled: false, title: '계약 상세 C-0001' },
+    { type: 'RECONCILIATION_MISMATCH' as const, reason: 'INVALID_CONTRACT_PAYMENT', target: 'CONTRACT', scheduled: false, title: '계약 상태 및 예상 스케줄 확인' },
+  ])('$reason 원인은 지급 편집 대신 스케줄 및 계약 확인과 재검증을 제공한다', async ({ type, reason, target, scheduled, title }) => {
     currentUser = scheduled || target === 'CONTRACT' ? { ...user, roleCode: 'GA_ADMIN', canProcess: false } : user
     searchResponse = () => search([{ ...baseCase, type, reasonCode: reason, reconciliationResultType: reason,
       status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }])
@@ -809,37 +858,37 @@ describe('EXCP-W01 예외함', () => {
     searchResponse = () => search([{ ...baseCase, type: 'RECONCILIATION_MISMATCH', reconciliationResultType: 'INVALID_CONTRACT_PAYMENT', status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }])
     const original = vi.mocked(apiClient.request).getMockImplementation()!
     vi.mocked(apiClient.request).mockImplementation((async (path: string, init: Parameters<typeof apiClient.request>[1] = {}) =>
-      path.endsWith('/review') ? envelope({ rejectionRequiresEvidence: true, links: [{ label: '환수액 계산·PDF', href: '/clawbacks?contractNo=C-0001' }] }) : original(path, init)) as typeof apiClient.request)
+      path.endsWith('/review') ? envelope({ rejectionRequiresEvidence: true, links: [{ label: '환수액 계산 및 PDF', href: '/clawbacks?contractNo=C-0001' }] }) : original(path, init)) as typeof apiClient.request)
     postResponse = (_path, body) => {
       const request = body as { actionType: string; reason: string; evidenceRef: string | null }
       return { actionSeq: request.actionType === 'COMMENT' ? 1 : 2, fromStatus: 'IN_REVIEW', toStatus: request.actionType === 'COMMENT' ? 'IN_REVIEW' : 'REJECTED',
         actionType: request.actionType, actionTypeLabel: request.actionType === 'COMMENT' ? '의견' : '반려', reason: request.reason, evidenceRef: request.evidenceRef }
     }
     const { actions } = renderPage('/app/exceptions?selected=11')
-    const memo = await screen.findByLabelText(/검토 메모 · 종결 근거/)
+    const memo = await screen.findByLabelText(/검토 메모 및 종결 근거/)
     await actions.type(memo, '청약철회 계약 지급분 환수 확인 중')
-    await actions.click(screen.getByRole('button', { name: '의견 저장 · 검토중 유지' }))
+    await actions.click(screen.getByRole('button', { name: '의견 저장 후 검토중 유지' }))
     expect(await screen.findByText('1. 의견')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '예외 건 처리' })).toBeEnabled()
     await actions.type(memo, '청약철회 계약 지급분 환수 완료')
-    const reject = screen.getByRole('button', { name: '근거 확인 · 반려 종결' })
+    const reject = screen.getByRole('button', { name: '근거 확인 후 반려 종결' })
     expect(reject).toBeDisabled()
-    await actions.type(screen.getByLabelText(/근거 문서·관리번호/), '통지서 CLW-1 · 차감 DED-1')
+    await actions.type(screen.getByLabelText(/근거 문서 및 관리번호/), '통지서 CLW-1 차감 DED-1')
     await actions.click(reject)
     expect(await screen.findByText('2. 반려')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '예외 건 처리' })).toBeDisabled()
   })
 
-  it('보험사 지급기준의 반려는 정산담당자가 할 수 없고 의견·배정은 유지한다', async () => {
+  it('보험사 지급기준의 반려는 정산담당자가 할 수 없고 의견 및 배정은 유지한다', async () => {
     searchResponse = () => search([{ ...baseCase, status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }])
     const original = vi.mocked(apiClient.request).getMockImplementation()!
     vi.mocked(apiClient.request).mockImplementation((async (path: string, init: Parameters<typeof apiClient.request>[1] = {}) =>
       path.endsWith('/review') ? envelope({ administratorReviewRequired: true, rejectionRequiresEvidence: true, links: [] }) : original(path, init)) as typeof apiClient.request)
     const { actions } = renderPage('/app/exceptions?selected=11')
     await actions.type(await screen.findByLabelText(/검토 메모/), '보험사 확인 요청')
-    await actions.type(screen.getByLabelText(/근거 문서·관리번호/), 'INS-REQ-1')
-    expect(screen.getByRole('button', { name: '근거 확인 · 반려 종결' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '의견 저장 · 검토중 유지' })).toBeEnabled()
+    await actions.type(screen.getByLabelText(/근거 문서 및 관리번호/), 'INS-REQ-1')
+    expect(screen.getByRole('button', { name: '근거 확인 후 반려 종결' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '의견 저장 후 검토중 유지' })).toBeEnabled()
     expect(screen.getByText(/GA관리자에게 배정해/)).toBeInTheDocument()
   })
 
@@ -971,7 +1020,7 @@ describe('원장 정정 입력 검증', () => {
     expect(validateCorrectionLines([{ debitAmount: '', creditAmount: '' }])).toContain('1번 줄')
     expect(validateCorrectionLines([{ debitAmount: '10', creditAmount: '10' }])).toContain('한쪽에만')
   })
-  it('음수·소수·차대 불균형·0원 합계를 거부한다', () => {
+  it('음수, 소수 및 차대 불균형 및 0원 합계를 거부한다', () => {
     expect(validateCorrectionLines([{ debitAmount: '-1', creditAmount: '0' }])).toContain('정수')
     expect(validateCorrectionLines([{ debitAmount: '1.5', creditAmount: '0' }])).toContain('정수')
     expect(validateCorrectionLines(lines('1000', '900'))).toContain('같아야')

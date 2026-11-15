@@ -48,7 +48,7 @@ export function CompareModal({
 }
 function CompareContent({ detail, month, revised }: { detail: Detail; month: string | null; revised: boolean }) {
   const [tab, setTab] = useState(0)
-  const tabs = ['비교 요약', '예상 원천', '실제 지급', '차액·분류 근거', '관련 화면']
+  const tabs = ['비교 요약', '예상 원천', '실제 지급', '차액 및 분류 근거', '관련 화면']
   const snapshot = detail.detailSnapshot
   const stage =
     snapshot != null &&

@@ -24,7 +24,7 @@ export function PriorityContracts({ home }: { home: AgentHome }) {
         <div>
           <h2 className="ah-panel-title">확인할 계약</h2>
           <p className="ah-panel-sub">
-            {total === 0 ? '지금 확인할 계약이 없어요' : `총 ${total}건${total > items.length ? ` · 상위 ${items.length}건 표시` : ''}`}
+            {total === 0 ? '지금 확인할 계약이 없어요' : `총 ${total}건${total > items.length ? ` 상위 ${items.length}건 표시` : ''}`}
           </p>
         </div>
       </div>
@@ -35,14 +35,14 @@ export function PriorityContracts({ home }: { home: AgentHome }) {
               <div className="ah-priority-main">
                 <Link data-guide-feature="features.agent-home.priority-contracts.contract-link" to={`/contracts/${item.contractId}`}>{item.contractNo}</Link>
                 <span className="ah-priority-meta">
-                  {item.insurerName} · {item.productName} · {item.currentStatus}
-                  {item.elapsedDays != null && ` · 마지막 변경 ${item.elapsedDays}일 경과`}
+                  {item.insurerName}  {item.productName}  {item.currentStatus}
+                  {item.elapsedDays != null && ` 마지막 변경 ${item.elapsedDays}일 경과`}
                 </span>
                 <span className="ah-priority-meta">
                   {`${month} 예정 ${int(item.expectedAmount ?? 0)}원`}
-                  {(item.heldCount ?? 0) > 0 && ` · 보류 ${item.heldCount}건 ${int(item.heldAmount ?? 0)}원`}
+                  {(item.heldCount ?? 0) > 0 && ` 보류 ${item.heldCount}건 ${int(item.heldAmount ?? 0)}원`}
                   {item.lastCheck &&
-                    ` · 마지막 확인 ${date(item.lastCheck.checkedAt)} ${item.lastCheck.result === 'CLOSED' ? '종결' : '후속 확인'}${
+                    ` 마지막 확인 ${date(item.lastCheck.checkedAt)} ${item.lastCheck.result === 'CLOSED' ? '종결' : '후속 확인'}${
                       item.lastCheck.nextCheckDate ? ` (다음 ${item.lastCheck.nextCheckDate})` : ''
                     }`}
                 </span>

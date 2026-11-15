@@ -462,7 +462,7 @@ describe('VRUN-W02 상세·실행·확정', () => {
     expect(line).not.toHaveTextContent('남은 대상')
     expect(line).not.toHaveTextContent('자료 없음')
     counts = { completedCount: 3, remainingCount: 0 }
-    await waitFor(() => expect(line).toHaveTextContent('완료 대상: 3 · 남은 대상: 0'), { timeout: 4000 })
+    await waitFor(() => expect(line).toHaveTextContent('완료 대상: 3 남은 대상: 0'), { timeout: 4000 })
   })
 
   it('실패 사유가 오류코드뿐이면 상세에 코드 대신 실패한 단계를 보인다', async () => {
@@ -709,7 +709,7 @@ it('does not allow finalizing a partial contract run even with a passed checklis
   detailHandlers()
   handlers['GET /api/v1/validation-runs/7'] = () => detail(run({ runType: 'MANUAL_CONTRACT' }))
   renderAt('/app/validation-runs/7')
-  expect(await screen.findByText('월 전체를 계산한 월간·확정 전 실행만 최종 확정할 수 있습니다.')).toBeVisible()
+  expect(await screen.findByText('월 전체를 계산한 월간 및 확정 전 실행만 최종 확정할 수 있습니다.')).toBeVisible()
   expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
   expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
 })
@@ -739,7 +739,7 @@ it('stops the creation spinner while help acknowledgement keeps duplicate submis
   await actions.click(screen.getByRole('button', { name: '도움말' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
   await actions.click(screen.getByRole('button', { name: '다음' }))
-  await waitFor(() => expect(screen.getByText('저장 가이드 · 2/2')).toBeVisible())
+  await waitFor(() => expect(screen.getByText('저장 가이드 2/2')).toBeVisible())
   await actions.click(create)
   await waitFor(() => expect(calls('POST /api/v1/validation-runs')).toHaveLength(1))
   await waitFor(() => expect(create).not.toHaveAttribute('aria-busy', 'true'))

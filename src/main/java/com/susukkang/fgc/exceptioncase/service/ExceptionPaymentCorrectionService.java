@@ -125,10 +125,10 @@ public class ExceptionPaymentCorrectionService {
                 : reco != null && "ACTUAL_MISSING".equals(reco.resultType()) ? ExceptionActionType.RECONCILE_AGAIN
                 : "RECONCILIATION_MISMATCH".equals(source.type()) ? ExceptionActionType.CORRECT : inferAction(old, request.payment());
         String reason = correctionReason(type, old, request.payment());
-        if ("DEFER".equals(request.plannedAction())) reason += " · 초과분 " + request.deferredAmount() + "원 이연 예정일 " + request.deferredPaymentDate();
+        if ("DEFER".equals(request.plannedAction())) reason += " 초과분 " + request.deferredAmount() + "원 이연 예정일 " + request.deferredPaymentDate();
         if (reco != null && "AMOUNT_DIFFERENCE".equals(reco.resultType())) {
-            reason += " · " + ("SETTLEMENT_COMPLETED".equals(request.correctionMode())
-                    ? "추가 송금·반환 확인: " + request.settlementEvidence().trim() : "기록 오류 정정");
+            reason += " " + ("SETTLEMENT_COMPLETED".equals(request.correctionMode())
+                    ? "추가 송금 및 반환 확인: " + request.settlementEvidence().trim() : "기록 오류 정정");
         }
         var body = normalized(id, old, request.payment(), reason);
         CommissionPaymentResponse corrected;
@@ -186,10 +186,10 @@ public class ExceptionPaymentCorrectionService {
                     settlementSupport ? a.attributionDate() : date, request.deferredAmount(),
                     settlementSupport ? InclusionDecisionStatus.REVIEW_REQUIRED : a.inclusionDecisionStatus(),
                     settlementSupport ? ExclusionType.NONE : a.exclusionType(),
-                    settlementSupport ? "정착지원금 지급일 이연 · 모집월 귀속과 한도 산입 재검토" : a.inclusionDecisionReason(),
+                    settlementSupport ? "정착지원금 지급일 이연 모집월 귀속과 한도 산입 재검토" : a.inclusionDecisionReason(),
                     a.allocationBasis(), a.evidenceRef(), a.attributionMethod())),
-                    body.evidenceRef(), "예외 " + id + "의 초과분 이연 · 원 지급 " + old.paymentId()));
-            reason += " · 초과분 " + request.deferredAmount() + "원 → " + date + " 지급 초안 " + deferred.paymentId();
+                    body.evidenceRef(), "예외 " + id + "의 초과분 이연 원 지급 " + old.paymentId()));
+            reason += " 초과분 " + request.deferredAmount() + "원 → " + date + " 지급 초안 " + deferred.paymentId();
             audit.record(AuditLogService.AuditEvent.builder().actionCode("EXCEPTION_PAYMENT_DEFERRED").entityType("EXCEPTION_CASE")
                     .entityId(id.toString()).userId(actor).after(Map.of("deferredPaymentId", deferred.paymentId(), "amount", request.deferredAmount(), "date", date))
                     .reason(reason).build());
@@ -210,8 +210,8 @@ public class ExceptionPaymentCorrectionService {
             var warnings = repository.newWarningsForCorrectedViolation(id, corrected.paymentId(), corrected.capCheckIds());
             for (var warning : warnings) {
                 capExceptions.resolve(new CapExceptionResolveCommand(warning.exceptionId(), ExceptionActionType.CORRECT,
-                        "위반 예외 " + id + "번 정정 후 한도 주의 · 잔여 "
-                                + warning.remainingAmount().stripTrailingZeros().toPlainString() + "원 · 추가 지급 전 사전검증",
+                        "위반 예외 " + id + "번 정정 후 한도 주의 잔여 "
+                                + warning.remainingAmount().stripTrailingZeros().toPlainString() + "원 추가 지급 전 사전검증",
                         "EXCP-" + id, actor));
             }
         }
@@ -223,7 +223,7 @@ public class ExceptionPaymentCorrectionService {
                 resolved ? type.label() + " 내용을 반영하고 재검증을 통과해 예외를 해결했습니다."
                         : remaining.isEmpty() ? "지급 건을 수정했습니다. 대사 결과에서 예외 해결 여부를 확인하세요."
                         : "지급 건을 수정했습니다. 재대사 결과: " + remaining.getFirst().resultLabel()
-                            + " · 예상 " + String.format("%,.0f", remaining.getFirst().expectedAmount()) + "원 / 실제 "
+                            + " 예상 " + String.format("%,.0f", remaining.getFirst().expectedAmount()) + "원 / 실제 "
                             + String.format("%,.0f", remaining.getFirst().actualAmount()) + "원. 남은 원인을 확인하세요.", latest, remaining, deferred);
     }
 
@@ -241,7 +241,7 @@ public class ExceptionPaymentCorrectionService {
         if (!paymentWrites.lockPayment(request.paymentId())) throw invalid("paymentId");
         var old = payments.get(request.paymentId());
         if (old.status() != CommissionPaymentStatus.CONFIRMED || !old.updatedAt().toInstant().equals(request.expectedUpdatedAt().toInstant())) throw new FgcBusinessException(FgcErrorCode.TRAN_010);
-        String reason = "중복 지급 기록 취소 · 지급 " + old.sourceBusinessKey();
+        String reason = "중복 지급 기록 취소 지급 " + old.sourceBusinessKey();
         Long journal = repository.postedJournal(old.paymentId());
         if (journal != null) journals.reverse(new ReverseJournalCommand(journal, reason, request.evidenceRef(), actor));
         else {
@@ -256,7 +256,7 @@ public class ExceptionPaymentCorrectionService {
         var latest = queries.findActionsByCaseIds(List.of(id)).stream().max(Comparator.comparingInt(ExceptionActionRow::actionSeq)).map(ExceptionActionResponse::from).orElse(null);
         boolean resolved = cases.findByIdForUpdate(id).status() == ExceptionStatus.RESOLVED;
         return new ExceptionPaymentCorrectionResponse(payments.get(old.paymentId()), resolved,
-                resolved ? "중복 지급 기록을 역분개·취소하고 재대사 일치를 확인했습니다." : "선택한 기록을 취소하고 재대사했습니다. 남은 대사 차이를 확인하세요.",
+                resolved ? "중복 지급 기록을 역분개 및 취소하고 재대사 일치를 확인했습니다." : "선택한 기록을 취소하고 재대사했습니다. 남은 대사 차이를 확인하세요.",
                 latest, repository.remainingIssues(source), null);
     }
 
@@ -307,13 +307,13 @@ public class ExceptionPaymentCorrectionService {
                 || !(Objects.equals(deduction.sourceBusinessKey(), "CLAWBACK-RECOVERY:" + recoveryKey)
                     || Objects.equals(deduction.sourceBusinessKey(), "EXCP-RECOVERY:" + id + ":" + recoveryKey))
                 || deduction.evidenceRef() == null || deduction.evidenceRef().isBlank()) throw invalid("deductionPaymentId");
-        String calculationRef = "환수 계산 v" + calculation.calculationVersion() + " · 원지급 " + original.paymentId();
-        String noticeRef = calculationRef.equals(deduction.evidenceRef()) ? null : deduction.evidenceRef();
+        String calculationRef = "환수 계산 v" + calculation.calculationVersion() + " 원지급 " + original.paymentId();
+        String noticeRef = calculationRef.equals(deduction.evidenceRef().replace(" · ", " ")) ? null : deduction.evidenceRef();
         if (!repository.registerRecovery(source, original.paymentId(), deduction.paymentId(), request.candidateId(),
                 calculation.calculationVersion(), noticeRef)) throw invalid("recoveryEvidence");
 
-        String evidence = (noticeRef == null ? calculationRef : "환수 통지서 " + noticeRef) + " · 차감 " + deduction.sourceBusinessKey();
-        String reason = "원지급 " + original.paymentId() + "번의 환수 차감 " + amount.stripTrailingZeros().toPlainString() + "원 확정 확인 · " + evidence;
+        String evidence = (noticeRef == null ? calculationRef : "환수 통지서 " + noticeRef) + " 차감 " + deduction.sourceBusinessKey();
+        String reason = "원지급 " + original.paymentId() + "번의 환수 차감 " + amount.stripTrailingZeros().toPlainString() + "원 확정 확인 " + evidence;
         reconciliation.refresh(runs, "EXCP-RECOVERY-" + id, actor, reason);
         boolean resolved = repository.recoveryComplete(source) && repository.remainingIssues(source).isEmpty();
         var actionRequest = new ExceptionActionRequest(ExceptionActionType.RECONCILE_AGAIN, reason, evidence);
@@ -350,7 +350,7 @@ public class ExceptionPaymentCorrectionService {
             var action = queries.findActionsByCaseIds(List.of(id)).stream().max(Comparator.comparingInt(ExceptionActionRow::actionSeq))
                     .map(ExceptionActionResponse::from).orElse(null);
             return new ExceptionSourceRecheckResponse(null, resolved,
-                    resolved ? "스케줄·계약 정정 후 재대사가 일치해 예외를 해결했습니다." : "재대사에서 원인이 남아 있습니다. 계약 상태와 예상 스케줄을 확인하세요.", action);
+                    resolved ? "스케줄 및 계약 정정 후 재대사가 일치해 예외를 해결했습니다." : "재대사에서 원인이 남아 있습니다. 계약 상태와 예상 스케줄을 확인하세요.", action);
         }
         if (scope == null || !scope.scheduledBasis()) throw invalid("scheduleCorrectionRequired");
         var saved = capChecks.calculateAndSave(com.susukkang.fgc.cap.dto.CapCalculationCommand.manual(
@@ -363,7 +363,7 @@ public class ExceptionPaymentCorrectionService {
                 : "예상 지급액 " + com.susukkang.fgc.common.util.DisplayFormat.won(saved.result().includedAmount())
                     + "원이 한도 " + com.susukkang.fgc.common.util.DisplayFormat.won(saved.result().limitAmount()) + "원을 초과합니다. 정책 규칙과 스케줄을 정정하세요.";
         ExceptionActionResponse action = resolved ? exceptions.action(id,
-                new ExceptionActionRequest(ExceptionActionType.CORRECT, "예상 스케줄 재검증 통과 · 계산근거 " + saved.capCheckId(), null), actor, login) : null;
+                new ExceptionActionRequest(ExceptionActionType.CORRECT, "예상 스케줄 재검증 통과 계산근거 " + saved.capCheckId(), null), actor, login) : null;
         return new ExceptionSourceRecheckResponse(com.susukkang.fgc.cap.dto.CapCheckBasisResponse.from(saved,
                 capChecks.findDetail(scope.checkId()).map(d -> d.capCheck().contractNo()).orElse(null)), resolved, message, action);
     }
@@ -435,8 +435,8 @@ public class ExceptionPaymentCorrectionService {
         return ExceptionActionType.CORRECT;
     }
     private String correctionReason(ExceptionActionType type, CommissionPaymentResponse old, CommissionPaymentCreateRequest next) {
-        return type.label() + " 처리 · " + (old == null ? "신규 지급 등록" : "지급 " + old.paymentId() + " " + old.amount() + "원 → " + next.amount() + "원")
-                + " · 정산월 " + next.settlementMonth() + " · 지급예정일 " + next.scheduledPaymentDate();
+        return type.label() + " 처리 " + (old == null ? "신규 지급 등록" : "지급 " + old.paymentId() + " " + old.amount() + "원 → " + next.amount() + "원")
+                + " 정산월 " + next.settlementMonth() + " 지급예정일 " + next.scheduledPaymentDate();
     }
     private CommissionPaymentCreateRequest normalized(Long id, CommissionPaymentResponse old, CommissionPaymentCreateRequest p, String reason) {
         return new CommissionPaymentCreateRequest("GA_MANUAL_PAYMENT",
@@ -446,10 +446,10 @@ public class ExceptionPaymentCorrectionService {
     }
     private FgcBusinessException invalid(String field) {
         String reason = switch (field) {
-            case "scheduleCorrectionRequired" -> "이 예외는 계약·예상 스케줄을 확인하고 재검증하세요.";
+            case "scheduleCorrectionRequired" -> "이 예외는 계약 및 예상 스케줄을 확인하고 재검증하세요.";
             case "newPaymentNotMissing" -> "금액 차이는 별도 지급으로 등록할 수 없습니다. 기존 지급 건의 전체 금액을 정정하세요.";
-            case "alreadyRegistered" -> "같은 수령인·항목·회차의 지급 건이 있습니다. 기존 초안을 확정하거나 이미 확정한 경우 재대사하세요.";
-            case "missingPaymentScope" -> "누락 지급은 예상 스케줄의 계약·수령인·항목·회차·정산월·금액에 맞춰 등록하세요.";
+            case "alreadyRegistered" -> "같은 수령인, 항목 및 회차의 지급 건이 있습니다. 기존 초안을 확정하거나 이미 확정한 경우 재대사하세요.";
+            case "missingPaymentScope" -> "누락 지급은 예상 스케줄의 계약, 수령인, 항목, 회차, 정산월 및 금액에 맞춰 등록하세요.";
             case "correctionMode" -> "기록 오류 정정인지 실제 지급 차이 정산 후 정정인지 선택하세요.";
             case "settlementEvidence" -> "추가 송금 또는 반환 처리 증빙을 입력하세요.";
             case "plannedAction" -> "한도 초과 지급의 기존 금액을 줄이고 감액 또는 초과분 이연을 선택하세요.";

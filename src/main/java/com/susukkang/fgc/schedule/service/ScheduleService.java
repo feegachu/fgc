@@ -131,7 +131,7 @@ public class ScheduleService {
         if (key == null || !key.matches("[A-Za-z0-9._:-]{1,100}")) throw validationException("Idempotency-Key", "멱등키가 필요합니다.");
         if (stage == null || (request.getRegime() != ScheduleRegime.FOUR_YEAR_2027 && request.getRegime() != ScheduleRegime.SEVEN_YEAR_2029) || request.getPolicyVersionId() == null
                 || request.getExpectedSourceVersion() == null || request.getExpectedSourceVersion().isBlank() || request.getReason() == null || request.getReason().isBlank() || request.getReason().length() > 40)
-            throw validationException("regime", "4년·7년 체계·선택 정책·원천 버전·사유를 확인하세요.");
+            throw validationException("regime", "4년 및 7년 체계 및 선택 정책 및 원천 버전 및 사유를 확인하세요.");
     }
 
     private String previewRequestHash(Long contractId, PaymentStage stage, Long sourceScheduleId, ScheduleRegenRequest request) {
@@ -1329,7 +1329,7 @@ public class ScheduleService {
         if (oldHeader == null)
             throw validationException(SCHEDULE_ID, SCHEDULE_NOT_FOUND);
         if (oldHeader.getScheduleRegime() == ScheduleRegime.FOUR_YEAR_2027 || oldHeader.getScheduleRegime() == ScheduleRegime.SEVEN_YEAR_2029)
-            throw validationException("regime", "예정 재생성은 체계·정책·원천 버전과 멱등키를 함께 보내야 합니다.");
+            throw validationException("regime", "예정 재생성은 체계, 정책 및 원천 버전과 멱등키를 함께 보내야 합니다.");
         if (!Boolean.TRUE.equals(oldHeader.getActiveYn()))
             throw new FgcBusinessException(FgcErrorCode.SCHE_001);
         if (oldHeader.getStatus() == ScheduleHeaderStatus.CANCELLED)

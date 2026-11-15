@@ -129,7 +129,7 @@ export function AgentStatusPanel({ month, preview = false, replay = 0 }: { month
         </h2>
         <span
           className="agent-status-basis"
-          title={`인원·유효 계약: ${query.data?.asOf ?? '-'} 기준. 활동 여부는 현재 상태. 수수료·신규 계약: 선택한 정산월. 미처리 예외: 현재 상태.`}
+          title={`인원 및 유효 계약: ${query.data?.asOf ?? '-'} 기준. 활동 여부는 현재 상태. 수수료 및 신규 계약: 선택한 정산월. 미처리 예외: 현재 상태.`}
         >
           {metric === 'EXCEPTIONS' ? '전체 기간' : metric === 'AGENTS' ? (query.data?.asOf ?? '-') : monthText(month)}
         </span>
@@ -221,15 +221,15 @@ export function AgentStatusPanel({ month, preview = false, replay = 0 }: { month
                 <strong>{active.name}</strong>
                 <dl>
                   <div>
-                    <dt>등록 · 활동</dt>
+                    <dt>등록 및 활동</dt>
                     <dd>
-                      {int(active.registeredAgents)} · {int(active.activeAgents)}명
+                      {int(active.registeredAgents)}  {int(active.activeAgents)}명
                     </dd>
                   </div>
                   <div>
-                    <dt>신규 · 유효 계약</dt>
+                    <dt>신규 및 유효 계약</dt>
                     <dd>
-                      {int(active.newContracts)} · {int(active.validContracts)}건
+                      {int(active.newContracts)}  {int(active.validContracts)}건
                     </dd>
                   </div>
                   <div>
@@ -328,16 +328,16 @@ function BranchDetails({
         ]),
   ]
   return (
-    <Modal open title={`${branch.name} · ${definition.label} 상세`} onClose={onClose} className="branch-detail-modal">
+    <Modal open title={`${branch.name} ${definition.label} 상세`} onClose={onClose} className="branch-detail-modal">
       <p className="branch-detail-basis">
         {metric === 'EXCEPTIONS'
-          ? '전체 기간 · 현재 미처리'
+          ? '전체 기간 현재 미처리'
           : metric === 'AGENTS'
             ? `${asOf} 기준`
             : metric === 'CONTRACTS'
-              ? `${monthText(month)} 신규 · ${asOf} 기준 유효 계약`
+              ? `${monthText(month)} 신규 ${asOf} 기준 유효 계약`
               : `${monthText(month)} 확정 지급`}
-        {' · 하위 팀 포함'}
+        {' 하위 팀 포함'}
       </p>
       {query.isError ? (
         <RegionError

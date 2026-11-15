@@ -20,6 +20,8 @@ import com.susukkang.fgc.reconciliation.service.ReconciliationExceptionService;
 import com.susukkang.fgc.reconciliation.service.ReconciliationExecutionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -66,8 +68,9 @@ class ClawbackCalculationIntegrationTest {
     private long incentiveItem;
     private long maintenanceItem;
 
-    @Test
-    void reconcilesConfirmedRecoveryByRecipientAndDetectsACancelledDeductionAgain() {
+    @ParameterizedTest
+    @ValueSource(strings = {" · ", " "})
+    void reconcilesConfirmedRecoveryByRecipientAndDetectsACancelledDeductionAgain(String separator) {
         long policy = policy(new Object[]{baseItem, 0, 11, "100"}, new Object[]{incentiveItem, 0, 11, "50"});
         long otherAgent = jdbc.queryForObject("SELECT min(agent_id) FROM fgc.agent WHERE agent_id<>?", Long.class, agentId);
         long first = payment(baseItem, "24000", "CONFIRMED");
@@ -79,11 +82,13 @@ class ClawbackCalculationIntegrationTest {
         long run = runReconciliation();
         long firstCase = reviewRecovery(run, first);
         long secondCase = reviewRecovery(run, second);
-        long fullDeduction = deduction(first, candidate, agentId, "24000", calculationResult.calculationVersion());
-        long halfDeduction = deduction(second, candidate, otherAgent, "9000", calculationResult.calculationVersion());
+        long fullDeduction = deduction(first, candidate, agentId, "24000", calculationResult.calculationVersion(), separator);
+        long halfDeduction = deduction(second, candidate, otherAgent, "9000", calculationResult.calculationVersion(), separator);
         var firstRequest = new ExceptionRecoveryRecheckRequest(candidate, first, fullDeduction);
         var firstResult = corrections.reconcileRecovery(firstCase, firstRequest, settlementUser, "settlement");
         assertThat(firstResult.resolved()).isTrue();
+        assertThat(firstResult.action().evidenceRef()).isEqualTo("환수 계산 v" + calculationResult.calculationVersion()
+                + " 원지급 " + first + " 차감 CLAWBACK-RECOVERY:" + first + ":" + candidate);
         assertThat(corrections.reconcileRecovery(firstCase, firstRequest, settlementUser, "settlement")).isEqualTo(firstResult);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id=? AND action_type='RECONCILE_AGAIN'",
                 Long.class, firstCase)).isEqualTo(1);
@@ -473,9 +478,9 @@ class ClawbackCalculationIntegrationTest {
         return tx;
     }
 
-    private long deduction(long original, long candidate, long recipient, String amount, int version) {
+    private long deduction(long original, long candidate, long recipient, String amount, int version, String separator) {
         return payment(item("CLAWBACK"), amount, "CONFIRMED", recipient, "DEDUCTION", "CLAWBACK-RECOVERY:" + original + ":" + candidate,
-                "환수 계산 v" + version + " · 원지급 " + original);
+                "환수 계산 v" + version + separator + "원지급 " + original);
     }
 
     private long runReconciliation() {

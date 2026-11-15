@@ -100,7 +100,7 @@ export default function TransactionListPage() {
     setKnown(next)
   }
   const rows = search.isError ? [] : (search.data?.content ?? [])
-  const example: PaymentRow = { commissionTransactionId: -1, sourceBusinessKey: '안내용 예시 · 실제 지급 건 아님',
+  const example: PaymentRow = { commissionTransactionId: -1, sourceBusinessKey: '안내용 예시 실제 지급 건 아님',
     paymentStage: 'GA_TO_FC', paymentStageLabel: 'GA→설계사', sourceType: 'GA_MANUAL_PAYMENT', sourceTypeLabel: '안내 예시',
     status: 'DRAFT', statusLabel: '예시', recipientAgentName: '예시 설계사', commissionItemName: '예시 수수료', amount: 0, attributionCount: 1 }
   const sum = rows.reduce((total, row) => total + Number(row.amount ?? 0), 0)

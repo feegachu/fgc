@@ -92,7 +92,7 @@ async function fixture(page: Page) {
   })
 }
 
-test('필터 URL·계산근거·Escape 닫기·딥링크를 확인한다', async ({ page }) => {
+test('필터 URL, 계산근거 및 Escape 닫기 및 딥링크를 확인한다', async ({ page }) => {
   await fixture(page)
   await page.goto('cap-checks?month=2026-07')
   const table = page.getByRole('table', { name: '계약별 판정 목록' })

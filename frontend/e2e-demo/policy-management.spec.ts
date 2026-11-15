@@ -32,7 +32,7 @@ async function action(page: Page, label: string) {
   return successful(response)
 }
 
-test('POL-W01 CT-P01 환수 등록·타 사용자 승인·활성화·복제와 원본 보존', async ({ page }, info) => {
+test('POL-W01 CT-P01 환수 등록 및 타 사용자 승인, 활성화 및 복제와 원본 보존', async ({ page }, info) => {
   await login(page, 'settle01', route)
   await newClawback(page, 'E2E-722-CLAW')
   const create = responseFor(page, '/policies')
@@ -80,7 +80,7 @@ test('POL-W01 CT-P01 환수 등록·타 사용자 승인·활성화·복제와 �
   await page.screenshot({ path: info.outputPath('04-real-api-new-draft-zero.png'), fullPage: true })
 })
 
-test('POL-W01 CT-P02 실제 422 필드 이동·입력 보존·중복 클릭 잠금·편집 취소', async ({ page }, info) => {
+test('POL-W01 CT-P02 실제 422 필드 이동 및 입력 보존 및 중복 클릭 잠금 및 편집 취소', async ({ page }, info) => {
   await login(page, 'settle01', route)
   await newClawback(page, 'E2E-722-ERROR')
   await page
@@ -129,7 +129,7 @@ test('POL-W01 CT-P02 실제 422 필드 이동·입력 보존·중복 클릭 잠�
   await expect(page.getByRole('button', { name: '초안 수정', exact: true })).toBeEnabled()
 })
 
-test('POL-W01 조회 로딩·0건·403·서버 실패·재시도 표시 (응답 장애 주입)', async ({ page }, info) => {
+test('POL-W01 조회 로딩, 0건, 403 및 서버 실패 및 재시도 표시 (응답 장애 주입)', async ({ page }, info) => {
   await login(page, 'audit01', route)
   await expect(page.getByRole('button', { name: /정책 등록/ })).toHaveCount(0)
   await expect(page.getByRole('table', { name: '정책 버전', exact: true })).toBeVisible()
@@ -192,7 +192,7 @@ test('POL-W01 조회 로딩·0건·403·서버 실패·재시도 표시 (응답 
   await expect(page.getByRole('table', { name: '정책 버전', exact: true })).toBeVisible()
 })
 
-test('POL-W01 실제 409 입력 보존·최신 조회와 응답 유실 재시도·401 복구', async ({ page }, info) => {
+test('POL-W01 실제 409 입력 보존 및 최신 조회와 응답 유실 재시도 및 401 복구', async ({ page }, info) => {
   await login(page, 'settle01', route)
   await newClawback(page, 'E2E-722-RETRY')
   const keys: (string | undefined)[] = []

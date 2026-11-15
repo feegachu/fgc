@@ -804,7 +804,7 @@ public class ContractServiceImpl implements ContractService {
         requireAllowedTransition(current.getCurrentStatus(), request.getContractStatus(), "contractStatus");
         // 3. 사건 입력·멱등키(사건 원천키)·사유코드 확인
         if (event == null) {
-            throw validationException("statusEvent", "상태를 바꾸려면 효력일시·접수일시·사유를 입력하세요.");
+            throw validationException("statusEvent", "상태를 바꾸려면 효력일시, 접수일시 및 사유를 입력하세요.");
         }
         if (idempotencyKey == null) {
             throw validationException("Idempotency-Key", "상태 변경 요청에는 멱등키가 필요합니다.");

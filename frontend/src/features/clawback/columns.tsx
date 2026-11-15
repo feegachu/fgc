@@ -13,7 +13,7 @@ export const columns = (openDetail: (row: CandidateRow) => void): TableColumn<Ca
     width: '12rem',
     cellClassName: 'tabular-nums',
     render: (r) => <button data-guide-feature="features.columns.button-1" type="button" className="claw-contract-link" title={present(r.contractNo)}
-      aria-haspopup="dialog" aria-label={`${present(r.contractNo)} 환수 상세 보기 · 후보 ${present(r.candidateId)}`}
+      aria-haspopup="dialog" aria-label={`${present(r.contractNo)} 환수 상세 보기 후보 ${present(r.candidateId)}`}
       disabled={r.candidateId == null} onClick={() => openDetail(r)}>{present(r.contractNo)}</button>,
   },
   {

@@ -66,7 +66,7 @@ async function failedMonthly(page: Page) {
   return { id, paymentId, state }
 }
 
-test('FUN-045 실제 서버: 6단계 실패 → 사유 입력 → 동일 실행 재시작 → 완료·이력·원장 보존', async ({ page }, info) => {
+test('FUN-045 실제 서버: 6단계 실패 → 사유 입력 → 동일 실행 재시작 → 완료, 이력 및 원장 보존', async ({ page }, info) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   const { id, paymentId, state } = await failedMonthly(page)
@@ -152,7 +152,7 @@ for (const account of ['audit01', 'gaadmin']) {
 }
 
 
-test('FUN-045 실제 서버: 빈 사유 400·지난 상태 409는 재시도 행을 만들지 않는다', async ({ page, request }) => {
+test('FUN-045 실제 서버: 빈 사유 400 및 지난 상태 409는 재시도 행을 만들지 않는다', async ({ page, request }) => {
   const { id, state } = await failedMonthly(page)
   const origin = new URL(page.url()).origin
   const auth = await request.post(`${origin}/api/v1/auth/login`, {

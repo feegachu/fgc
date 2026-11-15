@@ -156,7 +156,7 @@ test('예외 상세 모달에서 처리하고 닫으면 목록 조건을 유지�
   await page.goto('/exceptions?month=2026-07&status=OPEN')
   const list = page.getByRole('table', { name: '예외 목록' })
   await list.getByRole('button', { name: '11', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '예외 상세 · 계약-1', exact: true })
+  const dialog = page.getByRole('dialog', { name: '예외 상세 계약-1', exact: true })
   await expect(dialog).toBeVisible()
   await expect(dialog.getByText('검출 이력', { exact: true })).toBeVisible()
   await expect(dialog.getByText('처리 이력', { exact: true })).toBeVisible()

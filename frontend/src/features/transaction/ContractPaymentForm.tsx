@@ -1,3 +1,4 @@
+import { paymentEvidenceText } from '../../lib/screenText'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
@@ -59,7 +60,7 @@ function payload(
     !['PAYMENT', 'DEDUCTION'].includes(line.cashflowType ?? '') ||
     (stage === 'GA_TO_FC' && !line.beneficiaryAgentId)
   ) {
-    throw new Error('스케줄의 설계사·항목·금액·귀속일·예정일을 확인해 주세요.')
+    throw new Error('스케줄의 설계사, 항목, 금액, 귀속일 및 예정일을 확인해 주세요.')
   }
   return {
     sourceType: 'GA_MANUAL_PAYMENT',
@@ -200,7 +201,7 @@ export function ContractPaymentForm({
     if (first && entries.some(([,payment]) => payment.scheduledPaymentDate !== first.scheduledPaymentDate ||
       payment.attributions?.[0]?.attributionDate !== first.attributions?.[0]?.attributionDate ||
       payment.evidenceRef !== first.evidenceRef)) {
-      setResumeError('저장된 행의 귀속일·예정일·증빙이 서로 다릅니다. 지급 목록에서 개별 건을 이어서 처리하세요.')
+      setResumeError('저장된 행의 귀속일, 예정일 및 증빙이 서로 다릅니다. 지급 목록에서 개별 건을 이어서 처리하세요.')
       return
     }
     const restored: Record<number, Saved> = {}
@@ -589,7 +590,7 @@ export function ContractPaymentForm({
               <Field label="증빙">
                 <input data-guide-feature="features.contract-payment-form.input-8"
                   disabled={editingLocked || selected.some(line => done(line.scheduleLineId!))}
-                  value={evidence}
+                  value={paymentEvidenceText(evidence)}
                   maxLength={500}
                   placeholder="문서번호, 링크"
                   onChange={(event) => {
@@ -699,7 +700,7 @@ export function ContractPaymentForm({
                     {error}
                   </p>
                 )}
-                {uncertain && <Link data-guide-feature="features.contract-payment-form.link-15" to={returnTo}>지급 목록에서 저장·확정 결과 확인</Link>}
+                {uncertain && <Link data-guide-feature="features.contract-payment-form.link-15" to={returnTo}>지급 목록에서 저장 및 확정 결과 확인</Link>}
               </div>
             </fieldset>
             {(schedules.isFetching || detail.isFetching) && (
@@ -733,7 +734,7 @@ export function ContractPaymentForm({
             <header className="surface-header transaction-surface-header">
               <h2 className="surface-title">설계사별 지급 내역</h2>
               <span className="transaction-panel-meta">
-                {selected.length}행 · 스케줄 {header?.scheduleVersionNo ?? '-'} 버전
+                {selected.length}행 스케줄 {header?.scheduleVersionNo ?? '-'} 버전
               </span>
             </header>
             <div className="data-table-viewport">
@@ -928,7 +929,7 @@ export function ContractPaymentForm({
           <tbody>{remaining.map(line => <tr key={line.scheduleLineId}><td>{line.recipientName ?? 'GA'}</td>
             <td>{items.data.find(item => String(item.commissionItemId) === values(line).item)?.itemName ?? line.commissionItemName}</td>
             <td>{int(Number(values(line).amount))}원</td></tr>)}</tbody>
-          <tfoot><tr><th colSpan={2}>합계 · {remaining.length}행</th><td>{int(remaining.reduce((sum, line) => sum + Number(values(line).amount), 0))}원</td></tr></tfoot>
+          <tfoot><tr><th colSpan={2}>합계 {remaining.length}행</th><td>{int(remaining.reduce((sum, line) => sum + Number(values(line).amount), 0))}원</td></tr></tfoot>
         </table></div>
       </Modal>
     </div>

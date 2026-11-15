@@ -189,7 +189,7 @@ it.each([401, 403, 409, 422, 500])('shows issuance HTTP %i without adding a succ
       : status === 409
         ? '현재 계산 결과와 근거가 발행 요청과 다릅니다. 다시 조회해 주세요.'
         : status === 422
-          ? '발행에 필요한 계산·정책 근거를 확인해 주세요.'
+          ? '발행에 필요한 계산 및 정책 근거를 확인해 주세요.'
           : 'PDF 발행에 실패했습니다. 응답 유실 시 같은 요청으로 재시도합니다.',
   )
   expect(screen.queryByText(/PDF 발행 완료/)).not.toBeInTheDocument()

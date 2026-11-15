@@ -137,7 +137,7 @@ public class PolicyDraftValidator {
             }
             for (String tag : draft.sourceDetails().get(i).statusTags()) {
                 if (!SOURCE_STATUS_TAGS.contains(tag)) {
-                    throw invalid("sourceDetails[" + i + "].statusTags", "근거 상태는 현행규정·개정고시·시행세칙·FAQ·회사정책 중에서 고르세요.");
+                    throw invalid("sourceDetails[" + i + "].statusTags", "근거 상태는 현행규정, 개정고시, 시행세칙, FAQ 및 회사정책 중에서 고르세요.");
                 }
             }
         }
@@ -160,7 +160,7 @@ public class PolicyDraftValidator {
 
     private static void validateCommissionRules(PolicyDraft draft) {
         if (!draft.commissionRules().isEmpty() && !COMMISSION_TYPES.contains(draft.policyType())) {
-            throw invalid("commissionRules", "수수료 규칙은 현행·4년·7년 수수료 정책에만 등록할 수 있습니다.");
+            throw invalid("commissionRules", "수수료 규칙은 현행, 4년 및 7년 수수료 정책에만 등록할 수 있습니다.");
         }
         Set<Long> commissionIds = new HashSet<>();
         for (int i = 0; i < draft.commissionRules().size(); i++) {
@@ -174,7 +174,7 @@ public class PolicyDraftValidator {
 
     private static void validateFeeRules(PolicyDraft draft, String requiredRegime) {
         if (!draft.feeRegimeRules().isEmpty() && requiredRegime == null) {
-            throw invalid("feeRegimeRules", "분급 규칙은 4년·7년 수수료 정책에만 등록할 수 있습니다.");
+            throw invalid("feeRegimeRules", "분급 규칙은 4년 및 7년 수수료 정책에만 등록할 수 있습니다.");
         }
         Set<Long> feeIds = new HashSet<>();
         for (int i = 0; i < draft.feeRegimeRules().size(); i++) {
@@ -227,7 +227,7 @@ public class PolicyDraftValidator {
                         && left.installmentFrom() <= right.installmentTo()
                         && right.installmentFrom() <= left.installmentTo()) {
                     throw new FgcBusinessException(FgcErrorCode.POL_002, COMMISSION_RULE_PREFIX + j + "]",
-                            Map.of(CONFLICTING_INDEX, i), "같은 적용 범위·우선순위의 수수료 규칙 회차가 겹칩니다.");
+                            Map.of(CONFLICTING_INDEX, i), "같은 적용 범위 및 우선순위의 수수료 규칙 회차가 겹칩니다.");
                 }
             }
         }

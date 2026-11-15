@@ -1,7 +1,7 @@
 import { test, expect, login } from './fixtures'
 
 for (const width of [1440, 390]) {
-  test(`CMN-C04 DoD ${width}px: 실제 화면의 배치·키보드·입력 보존·대상 오류 복구`, async ({ page }, info) => {
+  test(`CMN-C04 DoD ${width}px: 실제 화면의 배치, 키보드 및 입력 보존 및 대상 오류 복구`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 900 })
     await login(page, 'audit01', '/schedules')
     const writes: string[] = []
@@ -19,7 +19,7 @@ for (const width of [1440, 390]) {
     const spotlight = page.locator('.payment-guide-spotlight')
     await expect(card).toBeVisible()
     await expect(spotlight).toHaveCount(1)
-    await expect(card).toContainText(/화면 요소 안내 · 1\/\d+/)
+    await expect(card).toContainText(/화면 요소 안내 1\/\d+/)
     // Check the actual viewport bounds and input/card overlap after layout settles.
     await expect.poll(async () => {
       const target = await input.boundingBox()
@@ -34,7 +34,7 @@ for (const width of [1440, 390]) {
     await expect(input).toHaveValue('DOD-KEEP-INPUT')
     await page.screenshot({ path: info.outputPath('02-folded.png'), fullPage: true })
     await card.getByRole('button', { name: '펼치기', exact: true }).click()
-    await expect(card).toContainText(/화면 요소 안내 · 1\/\d+/)
+    await expect(card).toContainText(/화면 요소 안내 1\/\d+/)
     await page.emulateMedia({ reducedMotion: 'reduce' })
     expect(await card.locator('img').evaluate(element => getComputedStyle(element).animationName)).toBe('none')
     expect(await spotlight.evaluate(element => getComputedStyle(element).transitionDuration.split(',').every(value => parseFloat(value) <= 0.001))).toBe(true)
@@ -68,9 +68,9 @@ for (const width of [1440, 390]) {
     await expect(spotlight).toHaveCount(1)
     await expect(input).toHaveValue('DOD-KEEP-INPUT')
     await card.getByRole('button', { name: '다음', exact: true }).click()
-    await expect(card).toContainText(/화면 요소 안내 · 2\/\d+/)
+    await expect(card).toContainText(/화면 요소 안내 2\/\d+/)
     await card.getByRole('button', { name: '이전', exact: true }).click()
-    await expect(card).toContainText(/화면 요소 안내 · 1\/\d+/)
+    await expect(card).toContainText(/화면 요소 안내 1\/\d+/)
     await card.getByRole('button', { name: '종료', exact: true }).click()
     await expect(help).toBeFocused()
     await expect(input).toHaveValue('DOD-KEEP-INPUT')

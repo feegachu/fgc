@@ -56,13 +56,13 @@ describe('AppShell·라우트', () => {
     await screen.findByRole('heading', { name: '보험계약 목록' })
     const shell = document.querySelector('.app-shell')!
     expect(shell).toHaveAttribute('data-ui-revision', 'after')
-    expect(screen.queryByRole('group', { name: '계약/지급 화면 이전·이후 비교' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: '계약/지급 화면 이전 및 이후 비교' })).not.toBeInTheDocument()
     expect(router.state.location.search).toContain('contractNo=KEEP')
     expect(screen.queryByRole('link', { name: '신규 등록' })).not.toBeInTheDocument()
     await router.navigate('/agent-home?month=2026-07')
     await screen.findByRole('heading', { name: '포트폴리오' })
     expect(shell).not.toHaveAttribute('data-ui-revision')
-    expect(screen.queryByRole('group', { name: '계약/지급 화면 이전·이후 비교' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: '계약/지급 화면 이전 및 이후 비교' })).not.toBeInTheDocument()
   })
   it('AGENT의 관리자 홈 직접 접근은 관리자 API 호출 없이 포트폴리오로 이동한다', async () => {
     const router = renderAt('/', 'AGENT')

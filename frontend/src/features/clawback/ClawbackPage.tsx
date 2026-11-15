@@ -268,13 +268,13 @@ export default function ClawbackPage() {
           />
         )}
       </section>
-      <Modal open={selected != null} title={`환수 상세 · ${selected?.contractNo ?? '계약 확인'}`}
+      <Modal open={selected != null} title={`환수 상세 ${selected?.contractNo ?? '계약 확인'}`}
         className="modal-large claw-detail-modal" onClose={closeDetail} closeOnEscape={!processing}
         footer={<div className="claw-footer-actions">{revised && <div ref={setCalculationHost} />}
           <Button data-guide-feature="features.clawback-page.button-1" variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button></div>}>
         <section data-guide-feature="features.clawback.clawback-page.section-2" className="claw-detail-panel" aria-labelledby="claw-detail-title">
           <header className="surface-header claw-panel-header">
-            <h3 className="surface-title" id="claw-detail-title">후보 근거 · 환수 계산</h3>
+            <h3 className="surface-title" id="claw-detail-title">후보 근거 및 환수 계산</h3>
             <div className="claw-detail-actions">
               {selected && <CalculationBadge row={detail.data?.candidate ?? selected} />}
               <ScreenWalkthrough title="환수 상세" steps={getScreenWalkthrough('CLAW-W01').slice(2)} disabled={processing} />

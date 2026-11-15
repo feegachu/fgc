@@ -67,7 +67,7 @@ const columns: TableColumn<AcquisitionCheck>[] = [
   { key: 'stage', label: '지급단계', width: '6.5rem', render: (row) => row.paymentStageLabel },
   {
     key: 'product',
-    label: '적용 상품·기초서류',
+    label: '적용 상품 및 기초서류',
     width: '14rem',
     render: (row) => `${row.productName}, ${row.basicDocumentVersion}`,
   },
