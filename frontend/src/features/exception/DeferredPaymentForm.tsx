@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '../../components/Button'
 import { DataTable } from '../../components/DataTable'
@@ -7,18 +7,24 @@ import { CapPanel, GatePanel } from '../transaction/ConfirmationPanels'
 import { buildPayload, draftRows, initialForm } from '../transaction/form-model'
 import type { Payment, PaymentPayload, Precheck } from '../transaction/form-api'
 
-export function DeferredPaymentForm({ payment, date, earliestDate, excess, contractNo, pending, canProcess, actionContainer, onPreview, onSave }: {
+type DeferredPaymentFormProps = {
   payment: Payment; date: string; earliestDate?: string | null; excess: number; contractNo?: string
   pending: boolean; canProcess: boolean; actionContainer: HTMLElement | null
   onPreview: (body: PaymentPayload) => Promise<Precheck>
   onSave: (body: PaymentPayload, expectedUpdatedAt?: string) => Promise<void>
-}) {
+}
+
+export function DeferredPaymentForm(props: DeferredPaymentFormProps) {
+  const { payment, date, earliestDate, excess } = props
+  return <DeferredPaymentEditor key={JSON.stringify([payment, date, earliestDate, excess])} {...props} />
+}
+
+function DeferredPaymentEditor({ payment, date, earliestDate, excess, contractNo, pending, canProcess, actionContainer, onPreview, onSave }: DeferredPaymentFormProps) {
   const [result, setResult] = useState<Precheck | null>(null)
   const [error, setError] = useState('')
   const currentAmount = Number(payment.amount ?? 0) - excess
   const valid = canProcess && Boolean(payment.updatedAt && earliestDate && date && date >= earliestDate)
     && excess > 0 && currentAmount >= 0 && payment.attributions?.length === 1 && payment.cashflowType === 'PAYMENT'
-  useEffect(() => { setResult(null); setError('') }, [date, excess, payment])
   function body() {
     const reduced = { ...payment, amount: currentAmount, attributions: payment.attributions!.map(row => ({ ...row, amount: currentAmount })) }
     const payload = buildPayload(initialForm(payment.settlementMonth?.slice(0, 7) ?? '', reduced), draftRows(reduced), false)

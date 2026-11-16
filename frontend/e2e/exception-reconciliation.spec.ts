@@ -66,4 +66,3 @@ test('청약철회 지급 원인과 계약 타임라인을 보고 예외 상세�
   await expect(parent.getByRole('textbox', { name: /증빙/ })).toHaveValue('기존 입력 보존 확인')
   await expect(parent.getByRole('list', { name: '계약 상태 변화' })).toBeVisible()
 })
-

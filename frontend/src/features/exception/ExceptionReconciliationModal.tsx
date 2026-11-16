@@ -10,7 +10,7 @@ import { amountText } from '../reconciliation/amounts'
 import { Failure, ResultBadge } from '../reconciliation/display'
 import { reconciliationExplanation } from '../reconciliation/explanation'
 import { PAYMENT_STAGE } from '../reconciliation/labels'
-import { contractStateLabel, useExceptionContract } from './ContractStatusContext'
+import { contractStateLabel, useExceptionContract } from './contract-context'
 import { ContractStatusBadge } from '../contract/badges'
 
 const walkthrough: ScreenHelpStep[] = [

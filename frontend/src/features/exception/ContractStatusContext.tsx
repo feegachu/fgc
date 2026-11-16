@@ -1,16 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { ContractStatusHistory } from '../contract/ContractStatusHistory'
 import '../contract/detail.css'
-import { contractDetailQuery, contractEventsQuery } from '../contract/api'
-import { contractStatusLabels } from '../contract/labels'
-
-export function useExceptionContract(contractId?: number) {
-  return useQuery({ ...contractDetailQuery(contractId ? String(contractId) : ''), staleTime: 30_000 })
-}
-
-export function contractStateLabel(status?: string, label?: string) {
-  return label || contractStatusLabels[status as keyof typeof contractStatusLabels] || '확인 필요'
-}
+import { contractEventsQuery } from '../contract/api'
 
 /** 계약 상세와 같은 상태 타임라인을 예외 상세·대사 모달에서도 사용한다. */
 export function ContractStatusContext({ contractId }: { contractId: number }) {

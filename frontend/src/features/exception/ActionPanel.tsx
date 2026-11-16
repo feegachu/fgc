@@ -20,7 +20,7 @@ import { JournalCorrectionModal } from './JournalCorrectionModal'
 import { decisionReasonText } from '../arbitrage/utils'
 import { CapDetailModal } from '../cap/CapDetailModal'
 import { ExceptionReconciliationModal } from './ExceptionReconciliationModal'
-import { contractStateLabel, useExceptionContract } from './ContractStatusContext'
+import { contractStateLabel, useExceptionContract } from './contract-context'
 
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 
