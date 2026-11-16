@@ -240,7 +240,7 @@ class Demo:
                  '--file=-'], stdin=stream, stdout=sql)
             sql.seek(0)
             run(['docker', 'exec', '-i', self.db, 'psql', '-X', '-q', '-U', 'fgc', '-d', 'fgc',
-                 '-v', 'ON_ERROR_STOP=1', '--single-transaction', '--file=-'], stdin=sql)
+                 '-v', 'ON_ERROR_STOP=1', '--single-transaction', '--file=-'], stdin=sql, stdout=subprocess.DEVNULL)
         if self.ec2:
             # /data는 위에서 확인한 PDF 전용 볼륨이다. 다른 Docker 볼륨은 접근하지 않는다.
             self.files_command(path, 'find /data -mindepth 1 -delete; tar -xzf /backup/files.tgz -C /data')
