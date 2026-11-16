@@ -892,17 +892,17 @@ def main():
     prepare_payment_cap(demo)
     print('10월 통합검증 실행', flush=True)
     demo.execute('2026-10')
-    all_open = demo.open_cases()
-    monitoring = [row for row in all_open if row['status'] == 'REVIEW_REQUIRED'
-                  and row['type'] in ('CAP_WARNING', 'ARBITRAGE_CANDIDATE')]
-    counts = Counter(row['type'] for row in all_open if row not in monitoring)
+    counts = Counter(row['type'] for row in demo.open_cases())
+    # OPEN 업무 목록은 모니터링 유형을 제외하므로 검토대상은 별도로 조회한다.
+    monitoring = [row for row in demo.loader.pages('/api/v1/exceptions?status=REVIEW_REQUIRED&validationMonth=2026-10-01')
+                  if row['type'] in ('CAP_WARNING', 'ARBITRAGE_CANDIDATE')]
     expected_open = october_open_count(demo.manifest)
     require(counts == {'CAP_VIOLATION': 1, 'RECONCILIATION_MISMATCH': expected_open - 1}, f'10월 예외 구성이 다릅니다: {counts}')
     require(Counter(row['type'] for row in monitoring) == {'CAP_WARNING': 1, 'ARBITRAGE_CANDIDATE': 1},
         f'10월 모니터링 검토대상 구성이 다릅니다: {monitoring}')
     dashboard = demo.s.ok('GET', '/api/v1/dashboard/summary?month=2026-10')
     require(dashboard['capViolation'] == 1 and dashboard['capWarning'] == 1
-        and dashboard['arbitrageCandidate'] == 1 and dashboard['openException'] == expected_open + len(monitoring),
+        and dashboard['arbitrageCandidate'] == 1 and dashboard['openException'] == expected_open,
         f'10월 한도 카드 확인 실패: {dashboard}')
     require(db.sql("SELECT count(*) FROM fgc.validation_run WHERE validation_month>='2026-11-01'") == '0',
         '11월은 실행 전이어야 합니다')
