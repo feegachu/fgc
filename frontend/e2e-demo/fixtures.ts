@@ -42,11 +42,14 @@ export const password = process.env.FGC_E2E_PASSWORD ?? 'fgc1234!' // checked-in
 
 export async function login(page: Page, account = 'settle01', route = '/contracts?month=2026-07') {
   await page.context().clearCookies()
-  await page.goto(`login?redirect=${encodeURIComponent(route)}`)
+  await page.goto('login')
   await page.getByLabel(/^아이디/).fill(account)
   await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
   await page.getByRole('button', { name: '로그인', exact: true }).click()
-  await expect(page).not.toHaveURL(/\/login/)
+  await expect(page.getByRole('heading', { name: /^(업무 대시보드|포트폴리오)$/ })).toBeVisible()
+  await expect(page).toHaveURL(/\/(?:agent-home)?\?month=\d{4}-\d{2}$/)
+  // 새 로그인은 메인에서 시작한다. 업무 시나리오의 목적지는 인증 완료 후 별도로 연다.
+  await page.goto(route)
 }
 export async function successful(response: Promise<Response>) {
   const result = await response
