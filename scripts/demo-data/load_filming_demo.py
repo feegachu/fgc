@@ -187,7 +187,7 @@ class OctoberDemo:
                  payment_cycle='ANNUAL', snapshot_through=10):
         require(product in (*PRODUCTS, *PORTFOLIO_PRODUCTS, 'STD-TERM-A') and agent_code in AGENTS, '시드 상품/설계사만 사용합니다')
         require(payment_cycle in ('ANNUAL', 'MONTHLY'), '연납 또는 월납만 사용합니다')
-        paid_premium = premium * (12 if payment_cycle == 'ANNUAL' else 1)
+        paid_premium = round(premium * (12 if payment_cycle == 'ANNUAL' else 1), 2)
         reference = self.db.rows("SELECT p.product_offering_id, p.product_id, pr.insurer_id, i.insurer_code "
             "FROM fgc.product_offering p JOIN fgc.product pr USING(product_id) JOIN fgc.insurer i USING(insurer_id) "
             f"WHERE pr.standard_product_code='{product}' AND p.offering_version='2026-CURRENT-A'")[0]
@@ -271,7 +271,7 @@ class OctoberDemo:
             run = self.execute(month)
             require(not self.open_cases(), f'{month}에 예상하지 않은 예외: {self.open_cases()}')
             self.admin.ok('POST', f'/api/v1/validation-runs/{run}/finalize', {}, idem())
-        print(f'{MONTH} 정상 {normal_per_month}건과 오류 시연 4건 준비 (월 검증 미실행)', flush=True)
+        print(f'{MONTH} 정상 {normal_per_month}건과 예외 시연 {october_open_count(self.manifest)}건 준비 (월 검증 미실행)', flush=True)
         self.register_month(MONTH, normal_per_month)
         self.pay_month(MONTH)
         contract = self.manifest['contracts']['RECOVERY']
@@ -384,6 +384,10 @@ class FilmingOctoberDemo(OctoberDemo):
             products = NON_LIFE if non_life else LIFE
             product = products[(mon + n // 2) % len(products)]
             premium = PREMIUMS[(mon * 2 + n) % len(PREMIUMS)]
+            if self.variant == 'compact' and getattr(self, 'normal_per_month', 10) == 10:
+                # 10월 신규 보험료 720,000원, 예정 수수료 4,000,000원.
+                # 1월 정상 계약의 유지수수료를 500원 줄이고 10월 보험료는 정수로 맞춘다.
+                premium = {(1, 0): 75000, (10, 1): 100000}.get((mon, n), premium)
             contract = self.register(f'SON_{mon:02d}_{n+1:02d}', f'2026-{mon:02d}-{3+n*3:02d}',
                 len(self.manifest['contracts']) + 1, product, premium=premium)
             rows.append({'contractId': contract['contractId'], 'contractNo': contract['contractNo'],
@@ -395,6 +399,7 @@ class FilmingOctoberDemo(OctoberDemo):
         self.register_portfolio_month(int(month[5:7]))
 
     def prepare(self, normal_per_month=20, cap_detection='MONTHLY'):
+        self.normal_per_month = normal_per_month
         for mon in range(1, 7):
             print(f'손설계 2026-{mon:02d} 과거 계약·지급 준비', flush=True)
             self.register_portfolio_month(mon)
@@ -717,8 +722,8 @@ def verify(demo, manifest, already_completed=False):
     require(Counter((r['type'], r.get('reasonCode'), r.get('contractNo')) for r in detected) == expected,
             '요청한 시나리오 외 예외가 생겼거나 필요한 예외가 누락됐습니다')
     checklist = demo.s.ok('GET', f'/api/v1/validation-runs/{run}/finalize-checklist')
-    critical = next(c for c in checklist['conditions'] if c['no'] == 3)
-    require(not checklist['passed'] and critical['count'] == 1, f'긴급 예외 차단 실패: {checklist}')
+    open_exceptions = next(c for c in checklist['conditions'] if c['no'] == 3)
+    require(not checklist['passed'] and open_exceptions['count'] == len(detected), f'미처리 예외 차단 실패: {checklist}')
     status, result = demo.admin.call('POST', f'/api/v1/validation-runs/{run}/finalize', {}, idem())
     require(status == 422 and result.get('error', {}).get('code') == 'FGC-VRUN-002', f'실제 확정 API가 차단되지 않았습니다: {status} {result}')
     cap = next(r for r in detected if r['type'] == 'CAP_VIOLATION')
@@ -888,8 +893,13 @@ def main():
     print('10월 통합검증 실행', flush=True)
     demo.execute('2026-10')
     counts = Counter(row['type'] for row in demo.open_cases())
+    # OPEN 업무 목록은 모니터링 유형을 제외하므로 검토대상은 별도로 조회한다.
+    monitoring = [row for row in demo.loader.pages('/api/v1/exceptions?status=REVIEW_REQUIRED&validationMonth=2026-10-01')
+                  if row['type'] in ('CAP_WARNING', 'ARBITRAGE_CANDIDATE')]
     expected_open = october_open_count(demo.manifest)
     require(counts == {'CAP_VIOLATION': 1, 'RECONCILIATION_MISMATCH': expected_open - 1}, f'10월 예외 구성이 다릅니다: {counts}')
+    require(Counter(row['type'] for row in monitoring) == {'CAP_WARNING': 1, 'ARBITRAGE_CANDIDATE': 1},
+        f'10월 모니터링 검토대상 구성이 다릅니다: {monitoring}')
     dashboard = demo.s.ok('GET', '/api/v1/dashboard/summary?month=2026-10')
     require(dashboard['capViolation'] == 1 and dashboard['capWarning'] == 1
         and dashboard['arbitrageCandidate'] == 1 and dashboard['openException'] == expected_open,
@@ -897,8 +907,23 @@ def main():
     require(db.sql("SELECT count(*) FROM fgc.validation_run WHERE validation_month>='2026-11-01'") == '0',
         '11월은 실행 전이어야 합니다')
     require(master_snapshot(db) == masters, '시드 마스터가 변경됐습니다')
+    if args.variant == 'compact' and args.normal_per_month == 10:
+        son_expected = db.sql("SELECT coalesce(sum(sl.expected_amount),0) FROM fgc.schedule_line sl "
+            "JOIN fgc.schedule_header sh USING(schedule_header_id) JOIN fgc.agent a ON a.agent_id=sl.beneficiary_agent_id "
+            "WHERE a.agent_code='A-FC-001' AND sh.payment_stage='GA_TO_FC' "
+            "AND sh.schedule_purpose='OPERATIONAL' AND sh.active_yn AND sl.line_status='PLANNED' "
+            "AND sl.due_month='2026-10-01'")
+        require(Decimal(son_expected) == Decimal('4000000'), f'손설계 10월 예정 합계 확인 실패: {son_expected}')
+        son_new = db.rows("SELECT count(*) AS count,coalesce(sum(c.monthly_equivalent_first_premium),0) AS premium "
+            "FROM fgc.insurance_contract c JOIN fgc.agent a USING(agent_id) WHERE a.agent_code='A-FC-001' "
+            "AND c.contract_date>='2026-10-01' AND c.contract_date<'2026-11-01'")[0]
+        require(son_new['count'] == 8 and Decimal(str(son_new['premium'])) == Decimal('720000'),
+            f'손설계 10월 신규 계약/보험료 확인 실패: {son_new}')
+        demo.manifest['sonOctoberExpectedCommission'] = 4_000_000
+        demo.manifest['sonOctoberNewContractCount'] = 8
+        demo.manifest['sonOctoberMonthlyPremium'] = 720_000
     demo.manifest.update(masterChecksums=masters, normalPerMonth=args.normal_per_month,
-        initialState='OCTOBER_COMPLETED_NOVEMBER_NOT_RUN')
+        initialState='OCTOBER_COMPLETED_NOVEMBER_NOT_RUN', reviewTargetCount=len(monitoring))
     (output / 'prepared.json').write_text(json.dumps(demo.manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     db.backup(output / 'filming-start.dump')
     print(f'준비 완료: {output}\n계약 {len(demo.manifest["contracts"])}건 / 10월 미처리 {expected_open}건 / 11월 예상 {plan}', flush=True)

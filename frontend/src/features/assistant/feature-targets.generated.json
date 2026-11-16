@@ -1225,6 +1225,26 @@
     "element": "Button"
   },
   {
+    "id": "features.cap.cap-detail-modal.current",
+    "file": "features/cap/CapDetailModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.cap.cap-detail-modal.deferred",
+    "file": "features/cap/CapDetailModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.cap.cap-detail-modal.detected",
+    "file": "features/cap/CapDetailModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.cap.cap-detail-modal.exception-section",
+    "file": "features/cap/CapDetailModal.tsx",
+    "element": "section"
+  },
+  {
     "id": "features.cap.cap-detail-modal.link",
     "file": "features/cap/CapDetailModal.tsx",
     "element": "Link"
@@ -1235,29 +1255,9 @@
     "element": "section"
   },
   {
-    "id": "features.cap.cap-detail-modal.section-2",
-    "file": "features/cap/CapDetailModal.tsx",
-    "element": "section"
-  },
-  {
-    "id": "features.cap.cap-detail-modal.section-3",
-    "file": "features/cap/CapDetailModal.tsx",
-    "element": "section"
-  },
-  {
-    "id": "features.cap.cap-detail-modal.section-4",
-    "file": "features/cap/CapDetailModal.tsx",
-    "element": "section"
-  },
-  {
     "id": "features.cap.cap-detail-modal.section-5",
     "file": "features/cap/CapDetailModal.tsx",
     "element": "section"
-  },
-  {
-    "id": "features.cap.cap-detail-modal.table",
-    "file": "features/cap/CapDetailModal.tsx",
-    "element": "table"
   },
   {
     "id": "features.cap.cap-list-page.button",
@@ -2127,7 +2127,7 @@
   {
     "id": "features.exception.action-panel.link-2",
     "file": "features/exception/ActionPanel.tsx",
-    "element": "Link"
+    "element": "Button"
   },
   {
     "id": "features.exception.action-panel.reason",
@@ -2138,6 +2138,71 @@
     "id": "features.exception.action-panel.select",
     "file": "features/exception/ActionPanel.tsx",
     "element": "select"
+  },
+  {
+    "id": "features.exception.contract-status",
+    "file": "features/exception/ContractStatusContext.tsx",
+    "element": "div"
+  },
+  {
+    "id": "features.exception.deferred-payment.agent",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.deferred-payment.amount",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.deferred-payment.business-key",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.deferred-payment.cashflow",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.deferred-payment.evidence",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.deferred-payment.item",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.deferred-payment.month",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.deferred-payment.preview",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.deferred-payment.save",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.deferred-payment.source",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.deferred-payment.stage",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.deferred-payment.summary",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "section"
   },
   {
     "id": "features.exception.duplicate-journal.back",
@@ -2325,11 +2390,6 @@
     "element": "section"
   },
   {
-    "id": "features.exception.payment-correction.basis",
-    "file": "features/exception/PaymentCorrectionModal.tsx",
-    "element": "summary"
-  },
-  {
     "id": "features.exception.payment-correction.cancel-duplicate",
     "file": "features/exception/DuplicateJournalModal.tsx",
     "element": "Button"
@@ -2425,6 +2485,46 @@
     "element": "input"
   },
   {
+    "id": "features.exception.reconciliation-actual-kpi",
+    "file": "features/exception/ExceptionReconciliationModal.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "features.exception.reconciliation-amounts",
+    "file": "features/exception/ExceptionReconciliationModal.tsx",
+    "element": "div"
+  },
+  {
+    "id": "features.exception.reconciliation-back",
+    "file": "features/exception/ExceptionReconciliationModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.reconciliation-cause",
+    "file": "features/exception/ExceptionReconciliationModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.reconciliation-current",
+    "file": "features/exception/ExceptionReconciliationModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.reconciliation-detected",
+    "file": "features/exception/ExceptionReconciliationModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.reconciliation-difference-kpi",
+    "file": "features/exception/ExceptionReconciliationModal.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "features.exception.reconciliation-expected-kpi",
+    "file": "features/exception/ExceptionReconciliationModal.tsx",
+    "element": "KpiCard"
+  },
+  {
     "id": "features.exception.reconciliation-journal.close",
     "file": "features/exception/ReconciliationJournalModal.tsx",
     "element": "Button"
@@ -2438,6 +2538,26 @@
     "id": "features.exception.reconciliation-journal.payment",
     "file": "features/exception/ReconciliationJournalModal.tsx",
     "element": "select"
+  },
+  {
+    "id": "features.exception.reconciliation-open",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.reconciliation-results",
+    "file": "features/exception/ExceptionReconciliationModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.reconciliation-select",
+    "file": "features/exception/ExceptionReconciliationModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.reconciliation-table",
+    "file": "features/exception/ExceptionReconciliationModal.tsx",
+    "element": "table"
   },
   {
     "id": "features.exception.review-panel",

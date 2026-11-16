@@ -8,6 +8,20 @@ import { STAGES, STATUS_LABELS } from './labels'
 type Schemas = components['schemas']
 export type CapItem = Schemas['CapCheckItemResponse']
 export type CapBasis = Schemas['CapCheckBasisResponse']
+export type ExceptionCapBasis = Schemas['ExceptionCapBasisResponse']
+export const exceptionCapBasisQuery = (id?: number | null) => queryOptions({
+  queryKey: ['cap-checks', 'exception-basis', id ?? null],
+  queryFn: async ({ signal }) => {
+    const data = await get<ExceptionCapBasis>(`/api/v1/exceptions/${id}/cap-basis`, signal)
+    if (!data.detectedBasis?.capCheck) throw new Error('검출 당시 계산근거를 찾을 수 없습니다.')
+    return data
+  },
+  enabled: id != null,
+  staleTime: 0,
+  refetchOnMount: 'always',
+  refetchOnWindowFocus: false,
+  meta: { errorToast: false },
+})
 export type CapSearch = Schemas['CapCheckSearchResponse']
 export type CapStage = Schemas['CapStageSummaryResponse']
 export type CapAgent = Schemas['CapAgentSummaryResponse']

@@ -195,7 +195,7 @@ class ExceptionGenerationRepositoryIntegrationTest {
                 .containsEntry("min_detection_count", 2)
                 .containsEntry("max_detection_count", 2);
         assertThat(status(resolvedCaseId)).isEqualTo("NEW");
-        assertThat(status(changedRejectedCaseId)).isEqualTo("NEW");
+        assertThat(status(changedRejectedCaseId)).isEqualTo("REVIEW_REQUIRED");
         assertThat(status(unchangedRejectedCaseId)).isEqualTo("REJECTED");
     }
 

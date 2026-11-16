@@ -1206,7 +1206,7 @@ A1·A2(및 0475 복제본)의 관리자수수료는 팀장 1명에게 90,000 1�
 - 다른 월의 같은 계약·같은 문제: 예외 업무건 +1 `[SRC-032]`
 - 해결(`RESOLVED`)된 문제가 다시 검출되면 기존 업무건을 `NEW`로 재오픈하고 검출 이력에 재오픈 여부를 남긴다. 반려(`REJECTED`)된 건은 증거가 같으면 닫힌 채 남는다(운영정책서 제44조) `[SRC-032]`
 - 상태전이:
-  - NEW → IN_REVIEW → RESOLVED / REJECTED 성공
+  - NEW / REVIEW_REQUIRED → IN_REVIEW → RESOLVED / REJECTED 성공
   - NEW에서 바로 해결 조치 → 거절(운영정책서 제41조, `ExceptionActionType`)
   - REJECTED → REOPEN → IN_REVIEW 성공
   - RESOLVED 원장 정정 예외는 재오픈하지 않고 새 정정 예외를 만든다

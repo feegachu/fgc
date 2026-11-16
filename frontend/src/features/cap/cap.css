@@ -220,27 +220,54 @@
 .cap-react-pagination select {
   width: 6rem;
 }
-.cap-react-modal {
+.modal.cap-react-modal {
   width: min(96vw, 90rem);
   max-width: 90rem;
 }
 .cap-react-detail-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
   padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--color-border-subtle);
 }
-.cap-react-detail-summary > span {
+.cap-react-detail-stage {
   margin-left: var(--space-3);
 }
-.cap-react-detail-grid {
-  display: grid;
-  grid-template-columns: minmax(18rem, 0.8fr) minmax(0, 1.6fr);
-  gap: var(--space-4);
-  margin-top: var(--space-4);
+.cap-react-detail-limit {
+  flex: 0 1 28rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-8);
 }
-.cap-react-detail-left {
-  display: grid;
-  gap: var(--space-3);
-  align-content: start;
+.cap-react-detail-limit-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+.cap-react-detail .cap-react-detail-limit-heading h3 {
+  margin: 0;
+}
+.cap-react-detail-limit dl {
+  margin-bottom: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.cap-react-detail-limit dl div {
+  display: block;
+}
+.cap-react-detail-limit dt {
+  margin-bottom: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+.cap-react-detail-limit dd {
+  margin: 0;
+  white-space: nowrap;
+}
+.cap-react-detail-lines {
+  margin-top: var(--space-4);
 }
 .cap-react-detail .surface {
   padding: var(--space-4);
@@ -258,7 +285,24 @@
   font-weight: 400;
 }
 .cap-react-detail-lines .data-table {
-  min-width: 51rem;
+  min-width: 58rem;
+}
+.cap-react-modal .cap-react-detail-lines {
+  padding: var(--space-4);
+  min-width: 0;
+}
+.cap-react-detail-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: flex-start;
+}
+.cap-react-detail-totals > span {
+  white-space: nowrap;
+}
+.cap-react-detail-excess {
+  color: var(--color-status-error-text);
+  font-weight: 700;
 }
 .cap-react-error {
   padding: var(--space-4);
@@ -274,13 +318,25 @@
   .cap-react-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .cap-react-stages,
-  .cap-react-detail-grid {
+  .cap-react-stages {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 600px) {
+  .cap-react-detail-summary {
+    flex-direction: column;
+  }
+  .cap-react-detail-limit {
+    flex-basis: auto;
+    width: 100%;
+  }
   .cap-react-filter .filter-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+.cap-react-basis-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }

@@ -196,6 +196,8 @@ beforeEach(() => {
     if (path.startsWith('/api/v1/exceptions?')) return envelope(await searchResponse(path))
     if (path.startsWith('/api/v1/journals/accounts')) return envelope(accounts)
     if (path.startsWith('/api/v1/journals/70')) return envelope(journal)
+    if (/\/api\/v1\/contracts\/\d+\/status-events$/.test(path)) return envelope([])
+    if (/\/api\/v1\/contracts\/\d+$/.test(path)) return envelope({ contractId: 3, contractStatus: 'ACTIVE', contractStatusLabel: '정상' })
     return envelope(currentUser)
   }) as typeof apiClient.request)
 })
@@ -218,6 +220,47 @@ function renderPage(path = '/app/exceptions') {
   return { router, actions: userEvent.setup(), unmount: view.unmount }
 }
 const table = () => screen.findByRole('table', { name: '예외 목록' })
+
+it('계약 상태와 지급 제외 이유를 표시하고 같은 계약의 대사를 본 뒤 원래 예외로 돌아온다', async () => {
+  const item = { ...baseCase, type: 'RECONCILIATION_MISMATCH', typeLabel: '대사 불일치', sourceEntityType: 'RECONCILIATION_RESULT',
+    sourceEntityId: '1473', sourceLink: '/reconciliations?resultId=1473', reasonCode: 'INVALID_CONTRACT_PAYMENT', reasonLabel: '비유효 계약 지급',
+    description: '지급단계 GA→설계사 예상 0원 / 실제 650,000원 차액 650,000원' } as ExceptionCase
+  searchResponse = () => search([item])
+  const detail = { reconciliationResultId: 1473, reconciliationRunId: 41, contractId: 3, contractNo: 'C-0001', commissionItemName: '기본수수료',
+    expectedTotalAmount: 0, actualTotalAmount: 650000, differenceAmount: 650000, resultType: 'INVALID_CONTRACT_PAYMENT', resultTypeLabel: '비유효 계약 지급',
+    matches: [], detailSnapshot: { paymentStage: 'GA_TO_FC' } }
+  const matched = { ...detail, reconciliationResultId: 1474, commissionItemName: '유지수수료', expectedTotalAmount: 2000, actualTotalAmount: 2000, differenceAmount: 0, resultType: 'MATCHED', resultTypeLabel: '일치' }
+  const fallback = vi.mocked(apiClient.request).getMockImplementation()!
+  vi.mocked(apiClient.request).mockImplementation((async (path: string, init) => {
+    if (path === '/api/v1/contracts/3') return envelope({ contractId: 3, contractStatus: 'CANCELLED', contractStatusLabel: '청약철회' })
+    if (path === '/api/v1/contracts/3/status-events') return envelope([{ eventId: 1, eventSeq: 1, previousStatus: 'ACTIVE', newStatus: 'CANCELLED', effectiveAt: '2026-07-01T00:00:00+09:00', reason: '청약철회 접수' }])
+    if (path === '/api/v1/reconciliations/results/1473/basis') return envelope({ detected: detail, currentRunId: null, currentResults: [] })
+    if (path === '/api/v1/reconciliations/results/1473') return envelope(detail)
+    if (path === '/api/v1/reconciliations/results/1474') return envelope(matched)
+    if (path.startsWith('/api/v1/reconciliations/41/results?')) return envelope({ items: { content: [detail, matched], totalPages: 1 } })
+    return fallback(path, init)
+  }) as typeof apiClient.request)
+  const { actions, router } = renderPage('/app/exceptions?month=2026-07&status=NEW&selected=11')
+  const parent = await screen.findByRole('dialog', { name: /^예외 상세/ })
+  await within(parent).findByText('현재 계약 상태: 청약철회')
+  expect(within(parent).queryByText(/검출 당시 계약 상태가 지급 조건에 맞지 않아/)).not.toBeInTheDocument()
+  expect(within(parent).getByRole('list', { name: '계약 상태 변화' })).toHaveTextContent('정상청약철회')
+  expect(within(parent).getByText(/지급단계 GA→설계사 예상/).textContent).toContain('예상 0원\n실제 650,000원\n차액 650,000원')
+  await actions.type(within(parent).getByRole('textbox', { name: /증빙/ }), '보존할 검토 메모')
+  const location = router.state.location
+  await actions.click(within(parent).getByRole('button', { name: '대사 결과 열기' }))
+  const modal = await screen.findByRole('dialog', { name: '계약 대사 결과' })
+  await within(modal).findByRole('table', { name: '해당 계약의 대사 결과' })
+  expect(within(modal).queryByRole('tablist')).not.toBeInTheDocument()
+  expect(within(modal).getByRole('button', { name: '도움말' }).closest('.modal-header')).not.toBeNull()
+  expect(requests().some(([path]) => path.includes('/41/results?') && new URL(path, 'http://test').searchParams.get('contractId') === '3')).toBe(true)
+  await actions.click(within(modal).getByRole('button', { name: '유지수수료 원인 보기' }))
+  expect(await within(modal).findByText('예상 지급액과 실제 지급 자료가 일치합니다.')).toBeVisible()
+  await actions.click(within(modal).getByRole('button', { name: '뒤로가기' }))
+  expect(screen.queryByRole('dialog', { name: '계약 대사 결과' })).not.toBeInTheDocument()
+  expect(router.state.location).toEqual(location)
+  expect(within(parent).getByRole('textbox', { name: /증빙/ })).toHaveValue('보존할 검토 메모')
+})
 const actionHelp = () => within(screen.getByRole('dialog', { name: /^예외 상세/ })).getByRole('button', { name: '도움말' })
 
 describe('EXCP-W01 예외함', () => {
@@ -560,10 +603,11 @@ describe('EXCP-W01 예외함', () => {
     expect(document.querySelector('#root script, main script, [onerror]')).toBeNull()
   })
 
-  it('본인 배정은 제외하고 사유를 남겨 직접 검토를 시작한다', async () => {
+  it.each(['NEW', 'REVIEW_REQUIRED'] as const)('%s에서 본인 배정은 제외하고 사유를 남겨 직접 검토를 시작한다', async (status) => {
+    searchResponse = () => search([{ ...baseCase, status, statusLabel: status === 'NEW' ? '미처리' : '검토대상' }])
     postResponse = (_path, body) => {
       expect(body).toEqual({ actionType: 'START_REVIEW', reason: '지급 근거 확인', evidenceRef: null })
-      return { actionSeq: 1, fromStatus: 'NEW', toStatus: 'IN_REVIEW', toStatusLabel: '검토중',
+      return { actionSeq: 1, fromStatus: status, toStatus: 'IN_REVIEW', toStatusLabel: '검토중',
         actionType: 'START_REVIEW', actionTypeLabel: '검토 시작', actionBy: 7, actionByLoginId: 'settle01' }
     }
     const { actions } = renderPage('/app/exceptions?selected=11')
@@ -586,10 +630,11 @@ describe('EXCP-W01 예외함', () => {
     expect(actionHelp().closest('.modal-header')).not.toBeNull()
   })
 
-  it('다른 담당자에게 배정하면 해당 사람의 검토중이 되고 내 원인 수정은 비활성화된다', async () => {
+  it.each(['NEW', 'REVIEW_REQUIRED'] as const)('%s에서 다른 담당자에게 배정하면 해당 사람의 검토중이 되고 내 원인 수정은 비활성화된다', async (status) => {
+    searchResponse = () => search([{ ...baseCase, status, statusLabel: status === 'NEW' ? '미처리' : '검토대상' }])
     postResponse = (_path, body) => {
       expect(body).toEqual({ actionType: 'ASSIGN', assignedTo: 8, reason: '계약 담당자에게 배정', evidenceRef: null })
-      return { actionSeq: 1, fromStatus: 'NEW', toStatus: 'IN_REVIEW', toStatusLabel: '검토중',
+      return { actionSeq: 1, fromStatus: status, toStatus: 'IN_REVIEW', toStatusLabel: '검토중',
         actionType: 'ASSIGN', actionTypeLabel: '담당 배정', actionBy: 7, actionByLoginId: 'settle01' }
     }
     const { actions } = renderPage('/app/exceptions?selected=11')
@@ -853,6 +898,33 @@ describe('EXCP-W01 예외함', () => {
     const list = await table()
     expect(within(list).getByRole('link', { name: /^1,200% 판정$/ })).toHaveAttribute('href', '/app/cap-checks?contractNo=C-0001')
   })
+  it.each(['뒤로가기', 'Escape', '창 닫기'])('지급건 참조는 숨기고 계산근거 모달의 %s는 원래 예외 상세로 돌아온다', async (closeAction) => {
+    searchResponse = () => search([{ ...baseCase,
+      sourceEntityType: 'COMMISSION_TRANSACTION', sourceEntityId: '91',
+      sourceLink: '/payments?selected=91', capBasisLink: '/cap-checks?capCheckId=42',
+    }])
+    const original = vi.mocked(apiClient.request).getMockImplementation()!
+    vi.mocked(apiClient.request).mockImplementation((async (path: string, init: Parameters<typeof apiClient.request>[1] = {}) => {
+      if (path === '/api/v1/exceptions/11/cap-basis') return envelope({ detectedBasis: { capCheck: { contractNo: 'C-0001', resultStatus: 'VIOLATION', includedAmount: 1012000, limitAmount: 960000, remainingAmount: -52000 }, details: [] } })
+      return original(path, init)
+    }) as typeof apiClient.request)
+    const { router, actions } = renderPage('/app/exceptions?selected=11&status=ALL&contractNo=C-0001')
+    const dialog = await screen.findByRole('dialog', { name: /^예외 상세/ })
+    expect(within(dialog).queryByRole('link', { name: '지급 건 열기' })).not.toBeInTheDocument()
+    const before = router.state.location.pathname + router.state.location.search
+    await actions.click(within(dialog).getByRole('button', { name: '1,200% 계산근거 열기' }))
+    const basis = await screen.findByRole('dialog', { name: '계산근거' })
+    await within(basis).findByRole('table', { name: '항목별 산입 내역' })
+    expect(router.state.location.pathname + router.state.location.search).toBe(before)
+    expect(requests().some(([path]) => path.startsWith('/api/v1/cap-checks?'))).toBe(false)
+    expect(within(basis).getByRole('link', { name: '예외 목록 보기' })).toHaveAttribute('href', '/app/exceptions?status=ALL&contractNo=C-0001&month=2026-07')
+    if (closeAction === 'Escape') await actions.keyboard('{Escape}')
+    else await actions.click(within(basis).getByRole('button', { name: closeAction }))
+    expect(screen.queryByRole('dialog', { name: '계산근거' })).not.toBeInTheDocument()
+    expect(dialog).toBeVisible()
+    expect(router.state.location.pathname + router.state.location.search).toBe(before)
+    expect(dialog.querySelector('[data-guide-target="exception.reference"]')).toHaveTextContent('설명')
+  })
 
   it('검토 의견은 상태를 유지하고 반려는 근거 문서를 기록해 종결한다', async () => {
     searchResponse = () => search([{ ...baseCase, type: 'RECONCILIATION_MISMATCH', reconciliationResultType: 'INVALID_CONTRACT_PAYMENT', status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }])
@@ -877,6 +949,103 @@ describe('EXCP-W01 예외함', () => {
     await actions.click(reject)
     expect(await screen.findByText('2. 반려')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '예외 건 처리' })).toBeDisabled()
+  })
+  it('처리 후 다시 연 계산근거는 감액 결과와 이연 지급을 기본 표시하고 과거 근거를 비교한다', async () => {
+    searchResponse = () => search([{ ...baseCase, capCheckId: 42, capBasisLink: '/cap-checks?capCheckId=42' }])
+    const original = vi.mocked(apiClient.request).getMockImplementation()!
+    const basis = (amount: number, status: string, fee: number) => ({
+      capCheck: { contractNo: 'C-0001', includedAmount: amount, limitAmount: 960000, remainingAmount: 960000 - amount,
+        usagePct: status === 'NORMAL' ? '100' : '105.4', resultStatus: status, resultStatusLabel: status === 'NORMAL' ? '정상' : '위반' },
+      details: [{ detailSeq: 1, commissionItemName: '정착지원금', amount: fee, paymentStatus: 'CONFIRMED', paymentStatusSnapshot: 'DRAFT', classificationSnapshot: 'INCLUDED' }],
+    })
+    vi.mocked(apiClient.request).mockImplementation((async (path: string, init: Parameters<typeof apiClient.request>[1] = {}) => {
+      if (path === '/api/v1/exceptions/11/cap-basis') return envelope({ detectedBasis: basis(1012000, 'VIOLATION', 210000), currentBasis: basis(960000, 'NORMAL', 158000),
+        deferredPayments: [{ commissionTransactionId: 80, commissionItemName: '정착지원금', amount: 52000, scheduledPaymentDate: '2027-10-05', status: 'DRAFT', attributions: [{ attributionDate: '2027-10-05' }] }] })
+      return original(path, init)
+    }) as typeof apiClient.request)
+    const { actions } = renderPage('/app/exceptions?selected=11')
+    await actions.click(await screen.findByRole('button', { name: '1,200% 계산근거 열기' }))
+    const dialog = await screen.findByRole('dialog', { name: '계산근거' })
+    const lines = await within(dialog).findByRole('table', { name: '항목별 산입 내역' })
+    expect(lines).toHaveTextContent('158,000원')
+    expect(lines.querySelector('tfoot')).toHaveTextContent('960,000원')
+    expect(within(dialog).getByRole('table', { name: '이연 지급 내역' })).toHaveTextContent('52,000원')
+    await actions.click(within(dialog).getByRole('button', { name: '검출 당시 보기' }))
+    expect(lines).toHaveTextContent('210,000원')
+    expect(lines).toHaveTextContent('검출 당시 지급 상태')
+    expect(lines).toHaveTextContent('작성중')
+    await actions.click(within(dialog).getByRole('button', { name: '뒤로가기' }))
+    await actions.click(screen.getByRole('button', { name: '1,200% 계산근거 열기' }))
+    const reopened = await screen.findByRole('dialog', { name: '계산근거' })
+    expect(await within(reopened).findByRole('table', { name: '항목별 산입 내역' })).toHaveTextContent('158,000원')
+  })
+  it('초과액보다 큰 이연 금액을 직접 입력하고 예정일에 맞춰 귀속을 고정한다', async () => {
+    searchResponse = () => search([{ ...baseCase, status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }])
+    const payment = { commissionTransactionId: 77, sourceType: 'GA_MANUAL_PAYMENT', sourceBusinessKey: 'SETTLE-77',
+      status: 'DRAFT', paymentStage: 'GA_TO_FC', contractId: 3, agentId: 1, commissionItemId: 1, commissionItemName: '정착지원금',
+      settlementMonth: '2026-10-01', scheduledPaymentDate: '2026-10-25', cashflowType: 'PAYMENT', amount: 210000,
+      updatedAt: '2026-10-25T09:00:00+09:00', evidenceRef: 'DOC-1', allocationPolicyVersion: 77,
+      attributions: [{ contractId: 3, attributionDate: '2026-10-25', amount: 210000, inclusionDecisionStatus: 'INCLUDED', attributionMethod: 'SETTLEMENT_SUPPORT_MONTHLY' }] }
+    const original = vi.mocked(apiClient.request).getMockImplementation()!
+    vi.mocked(apiClient.request).mockImplementation((async (path: string, init: Parameters<typeof apiClient.request>[1] = {}) => {
+      if (!init.method) {
+        if (path.endsWith('/payment-correction')) return envelope({ payments: [payment], deferrableFrom: '2027-10-05', capBasis: { capCheck: { includedAmount: 1012000, limitAmount: 960000 } } })
+        if (path.startsWith('/api/v1/base/agents')) return envelope({ content: [{ agentId: 1, agentCode: 'FC-001', agentName: '설계사', rankCode: 'FC', agentStatus: 'ACTIVE' }] })
+        if (path.startsWith('/api/v1/base/commission-items/search')) return envelope({ content: [{ commissionItemId: 1, itemCode: 'SETTLEMENT_SUPPORT', itemName: '정착지원금', cashflowType: 'PAYMENT' }] })
+        if (path.startsWith('/api/v1/contracts')) return envelope({ content: [{ contractId: 3, contractNo: 'C-0001', contractDate: '2026-10-05' }] })
+      }
+      return original(path, init)
+    }) as typeof apiClient.request)
+    postResponse = (path, body) => {
+      expect(body).toMatchObject({ paymentId: 77, plannedAction: 'DEFER', deferredAmount: 60000, deferredPaymentDate: '2027-11-07',
+        payment: { amount: 150000, allocationPolicyVersion: 77, scheduledPaymentDate: '2026-10-25', attributions: [{ amount: 150000, attributionDate: '2026-10-25' }] } })
+      if (path.endsWith('/precheck')) return { confirmable: true, capPreview: [], blockers: [] }
+      return { payment: { ...payment, amount: 150000 }, resolved: true, message: '이연 완료',
+        action: { actionSeq: 2, fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED', actionType: 'DEFER', actionTypeLabel: '이연', toStatusLabel: '해결' } }
+    }
+    const { actions } = renderPage('/app/exceptions?selected=11')
+    await actions.click(await screen.findByRole('button', { name: '예외 건 처리' }))
+    const dialog = await screen.findByRole('dialog', { name: '수수료 지급 건 등록 및 수정' })
+    await actions.selectOptions(await within(dialog).findByLabelText('감액 및 이연 구분'), 'DEFER')
+    expect(within(dialog).queryByLabelText('수정할 지급 건')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(/검출 당시 실제 산입액/)).not.toBeInTheDocument()
+    const dateInput = within(dialog).getByLabelText(/이연 지급 예정일/)
+    expect(dateInput).toHaveValue('2027-10-05')
+    const amountInput = within(dialog).getByLabelText(/이연 금액 \(원\)/)
+    const previewButton = within(dialog).getByRole('button', { name: '사전검증' })
+    expect(previewButton).toBeDisabled()
+    fireEvent.change(amountInput, { target: { value: '52000' } })
+    expect(previewButton).toBeDisabled()
+    fireEvent.change(within(dialog).getByLabelText(/이연 금액 \(원\)/), { target: { value: '210001' } })
+    expect(previewButton).toBeDisabled()
+    const editableAmount = within(dialog).getByLabelText(/이연 금액 \(원\)/)
+    await actions.clear(editableAmount)
+    await actions.type(editableAmount, '60000')
+    const planned = within(dialog).getByRole('table', { name: '이연 지급 및 귀속 내역' })
+    expect(within(planned).getAllByRole('row')).toHaveLength(4)
+    expect(within(planned).getByLabelText('1번 귀속 내역 귀속금액')).toHaveValue(150000)
+    expect(within(planned).getByLabelText('1번 귀속 내역 귀속일')).toHaveValue('2026-10-25')
+    expect(within(planned).getByLabelText('2번 귀속 내역 귀속일')).toHaveValue('2027-10-05')
+    expect(within(planned).getByLabelText('2번 귀속 내역 귀속금액')).toHaveValue(60000)
+    expect(within(planned).getByLabelText('2번 귀속 내역 귀속금액')).toBeDisabled()
+    expect(within(dialog).getByLabelText(/^지급 관리번호/)).toHaveAttribute('readonly')
+    expect(within(dialog).queryByLabelText(/^금액 \(원\)/)).not.toBeInTheDocument()
+    fireEvent.change(dateInput, { target: { value: '2027-11-07' } })
+    const updatedPlanned = within(dialog).getByRole('table', { name: '이연 지급 및 귀속 내역' })
+    expect(within(updatedPlanned).getByLabelText('2번 귀속 내역 귀속일')).toHaveValue('2027-11-07')
+    expect(within(updatedPlanned).getByLabelText('2번 귀속 내역 귀속월')).toHaveValue('2027-11-01')
+    expect(within(dialog).getByLabelText(/^정산월/)).toHaveValue('2027-11')
+    expect(within(dialog).getByLabelText(/이연 금액 \(원\)/)).toHaveValue(60000)
+    await actions.click(within(dialog).getByRole('button', { name: '사전검증' }))
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '이연 저장' })).toBeEnabled())
+    fireEvent.change(dateInput, { target: { value: '2027-11-08' } })
+    expect(within(dialog).getByRole('button', { name: '이연 저장' })).toBeDisabled()
+    fireEvent.change(dateInput, { target: { value: '2027-11-07' } })
+    expect(within(dialog).getByRole('button', { name: '이연 저장' })).toBeDisabled()
+    await actions.click(within(dialog).getByRole('button', { name: '사전검증' }))
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '이연 저장' })).toBeEnabled())
+    await actions.click(within(dialog).getByRole('button', { name: '이연 저장' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '수수료 지급 건 등록 및 수정' })).not.toBeInTheDocument())
   })
 
   it('보험사 지급기준의 반려는 정산담당자가 할 수 없고 의견 및 배정은 유지한다', async () => {

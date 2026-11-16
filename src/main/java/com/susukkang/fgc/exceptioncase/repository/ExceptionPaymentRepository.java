@@ -16,6 +16,8 @@ import java.util.*;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ExceptionPaymentRepository {
+    private static final String CONTRACT_PARAM = "contract";
+    private static final String ORIGINAL_PARAM = "original";
     private final EntityManager em;
 
     public record Source(Long id, String type, Long contractId, String sourceType,
@@ -24,6 +26,33 @@ public class ExceptionPaymentRepository {
                            boolean scheduledBasis, Long scheduleHeaderId, Long policyVersionId) {}
     public record ReconciliationSource(String resultType, BigDecimal expectedAmount, PaymentStage stage,
             Long contractId, Long expectedAgentId, Long commissionItemId, LocalDate month, Integer installmentNo, String itemCode) {}
+
+    /** 예외 자체의 정정 감사기록에 연결된 지급만 조회한다. 다른 검증 실행의 최신값으로 바꾸지 않는다. */
+    public Long correctedCapCheckId(Long id, CapScope scope) {
+        var rows = em.createNativeQuery("""
+                SELECT c.cap_check_id FROM (
+                    SELECT (a.after_value->>'paymentId')::bigint AS payment_id FROM fgc.audit_log a
+                    WHERE a.entity_type='EXCEPTION_CASE' AND a.entity_id=:id
+                      AND a.action_code='EXCEPTION_PAYMENT_CORRECTION'
+                    ORDER BY a.audit_log_id DESC LIMIT 1
+                ) latest
+                JOIN fgc.cap_check c ON c.candidate_transaction_id=latest.payment_id
+                WHERE c.contract_id=:contract AND c.payment_stage=:stage
+                ORDER BY c.checked_at DESC, c.cap_check_id DESC LIMIT 1
+                """).setParameter("id", id.toString()).setParameter(CONTRACT_PARAM, scope.contractId())
+                .setParameter("stage", scope.stage().name()).getResultList();
+        return rows.isEmpty() ? null : number(rows.getFirst());
+    }
+
+    public List<Long> deferredPaymentIds(Long id) {
+        return em.createNativeQuery("""
+                SELECT DISTINCT (after_value->>'deferredPaymentId')::bigint
+                FROM fgc.audit_log WHERE entity_type='EXCEPTION_CASE' AND entity_id=:id
+                  AND action_code='EXCEPTION_PAYMENT_DEFERRED'
+                  AND after_value->>'deferredPaymentId' IS NOT NULL
+                ORDER BY 1
+                """, Long.class).setParameter("id", id.toString()).getResultList();
+    }
 
     public LocalDate deferrableFrom(Long contractId) {
         if (contractId == null) return null;
@@ -58,7 +87,7 @@ public class ExceptionPaymentRepository {
                     WHERE a.commission_transaction_id=p.commission_transaction_id AND a.contract_id=:contract)
                 """).setParameter("stage", source.stage().name()).setParameter("month", source.month())
                 .setParameter("item", source.commissionItemId()).setParameter("agent", source.stage() == PaymentStage.GA_TO_FC ? source.expectedAgentId() : null)
-                .setParameter("installment", source.installmentNo()).setParameter("contract", source.contractId()).getSingleResult()).longValue() > 0;
+                .setParameter("installment", source.installmentNo()).setParameter(CONTRACT_PARAM, source.contractId()).getSingleResult()).longValue() > 0;
     }
 
     public CapScope capScope(Long id) {
@@ -105,7 +134,7 @@ public class ExceptionPaymentRepository {
                 JOIN fgc.exception_case warning ON warning.cap_check_id = recheck.cap_check_id
                 WHERE violation.exception_case_id = :exceptionId AND original.result_status = 'VIOLATION'
                   AND recheck.cap_check_id IN (:capCheckIds) AND recheck.result_status = 'WARNING'
-                  AND warning.exception_type = 'CAP_WARNING' AND warning.status = 'NEW'
+                  AND warning.exception_type = 'CAP_WARNING' AND warning.status IN ('NEW', 'REVIEW_REQUIRED')
                   AND warning.source_entity_type = 'COMMISSION_TRANSACTION' AND warning.source_entity_id = :paymentId
                 ORDER BY warning.exception_case_id
                 """, CorrectedViolationWarning.class)
@@ -278,14 +307,14 @@ public class ExceptionPaymentRepository {
                 WHERE c.candidate_id=:candidate AND c.version_no=:version
                   AND (CAST(:document AS text) IS NULL OR d.generated_document_id IS NOT NULL)
                 ON CONFLICT DO NOTHING
-                """).setParameter("original", originalPayment).setParameter("contract", source.contractId())
+                """).setParameter(ORIGINAL_PARAM, originalPayment).setParameter(CONTRACT_PARAM, source.contractId())
                 .setParameter("deduction", deductionPayment).setParameter("exception", source.id()).setParameter("candidate", candidate)
                 .setParameter("version", version).setParameter("document", documentNo).executeUpdate();
         return Boolean.TRUE.equals(em.createNativeQuery("""
                 SELECT EXISTS (SELECT 1 FROM fgc.exception_payment_recovery r JOIN fgc.clawback_calculation c USING(clawback_calculation_id)
                   WHERE r.original_payment_id=:original AND r.contract_id=:contract AND r.deduction_payment_id=:deduction
                     AND c.candidate_id=:candidate AND c.version_no=:version)
-                """).setParameter("original", originalPayment).setParameter("contract", source.contractId()).setParameter("deduction", deductionPayment)
+                """).setParameter(ORIGINAL_PARAM, originalPayment).setParameter(CONTRACT_PARAM, source.contractId()).setParameter("deduction", deductionPayment)
                 .setParameter("candidate", candidate).setParameter("version", version).getSingleResult());
     }
 
@@ -300,7 +329,7 @@ public class ExceptionPaymentRepository {
                       AND recovery.deduction_payment_id = :deduction AND deduction.status = 'CONFIRMED'
                       AND calculation.candidate_id = :candidate
                 )
-                """).setParameter("exceptionId", source.id()).setParameter("original", originalPayment)
+                """).setParameter("exceptionId", source.id()).setParameter(ORIGINAL_PARAM, originalPayment)
                 .setParameter("deduction", deductionPayment).setParameter("candidate", candidate).getSingleResult());
     }
 

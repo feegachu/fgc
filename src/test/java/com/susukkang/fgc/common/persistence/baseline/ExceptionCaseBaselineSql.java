@@ -330,7 +330,7 @@ final class ExceptionCaseBaselineSql {
                     SELECT exception_type AS exceptionType,
                            COUNT(*)       AS count
                       FROM fgc.exception_case
-                     WHERE status IN ('NEW', 'IN_REVIEW')
+                     WHERE status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW')
                      GROUP BY exception_type
                      ORDER BY MAX(CASE severity WHEN 'CRITICAL' THEN 3 WHEN 'HIGH' THEN 2 WHEN 'WARNING' THEN 1 ELSE 0 END) DESC,
                               exception_type

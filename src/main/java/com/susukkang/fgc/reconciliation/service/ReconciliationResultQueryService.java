@@ -8,6 +8,7 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailResponse;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationResultBasisResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultListItemResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultSearchResponse;
@@ -41,6 +42,18 @@ public class ReconciliationResultQueryService {
             int size,
             String sort
     ) {
+        return searchResults(reconciliationRunId, resultType, null, page, size, sort);
+    }
+
+    @Transactional(readOnly = true)
+    public ReconciliationResultSearchResponse search(long reconciliationRunId, String resultType, Long contractId,
+                                                      int page, int size, String sort) {
+        return searchResults(reconciliationRunId, resultType, contractId, page, size, sort);
+    }
+
+    private ReconciliationResultSearchResponse searchResults(long reconciliationRunId, String resultType, Long contractId,
+                                                             int page, int size, String sort) {
+        if (contractId != null && contractId <= 0) throw invalid("contractId");
         validatePage(page, size);
         ListSort listSort = ListSort.parse(sort, ReconciliationResultRepository.RESULT_SORT_KEYS,
                 ReconciliationResultRepository.DEFAULT_RESULT_SORT);
@@ -51,12 +64,15 @@ public class ReconciliationResultQueryService {
         if (offsetLong > Integer.MAX_VALUE) {
             throw invalid("page");
         }
-        List<ReconciliationResultListItemResponse> content = reconciliationResultRepository
-                .findResults(reconciliationRunId, resultType, listSort, (int) offsetLong, size)
+        var rows = contractId == null
+                ? reconciliationResultRepository.findResults(reconciliationRunId, resultType, listSort, (int) offsetLong, size)
+                : reconciliationResultRepository.findResults(reconciliationRunId, resultType, contractId, listSort, (int) offsetLong, size);
+        List<ReconciliationResultListItemResponse> content = rows
                 .stream()
                 .map(ReconciliationResultListItemResponse::from)
                 .toList();
-        long total = reconciliationResultRepository.countResults(reconciliationRunId, resultType);
+        long total = contractId == null ? reconciliationResultRepository.countResults(reconciliationRunId, resultType)
+                : reconciliationResultRepository.countResults(reconciliationRunId, resultType, contractId);
         ReconciliationSummaryRow summary = reconciliationResultRepository.findSummary(reconciliationRunId);
         return new ReconciliationResultSearchResponse(
                 ReconciliationSummaryResponse.from(summary),
@@ -65,6 +81,10 @@ public class ReconciliationResultQueryService {
 
     @Transactional(readOnly = true)
     public ReconciliationResultDetailResponse get(long reconciliationResultId) {
+        return readDetail(reconciliationResultId);
+    }
+
+    private ReconciliationResultDetailResponse readDetail(long reconciliationResultId) {
         ReconciliationResultDetailRow row = reconciliationResultRepository.findDetail(reconciliationResultId);
         if (row == null) {
             throw notFound(reconciliationResultId);
@@ -73,6 +93,15 @@ public class ReconciliationResultQueryService {
                 row,
                 reconciliationResultRepository.findMatches(reconciliationResultId),
                 readSnapshot(row.getDetailSnapshotJson()));
+    }
+
+    @Transactional(readOnly = true)
+    public ReconciliationResultBasisResponse basis(long resultId) {
+        var detected = readDetail(resultId);
+        var runId = reconciliationResultRepository.latestRevisionRun(resultId);
+        var current = runId == null ? List.<ReconciliationResultDetailResponse>of()
+                : reconciliationResultRepository.revisedResultIds(resultId, runId).stream().map(this::readDetail).toList();
+        return new ReconciliationResultBasisResponse(detected, runId, current);
     }
 
     private JsonNode readSnapshot(String json) {

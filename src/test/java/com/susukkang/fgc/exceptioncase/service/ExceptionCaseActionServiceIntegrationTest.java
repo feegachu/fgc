@@ -2,6 +2,7 @@ package com.susukkang.fgc.exceptioncase.service;
 
 import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.RequestIdContext;
@@ -40,13 +41,15 @@ class ExceptionCaseActionServiceIntegrationTest {
         RequestIdContext.clear();
     }
 
-    @Test
-    void 검토시작과_해결은_상태와_순번과_감사로그를_함께_남긴다() {
+    @ParameterizedTest
+    @EnumSource(ExceptionSeverity.class)
+    void 검토시작과_해결은_상태와_순번과_감사로그를_함께_남긴다(ExceptionSeverity severity) {
         Long userId = jdbcTemplate.queryForObject(
                 "SELECT user_id FROM fgc.app_user ORDER BY user_id LIMIT 1", Long.class);
         String loginId = jdbcTemplate.queryForObject(
                 "SELECT login_id FROM fgc.app_user WHERE user_id = ?", String.class, userId);
-        Long exceptionCaseId = insertNewCase();
+        Long exceptionCaseId = insertCase(severity);
+        assertThat(currentStatus(exceptionCaseId)).isEqualTo(ExceptionStatus.initial(severity).name());
         RequestIdContext.set("it-exception-action");
 
         var started = exceptionCaseService.action(
@@ -64,7 +67,7 @@ class ExceptionCaseActionServiceIntegrationTest {
         assertThat(started.actionSeq()).isEqualTo(1);
         // SIR-008: 저장 직후 응답의 처리 시각도 GET 조회 경로와 같은 Asia/Seoul 오프셋이어야 한다
         assertThat(started.actionAt().getOffset()).isEqualTo(ZoneOffset.ofHours(9));
-        assertThat(started.fromStatus()).isEqualTo(ExceptionStatus.NEW);
+        assertThat(started.fromStatus()).isEqualTo(ExceptionStatus.initial(severity));
         assertThat(started.toStatus()).isEqualTo(ExceptionStatus.IN_REVIEW);
         assertThat(resolved.actionSeq()).isEqualTo(2);
         assertThat(resolved.toStatus()).isEqualTo(ExceptionStatus.RESOLVED);
@@ -147,19 +150,21 @@ class ExceptionCaseActionServiceIntegrationTest {
                 "NEW", "IN_REVIEW", "ASSIGN", "DOC-ASSIGN-001", String.valueOf(userId)));
     }
 
-    @Test
-    void 다른담당자에게_배정하면_검토중상태와_실제처리자를_보존한다() {
+    @ParameterizedTest
+    @EnumSource(ExceptionSeverity.class)
+    void 다른담당자에게_배정하면_검토중상태와_실제처리자를_보존한다(ExceptionSeverity severity) {
         var users = exceptionCaseService.options().assignableUsers();
         assertThat(users).hasSizeGreaterThan(1);
         var actor = users.getFirst();
         var assignee = users.getLast();
-        Long exceptionCaseId = insertNewCase();
+        Long exceptionCaseId = insertCase(severity);
 
         var result = exceptionCaseService.action(exceptionCaseId,
                 new ExceptionActionRequest(ExceptionActionType.ASSIGN, "담당자에게 전달", null, assignee.userId()),
                 actor.userId(), actor.loginId());
 
         assertThat(result.toStatus()).isEqualTo(ExceptionStatus.IN_REVIEW);
+        assertThat(result.fromStatus()).isEqualTo(ExceptionStatus.initial(severity));
         assertThat(result.actionBy()).isEqualTo(actor.userId());
         assertThat(jdbcTemplate.queryForObject("SELECT assigned_to FROM fgc.exception_case WHERE exception_case_id = ?",
                 Long.class, exceptionCaseId)).isEqualTo(assignee.userId());
@@ -422,14 +427,18 @@ class ExceptionCaseActionServiceIntegrationTest {
     }
 
     private Long insertNewCase() {
+        return insertCase(ExceptionSeverity.HIGH);
+    }
+
+    private Long insertCase(ExceptionSeverity severity) {
         String suffix = UUID.randomUUID().toString();
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.exception_case (
                     exception_key, exception_type, severity, status,
                     source_entity_type, source_entity_id, title
-                ) VALUES (?, 'DATA_QUALITY', 'WARNING', 'NEW', 'IT', ?, '처리 테스트')
+                ) VALUES (?, 'DATA_QUALITY', ?, 'NEW', 'IT', ?, '처리 테스트')
                 RETURNING exception_case_id
-                """, Long.class, "IT-ACTION:" + suffix, suffix);
+                """, Long.class, "IT-ACTION:" + suffix, severity.name(), suffix);
     }
 
     private Long firstUserId() {

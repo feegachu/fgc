@@ -127,6 +127,35 @@ class ValidationRunFinalizationServiceIntegrationTest {
                 .isInstanceOf(AccessDeniedException.class);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"HIGH,NEW", "HIGH,IN_REVIEW", "WARNING,REVIEW_REQUIRED", "INFO,REVIEW_REQUIRED"})
+    @WithMockUser(username = "admin", roles = "SYSTEM_ADMIN")
+    // FGC-FUN-044: 대사 불일치 등 모든 미처리 업무는 긴급 여부와 무관하게 확정을 막는다.
+    void blocksUnresolvedWorkAndAllowsFinalizationOnlyAfterResolution(String severity, String status) {
+        LocalDate month = LocalDate.of(2087, 6, 1);
+        Long runId = createCompletedRun(month);
+        Long actor = systemAdminUserId();
+        String key = "FUN044-ALL-" + UUID.randomUUID();
+        Long exceptionId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.exception_case(exception_key,exception_type,severity,status,validation_run_id,
+                    validation_month,source_entity_type,source_entity_id,title)
+                VALUES (?,'RECONCILIATION_MISMATCH',?,?,?,?,'VALIDATION_RUN',?,'미처리 대사 불일치')
+                RETURNING exception_case_id
+                """, Long.class, key, severity, status, runId, month, runId.toString());
+        var condition = validationRunFinalizationService.getChecklist(runId).conditions().get(2);
+        assertThat(condition.label()).isEqualTo("미처리 예외가 0건인가");
+        assertThat(condition.count()).isEqualTo(1);
+        assertThat(condition.passed()).isFalse();
+        assertThat(condition.linkUrl()).isEqualTo("/exceptions?validationMonth=" + month + "&status=OPEN");
+        assertThatThrownBy(() -> validationRunFinalizationService.finalizeRun(runId, actor, key))
+                .isInstanceOfSatisfying(FgcBusinessException.class, error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_002));
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.validation_run WHERE validation_run_id=?", String.class, runId)).isEqualTo("COMPLETED");
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status='IN_REVIEW' WHERE exception_case_id=?", exceptionId);
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status='RESOLVED' WHERE exception_case_id=?", exceptionId);
+        assertThat(validationRunFinalizationService.getChecklist(runId).conditions().get(2).passed()).isTrue();
+        assertThat(validationRunFinalizationService.finalizeRun(runId, actor, key).status()).isEqualTo("FINALIZED");
+    }
+
     private Long createCompletedRun(LocalDate month) {
         int runNo = ThreadLocalRandom.current().nextInt(1, 1_000_000);
         Long runId = jdbcTemplate.queryForObject("""

@@ -511,7 +511,7 @@ it('finishes the revised guide inside the exception modal without returning to l
   document.body.append(modal)
   try {
     await act(async () => { await router.navigate('/exceptions?month=2026-07&selected=7') })
-    expect(await screen.findByRole('heading', { name: '참조 버튼에서 원인 확인' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: '예외 원인과 계산근거 확인' })).toBeVisible()
     expect(modal.querySelector('[aria-label="전체 업무 가이드"]')).not.toBeNull()
     expect(screen.queryByText('정정 후 지급 번호')).not.toBeInTheDocument()
     const calls = read.mock.calls.length

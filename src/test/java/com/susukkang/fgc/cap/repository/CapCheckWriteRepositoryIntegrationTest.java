@@ -140,11 +140,17 @@ class CapCheckWriteRepositoryIntegrationTest {
         detail.setEvidenceRef("CONFIRM-EVIDENCE");
         writes.insertCapCheckDetails(List.of(detail));
 
+        assertThat(queries.findDetailsByCapCheckId(candidate.getCapCheckId()))
+                .singleElement().satisfies(line -> assertThat(line.paymentStatus()).isEqualTo("DRAFT"));
+
         assertThat(queries.findLatestByContractAndStage(fixture.contractId(), "GA_TO_FC").getCapCheckId())
                 .isEqualTo(baseline.getCapCheckId());
         assertThat(queries.findById(candidate.getCapCheckId()).getCalculationSnapshotJson()).contains("candidate");
         assertThat(queries.search(null, "GA_TO_FC", "VIOLATION", null, null, fixture.contractNo(), 0, 10))
                 .isEmpty();
+        jdbc.update("UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?", paymentId);
+        assertThat(queries.findDetailsByCapCheckId(candidate.getCapCheckId()))
+                .singleElement().satisfies(line -> assertThat(line.paymentStatus()).isEqualTo("CONFIRMED"));
         CapCheckDetail managed = details.findById(detailId(candidate.getCapCheckId(), 1)).orElseThrow();
         writes.detachPreConfirmDetails(paymentId);
         assertThat(entityManager.contains(managed)).isFalse();
@@ -152,9 +158,12 @@ class CapCheckWriteRepositoryIntegrationTest {
         assertThat(detached.getTransactionAttributionId()).isNull();
         assertThat(detached.getEvidenceRef()).isEqualTo("CONFIRM-EVIDENCE");
         assertThat(detached.getItemName()).isEqualTo("계산 당시 항목명");
+        assertThat(queries.findDetailsByCapCheckId(candidate.getCapCheckId()))
+                .singleElement().satisfies(line -> {
+                    assertThat(line.paymentStatus()).isEqualTo("DRAFT");
+                    assertThat(line.paymentStatusSnapshot()).isEqualTo("DRAFT");
+                });
 
-        jdbc.update("UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?",
-                paymentId);
         assertThat(queries.findLatestByContractAndStage(fixture.contractId(), "GA_TO_FC").getCapCheckId())
                 .isEqualTo(candidate.getCapCheckId());
         assertThat(queries.search(null, "GA_TO_FC", "NORMAL", null, null, fixture.contractNo(), 0, 10))

@@ -33,6 +33,8 @@ class ValidationRunFinalizeChecklistRepositoryIntegrationTest {
     @Autowired
     private ValidationRunRepository validationRunRepository;
     @Autowired
+    private com.susukkang.fgc.exceptioncase.repository.ExceptionCaseQueryRepository exceptionQueries;
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     // 2026-08-23 yslee - #330 확정 게이트 예외 조건을 실행 범위 → 검증월 범위로 교정
@@ -72,9 +74,9 @@ class ValidationRunFinalizeChecklistRepositoryIntegrationTest {
 
         assertThat(counts.getIncompleteRunCount()).isZero();
         assertThat(counts.getJournalImbalanceCount()).isEqualTo(1);
-        // 같은 검증월의 미처리 CRITICAL 3건: 현재 실행 1 + 다른 실행 1 + 실시간(run_id NULL) 1.
+        // 같은 검증월의 미처리 업무 5건: 긴급 3 + 정책 2. 심각도와 실행 ID는 제한하지 않는다.
         // 다른 검증월·해결(RESOLVED) 건은 세지 않는다.
-        assertThat(counts.getUnresolvedCriticalExceptionCount()).isEqualTo(3);
+        assertThat(counts.getUnresolvedExceptionCount()).isEqualTo(5);
         // 같은 검증월의 미처리 정책 예외 2건: 배치 IN_REVIEW 1 + 실시간 NEW 1. 종결(REJECTED) 제외.
         assertThat(counts.getUnresolvedPolicyExceptionCount()).isEqualTo(2);
         assertThat(counts.getAttributionImbalanceCount()).isEqualTo(1);
@@ -89,6 +91,33 @@ class ValidationRunFinalizeChecklistRepositoryIntegrationTest {
                 .orElseThrow();
 
         assertThat(counts.getIncompleteRunCount()).isEqualTo(1);
+    }
+
+    @Test
+    // FGC-FUN-044: 확정 조건은 화면의 미처리 업무 건수와 같은 범위다.
+    void countsNonCriticalReconciliationAndReviewWorkButKeepsMonitoringCandidatesSeparate() {
+        LocalDate month = TEST_MONTH.plusMonths(8);
+        Long runId = createCompletedRun(month);
+        insertException(runId, month, "HIGH", "RECONCILIATION_MISMATCH", "NEW", "reconciliation-new");
+        insertException(null, month, "HIGH", "RECONCILIATION_MISMATCH", "IN_REVIEW", "reconciliation-review");
+        insertException(runId, month, "INFO", "OTHER", "REVIEW_REQUIRED", "work-review");
+        insertException(runId, month, "HIGH", "JOURNAL_CORRECTION_REQUIRED", "NEW", "journal-correction-work");
+        insertException(runId, month, "WARNING", "CAP_WARNING", "REVIEW_REQUIRED", "monitor-cap");
+        insertException(runId, month, "WARNING", "ARBITRAGE_CANDIDATE", "REVIEW_REQUIRED", "monitor-arbitrage");
+        insertException(runId, month, "HIGH", "RECONCILIATION_MISMATCH", "RESOLVED", "reconciliation-resolved");
+        insertException(runId, month.plusMonths(1), "HIGH", "RECONCILIATION_MISMATCH", "NEW", "reconciliation-another-month");
+        var counts = validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow();
+        var summary = validationRunRepository.summarize(runId).orElseThrow();
+        assertThat(counts.getUnresolvedExceptionCount()).isEqualTo(4);
+        assertThat(summary.getExceptionOpenWorkItemCount()).isEqualTo(counts.getUnresolvedExceptionCount());
+        var criteria = new com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO();
+        criteria.setValidationMonth(month);
+        criteria.setStatus("OPEN");
+        var statuses = com.susukkang.fgc.common.code.ExceptionStatus.dbStatuses("OPEN");
+        assertThat(exceptionQueries.count(criteria, statuses)).isEqualTo(counts.getUnresolvedExceptionCount());
+        assertThat(exceptionQueries.search(criteria, statuses, 0, 20)).hasSize(4)
+                .extracting(com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchRow::exceptionType)
+                .contains("JOURNAL_CORRECTION_REQUIRED");
     }
 
     @Test

@@ -68,16 +68,16 @@ export function monthText(value?: string | null) {
 
 
 const demoEvidenceLabels: Record<string, string> = {
-  'SYNTHETIC:FILMING:SETTLEMENT_SUPPORT': '시연용 정착지원금 지급 근거',
-  'SYNTHETIC:FILMING:APPROVED_COMMON_COST': '시연용 공통비 지급 승인 근거',
-  'SYNTHETIC:FILMING:OCTOBER_WARNING:INDIVIDUAL_AGREEMENT': '시연용 개별 약정 지급 근거',
-  'SYNTHETIC:OCTOBER_DEMO': '10월 시연용 지급 근거',
+  'SYNTHETIC:FILMING:SETTLEMENT_SUPPORT': '정착지원금 지급 근거',
+  'SYNTHETIC:FILMING:APPROVED_COMMON_COST': '공통비 지급 승인 근거',
+  'SYNTHETIC:FILMING:OCTOBER_WARNING:INDIVIDUAL_AGREEMENT': '개별 약정 지급 근거',
+  'SYNTHETIC:OCTOBER_DEMO': '10월 지급 근거',
 }
 
 /** 알려진 시연 증빙만 화면에서 풀어 쓴다. 입력 및 저장 값은 그대로 유지한다. */
 export function paymentEvidenceText(value: string) {
   if (Object.hasOwn(demoEvidenceLabels, value)) return demoEvidenceLabels[value]
-  if (/^SYNTHETIC:FILMING:EXTERNAL_PAYMENT_RECORD_ERROR:\d+$/.test(value)) return '시연용 실제 송금액 확인 및 지급 기록 정정 근거'
+  if (/^SYNTHETIC:FILMING:EXTERNAL_PAYMENT_RECORD_ERROR:\d+$/.test(value)) return '실제 송금액 확인 및 지급 기록 정정 근거'
   const paid = /^SYNTHETIC:FILMING:EXTERNAL_ALREADY_PAID:(\d{4}-\d{2})$/.exec(value)
-  return paid ? `${monthText(paid[1])} 시연용 지급 완료 확인 근거` : value
+  return paid ? `${monthText(paid[1])} 지급 완료 확인 근거` : value
 }

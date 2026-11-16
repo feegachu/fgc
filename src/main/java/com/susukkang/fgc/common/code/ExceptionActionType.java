@@ -29,9 +29,9 @@ public enum ExceptionActionType {
     public boolean supports(ExceptionStatus currentStatus) {
         return switch (this) {
             case ASSIGN, COMMENT ->
-                    currentStatus == ExceptionStatus.NEW
+                    currentStatus.isInitial()
                             || currentStatus == ExceptionStatus.IN_REVIEW;
-            case START_REVIEW -> currentStatus == ExceptionStatus.NEW || currentStatus == ExceptionStatus.IN_REVIEW;
+            case START_REVIEW -> currentStatus.isInitial() || currentStatus == ExceptionStatus.IN_REVIEW;
             case REOPEN -> currentStatus == ExceptionStatus.REJECTED;
             case CORRECT, REDUCE, CANCEL, DEFER, RECONCILE_AGAIN,
                     FALSE_POSITIVE, RESOLVE, REJECT ->

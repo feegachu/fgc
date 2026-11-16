@@ -75,6 +75,7 @@ public class CapCheckWriteRepository {
                 item_name                = EXCLUDED.item_name,
                 schedule_line_id         = EXCLUDED.schedule_line_id,
                 transaction_attribution_id = EXCLUDED.transaction_attribution_id,
+                payment_status_snapshot  = EXCLUDED.payment_status_snapshot,
                 contract_month_no        = EXCLUDED.contract_month_no,
                 classification_snapshot  = EXCLUDED.classification_snapshot,
                 amount                   = EXCLUDED.amount,

@@ -332,14 +332,14 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                    (SELECT COUNT(*)
                       FROM fgc.exception_case exception
                      WHERE exception.validation_month = vr.validation_month
-                       AND exception.severity = 'CRITICAL'
-                       AND exception.status IN ('NEW', 'IN_REVIEW'))
-                       AS unresolvedCriticalExceptionCount,
+                       AND exception.exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING')
+                       AND exception.status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW'))
+                       AS unresolvedExceptionCount,
                    (SELECT COUNT(*)
                       FROM fgc.exception_case exception
                      WHERE exception.validation_month = vr.validation_month
                        AND exception.exception_type IN ('POLICY_MISSING', 'POLICY_DUPLICATE')
-                       AND exception.status IN ('NEW', 'IN_REVIEW'))
+                       AND exception.status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW'))
                        AS unresolvedPolicyExceptionCount,
                    (SELECT COUNT(*)
                       FROM fgc.vw_transaction_attribution_balance balance
@@ -476,7 +476,7 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                            JOIN fgc.validation_run target_run
                              ON target_run.validation_run_id = :validationRunId
                           WHERE ec.validation_month = target_run.validation_month
-                            AND ec.status IN ('NEW', 'IN_REVIEW')
+                            AND ec.status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW')
                             AND ec.exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING')
                             AND NOT EXISTS (
                                 SELECT 1
@@ -489,7 +489,7 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                            JOIN fgc.validation_run target_run
                              ON target_run.validation_run_id = :validationRunId
                           WHERE ec.validation_month = target_run.validation_month
-                            AND ec.status IN ('NEW', 'IN_REVIEW')
+                            AND ec.status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW')
                             AND ec.exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING')) AS exceptionOpenWorkItemCount
                    FROM fgc.exception_occurrence occurrence
                   WHERE occurrence.validation_run_id = :validationRunId

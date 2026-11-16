@@ -120,7 +120,7 @@ public class ExceptionCase {
     @Column(name = "cap_check_id")
     private Long capCheckId;
 
-    // 신규 예외의 상태는 NEW이며 식별자·생성 시각·검출 횟수는 외부에서 지정하지 않는다.
+    // 최초 상태는 심각도로 결정하며 식별자·생성 시각·검출 횟수는 외부에서 지정하지 않는다.
     @Builder
     private ExceptionCase(String exceptionKey, ExceptionType exceptionType, ExceptionSeverity severity,
                           Long validationRunId, Long contractId, Long agentId, Long policyVersionId,
@@ -130,6 +130,7 @@ public class ExceptionCase {
         this.exceptionKey = exceptionKey;
         this.exceptionType = exceptionType;
         this.severity = severity;
+        this.status = ExceptionStatus.initial(severity);
         this.validationRunId = validationRunId;
         this.contractId = contractId;
         this.agentId = agentId;

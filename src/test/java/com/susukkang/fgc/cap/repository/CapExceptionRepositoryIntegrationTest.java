@@ -238,7 +238,7 @@ class CapExceptionRepositoryIntegrationTest {
     }
 
     @Test
-    void paymentExceptionResetsReviewStateAndKeepsNullableSourceFallback() {
+    void paymentExceptionPreservesReviewStateAndKeepsNullableSourceFallback() {
         String key = "IT-PAYMENT-EXCEPTION:" + UUID.randomUUID();
         assertThat(capExceptionRepository.insertExceptionCase(paymentException(key, null, "initial"))).isEqualTo(1);
         jdbcTemplate.update("UPDATE fgc.exception_case SET status = 'IN_REVIEW' WHERE exception_key = ?", key);
@@ -249,7 +249,7 @@ class CapExceptionRepositoryIntegrationTest {
         assertThat(capExceptionRepository.insertExceptionCase(paymentException(key, null, "updated"))).isEqualTo(1);
 
         ExceptionCase stored = entityManager.find(ExceptionCase.class, id);
-        assertThat(stored.getStatus()).isEqualTo(ExceptionStatus.NEW);
+        assertThat(stored.getStatus()).isEqualTo(ExceptionStatus.IN_REVIEW);
         assertThat(stored.getSourceEntityId()).isEqualTo("missing-payment-source");
         assertThat(stored.getValidationMonth()).isNull();
         assertThat(stored.getContractId()).isNull();

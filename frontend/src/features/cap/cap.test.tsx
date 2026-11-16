@@ -339,7 +339,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
     const { router, user } = renderAt('/cap-checks?month=2026-07&page=2')
     await user.click(await screen.findByRole('button', { name: 'C-2026-0001 계산근거 열기' }))
     const dialog = await screen.findByRole('dialog', { name: '계산근거' })
-    await within(dialog).findByText('입력값')
+    await within(dialog).findByRole('table', { name: '항목별 산입 내역' })
     expect(router.state.location.search).toContain('capCheckId=11')
     expect(router.state.location.search).toContain('page=2')
     await user.keyboard('{Escape}')
@@ -350,19 +350,19 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
     fireEvent.click(within(table).getByText('기준일').closest('table')!.querySelector('tbody td:nth-child(3)')!)
     await screen.findByRole('dialog')
   })
-  it('목록과 무관한 딥링크·공식·항목 순서·증빙 공란·합계 검산을 유지한다', async () => {
+  it('목록과 무관한 딥링크·항목 순서·증빙 공란을 유지하고 테이블만 표시한다', async () => {
     renderAt('/cap-checks?capCheckId=11', (url) =>
       url.startsWith('/api/v1/cap-checks?') ? { ...list, content: [] } : undefined,
     )
     const dialog = await screen.findByRole('dialog')
-    await within(dialog).findByText('한도 = 100,000 × 12.0 − 288,000 + 3,000 = 915,000원')
+    await within(dialog).findByRole('table', { name: '항목별 산입 내역' })
     expect(within(dialog).getByText('증빙 없음')).toBeVisible()
-    expect(within(dialog).getByText('제외 항목 미포함')).toBeVisible()
+    expect(within(dialog).queryByText('제외 항목 미포함')).not.toBeInTheDocument()
     const detailRows = within(dialog).getByRole('table', { name: '항목별 산입 내역' }).querySelectorAll('tbody tr')
     expect(detailRows[0]).toHaveTextContent('기본수수료') // API 순서를 프론트에서 임의 재정렬하지 않음
     expect(detailRows[1]).toHaveTextContent('지원비')
     expect(within(dialog).getByRole('link', { name: '예외 목록 보기' })).toHaveAttribute('href', '/exceptions')
-    expect(within(dialog).getAllByText(/1,200\.0%/).length).toBeGreaterThan(0)
+    expect(within(dialog).queryByText('입력값')).not.toBeInTheDocument()
     expect(within(dialog).getAllByText('주의').length).toBeGreaterThan(0)
   })
   it('없는 ID의 서버 오류를 표시해도 목록은 정상이다', async () => {
@@ -374,6 +374,27 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('저장된 판정을 찾을 수 없습니다.')
     await screen.findByText('C-2026-0001', { selector: 'a' })
     expect(screen.getByRole('table', { name: '계약별 판정 목록' })).toBeVisible()
+  })
+  it('지급 상태와 한국어 근거, 저장된 합계·한도·초과액을 표 하단에 표시한다', async () => {
+    renderAt('/cap-checks?capCheckId=11', (url) => url.endsWith('/details') ? {
+      ...basis,
+      details: basis.details!.map((line, index) => ({ ...line,
+        paymentStatus: index === 0 ? 'CONFIRMED' : 'DRAFT',
+        evidenceRef: index === 0 ? 'SYNTHETIC:FILMING:SETTLEMENT_SUPPORT' : undefined,
+      })),
+    } : undefined)
+    const dialog = await screen.findByRole('dialog')
+    const lines = await within(dialog).findByRole('table', { name: '항목별 산입 내역' })
+    expect(within(lines).getByRole('columnheader', { name: '지급 상태' })).toBeVisible()
+    expect(within(lines).getByText('확정')).toBeVisible()
+    expect(within(lines).getByText('작성중')).toBeVisible()
+    expect(within(lines).getByRole('button', { name: '정착지원금 지급 근거' })).toBeVisible()
+    expect(lines).not.toHaveTextContent('SYNTHETIC:')
+    const total = lines.querySelector('tfoot')!
+    expect(total).toHaveTextContent('산입 합계1,000,000원')
+    expect(total).toHaveTextContent('한도 915,000원')
+    expect(total).toHaveTextContent('초과액 85,000원')
+    expect(within(dialog).queryByText(/정착지원금 등 지급금액을 수정/)).not.toBeInTheDocument()
   })
   it('500은 요청 ID만 노출하고 상세 내부 메시지는 숨긴다', async () => {
     renderAt('/cap-checks?capCheckId=999', (url) => {
@@ -418,7 +439,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
         '/api/v1/cap-checks/11/details',
         expect.objectContaining({ signal: expect.any(AbortSignal) }),
       )
-      fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }))
+      fireEvent.click(within(dialog).getByRole('button', { name: '뒤로가기' }))
       expect(close).toHaveBeenCalledOnce()
     },
   )
@@ -438,7 +459,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
     await within(dialog).findByText('저장 당시 산입', { selector: '.table-cell-preview' })
     expect(dialog.querySelector('.cap-react-warning')).not.toBeInTheDocument()
   })
-  it('GA→설계사는 공제 미적용, 상세 합계 불일치 안내만 하고 저장 판정은 유지한다', async () => {
+  it('테이블 합계는 항목을 재계산하지 않고 서버에 저장된 금액과 판정을 유지한다', async () => {
     renderAt('/cap-checks?capCheckId=11', (url) =>
       url.endsWith('/details')
         ? {
@@ -455,13 +476,29 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
         : undefined,
     )
     const dialog = await screen.findByRole('dialog')
-    await within(dialog).findByText('저장 산입금액과 항목별 산입 합계가 일치하지 않습니다.')
-    expect(within(dialog).getByText('적용하지 않음')).toBeVisible()
-    expect(within(dialog).getByText('한도 = 100,000 × 12.0 − 288,000 = 912,000원')).toBeVisible()
+    const lines = await within(dialog).findByRole('table', { name: '항목별 산입 내역' })
+    expect(lines.querySelector('tfoot')).toHaveTextContent('999,999원')
+    expect(lines.querySelector('tfoot')).toHaveTextContent('912,000원')
+    expect(within(dialog).queryByText('계산식')).not.toBeInTheDocument()
     expect(within(dialog).getAllByText('주의').length).toBeGreaterThan(0)
   })
 })
 
+
+it('처리 후 근거가 없으면 검출 당시 금액과 당시 지급 상태를 함께 표시한다', async () => {
+  vi.spyOn(apiClient, 'request').mockResolvedValue(envelope({
+    detectedBasis: { ...basis, details: [{ ...basis.details![0], paymentStatus: 'CONFIRMED', paymentStatusSnapshot: 'DRAFT' }] },
+    currentBasis: null, deferredPayments: [],
+  }))
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <MemoryRouter><CapDetailModal capCheckId={11} exceptionCaseId={1} onClose={() => {}} /></MemoryRouter>
+  </QueryClientProvider>)
+  const lines = await screen.findByRole('table', { name: '항목별 산입 내역' })
+  expect(within(lines).getByRole('columnheader', { name: '검출 당시 지급 상태' })).toBeVisible()
+  expect(lines).toHaveTextContent('작성중')
+  expect(within(lines).queryByText('확정')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '처리 후 보기' })).not.toBeInTheDocument()
+})
 
 it.each(['NORMAL', 'NOT_APPLICABLE'] as const)(
   'provides one shared guide target for the %s calculation basis', async (resultStatus) => {
@@ -476,7 +513,7 @@ it.each(['NORMAL', 'NOT_APPLICABLE'] as const)(
       </QueryClientProvider>,
     )
     const dialog = await screen.findByRole('dialog', { name: '계산근거' })
-    const content = resultStatus === 'NORMAL' ? '입력값' : '한도/산입금액/사용률 계산 대상이 아닙니다.'
+    const content = resultStatus === 'NORMAL' ? '기본수수료' : '한도/산입금액/사용률 계산 대상이 아닙니다.'
     await within(dialog).findByText(content)
     const targetId = workflowDefinitions.find((guide) => guide.workflowId === 'cap.review')!.steps[2].targetId
     const targets = document.querySelectorAll(`[data-guide-feature="${targetId}"]`)

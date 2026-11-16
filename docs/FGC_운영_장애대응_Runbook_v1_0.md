@@ -331,7 +331,7 @@ SELECT c.exception_case_id, c.contract_id, ic.contract_no, c.status, c.last_dete
   FROM fgc.exception_case c
   JOIN fgc.insurance_contract ic USING (contract_id)
   JOIN fgc.batch_watermark w ON w.job_name = 'DailyChangedContractJob' AND w.step_name = 'changedContractStep'
- WHERE c.reason_code = 'CONTRACT_REVALIDATION_FAILED' AND c.status IN ('NEW', 'IN_REVIEW')
+ WHERE c.reason_code = 'CONTRACT_REVALIDATION_FAILED' AND c.status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW')
  ORDER BY c.last_detected_at DESC;
 ```
 
@@ -417,7 +417,7 @@ BEGIN
                    JOIN fgc.exception_occurrence o USING (exception_case_id)
                    JOIN fgc.validation_run r ON r.validation_run_id = o.validation_run_id
                   WHERE c.exception_case_id = v_exception AND c.contract_id = v_contract
-                    AND c.reason_code = 'CONTRACT_REVALIDATION_FAILED' AND c.status IN ('NEW', 'IN_REVIEW')
+                    AND c.reason_code = 'CONTRACT_REVALIDATION_FAILED' AND c.status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW')
                     AND o.validation_run_id = v_failed_run AND r.run_type = 'MANUAL_CONTRACT') THEN
     RAISE EXCEPTION '미처리 예외, 계약, 실패 실행이 서로 연결되지 않는다';
   END IF;

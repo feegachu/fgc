@@ -16,7 +16,7 @@ public final class CapDisplaySql {
                                  OR (display_exception.source_entity_type = 'CAP_CHECK'
                                      AND display_exception.source_entity_id = cc.cap_check_id::text))
                             AND display_exception.exception_type = 'CAP_VIOLATION'
-                            AND display_exception.status IN ('NEW', 'IN_REVIEW')
+                            AND display_exception.status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW')
                             AND COALESCE(display_exception.validation_month,
                                          CAST(date_trunc('month', cc.as_of_date) AS date))
                                 = CAST(date_trunc('month', cc.as_of_date) AS date)))

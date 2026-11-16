@@ -18,6 +18,7 @@ export const METHODS: [AttributionRequest['attributionMethod'], string][] = [
   ['DIRECT', '직접 귀속'],
   ['SETTLEMENT_SUPPORT_MONTHLY', '정착지원금 월귀속'],
   ['FIRST_CONTRACT_CARRY_FORWARD', '최초계약 이월'],
+  ['DEFERRED_CONTRACT', '2차년도 이연 귀속'],
   ['APPROVED_ALLOCATION', '승인배부'],
   ['MANUAL_REVIEW', '수동검토'],
 ]
@@ -118,7 +119,7 @@ export function normalizeRow(row: AttributionRow, insurer: boolean, newcomer: bo
     }
   const forbidden =
     row.attributionMethod === 'NEWCOMER_NON_CONTRACT' ||
-    (insurer && ['SETTLEMENT_SUPPORT_MONTHLY', 'FIRST_CONTRACT_CARRY_FORWARD'].includes(row.attributionMethod))
+    (insurer && ['SETTLEMENT_SUPPORT_MONTHLY', 'FIRST_CONTRACT_CARRY_FORWARD', 'DEFERRED_CONTRACT'].includes(row.attributionMethod))
   return {
     ...row,
     attributionMethod: forbidden ? 'DIRECT' : row.attributionMethod,

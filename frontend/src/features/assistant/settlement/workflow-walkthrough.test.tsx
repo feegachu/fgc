@@ -78,7 +78,7 @@ it('ends cancelled-payment guidance at the exception reference without correctio
   expect(steps).toHaveLength(1)
   expect(steps[0].id).toBe('exception.reference')
   expect(steps[0].scope).toBe('dialog')
-  expect(steps[0].instruction).toContain('참조')
+  expect(steps[0].instruction).toContain('상세 설명')
 })
 it('explains returned results rather than searching for inputs after successful navigation', () => {
   expect(workflowWalkthrough('contract.create', '/contracts/4', false, false, false)[0].id).toBe('saved')

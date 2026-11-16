@@ -300,7 +300,9 @@ public class ExceptionCaseQueryRepository {
     private String buildWhere(ExceptionCaseSearchDTO criteria, List<ExceptionStatus> statuses,
                               Map<String, Object> parameters) {
         StringBuilder where = new StringBuilder(" WHERE 1 = 1");
-        if (criteria.getType() != com.susukkang.fgc.common.code.ExceptionType.JOURNAL_CORRECTION_REQUIRED) {
+        // 월 확정 바로가기는 같은 달의 모든 미처리 업무를 보여야 하므로 기존 원장 정정도 포함한다.
+        if (criteria.getType() != com.susukkang.fgc.common.code.ExceptionType.JOURNAL_CORRECTION_REQUIRED
+                && criteria.getValidationMonth() == null) {
             where.append(" AND ec.exception_type <> 'JOURNAL_CORRECTION_REQUIRED'");
         }
         append(where, parameters, "ec.exception_type = :type", "type", criteria.getType());
@@ -317,7 +319,7 @@ public class ExceptionCaseQueryRepository {
         if (statuses != null && !statuses.isEmpty()) {
             // 유형 미지정 미처리 집계에서는 모니터링을 제외한다. 유형을 직접 고른 상태 조회는 보존한다.
             if (criteria.getType() == null && (criteria.getTypes() == null || criteria.getTypes().isEmpty())
-                    && statuses.stream().allMatch(status -> status == ExceptionStatus.NEW || status == ExceptionStatus.IN_REVIEW)) {
+                    && statuses.size() > 1 && statuses.stream().allMatch(status -> ExceptionStatus.isOpen(status.name()))) {
                 where.append(" AND ec.exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING')");
             }
             append(where, parameters, "ec.status IN (:statuses)", "statuses",

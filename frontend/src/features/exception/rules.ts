@@ -45,9 +45,9 @@ export function statusTone(status?: string): StatusTone {
 }
 
 export const statusOptions = [
-  { value: 'OPEN', label: '미처리 (신규 + 검토중)' },
   { value: 'ALL', label: '전체' },
-  { value: 'NEW', label: '신규' },
+  { value: 'NEW', label: '미처리' },
+  { value: 'REVIEW_REQUIRED', label: '검토대상' },
   { value: 'IN_REVIEW', label: '검토중' },
   { value: 'RESOLVED', label: '해결' },
   { value: 'REJECTED', label: '반려' },
@@ -61,8 +61,8 @@ export const JOURNAL_CORRECTION_TYPE = 'JOURNAL_CORRECTION_REQUIRED'
  * 화면은 허용되는 조치만 보여 주기 위해 쓰고, 최종 판정은 서버(409 FGC-EXCP-003)가 한다.
  */
 const actionTable: { type: string; label: string; from: ExceptionStatus[]; generalForCorrection: boolean }[] = [
-  { type: 'ASSIGN', label: '담당 배정', from: ['NEW', 'IN_REVIEW'], generalForCorrection: true },
-  { type: 'START_REVIEW', label: '검토 시작', from: ['NEW', 'IN_REVIEW'], generalForCorrection: true },
+  { type: 'ASSIGN', label: '담당 배정', from: ['NEW', 'REVIEW_REQUIRED', 'IN_REVIEW'], generalForCorrection: true },
+  { type: 'START_REVIEW', label: '검토 시작', from: ['NEW', 'REVIEW_REQUIRED', 'IN_REVIEW'], generalForCorrection: true },
   { type: 'CORRECT', label: '정정', from: ['IN_REVIEW'], generalForCorrection: false },
   { type: 'REDUCE', label: '감액', from: ['IN_REVIEW'], generalForCorrection: false },
   { type: 'CANCEL', label: '취소', from: ['IN_REVIEW'], generalForCorrection: false },
@@ -83,4 +83,4 @@ export function availableActions(status: string | undefined, exceptionType: stri
 }
 
 /** 처리 폼은 종결(RESOLVED)된 예외에는 없다. */
-export const isActionable = (status?: string) => status === 'NEW' || status === 'IN_REVIEW' || status === 'REJECTED'
+export const isActionable = (status?: string) => status === 'NEW' || status === 'REVIEW_REQUIRED' || status === 'IN_REVIEW' || status === 'REJECTED'

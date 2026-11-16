@@ -98,7 +98,7 @@ public class PaymentCorrectionReconciliationRepository {
                 SELECT e.exception_case_id, e.status, old.result_type FROM fgc.exception_case e
                 JOIN fgc.reconciliation_result old ON e.source_entity_type = 'RECONCILIATION_RESULT'
                     AND e.source_entity_id = CAST(old.reconciliation_result_id AS varchar)
-                WHERE e.exception_type = 'RECONCILIATION_MISMATCH' AND e.status IN ('NEW', 'IN_REVIEW')
+                WHERE e.exception_type = 'RECONCILIATION_MISMATCH' AND e.status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW')
                 AND old.reconciliation_run_id IN (SELECT reconciliation_run_id FROM prior_runs)
                 AND EXISTS (SELECT 1 FROM fgc.reconciliation_result n
                     WHERE n.reconciliation_run_id = :newId AND n.result_type = 'MATCHED'

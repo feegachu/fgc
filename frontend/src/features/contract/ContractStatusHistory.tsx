@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
@@ -88,16 +88,17 @@ function jobNotes(job: FollowUpJob) {
   }
 }
 
-function FollowUpStatus({ event }: { event: ContractStatusEvent }) {
+function FollowUpStatus({ event, hideCompleted = false }: { event: ContractStatusEvent; hideCompleted?: boolean }) {
   const jobs = event.followUp?.jobs ?? []
+  const showBadge = !hideCompleted || !['NOT_REQUIRED', 'SUCCEEDED'].includes(event.followUp?.status ?? '')
   return (
     <>
-      <StatusBadge
+      {showBadge && <StatusBadge
         optionCount={Object.keys(eventFollowUpLabels).length}
         tone={followUpTones[event.followUp?.status ?? ''] ?? 'neutral'}
       >
         {responseLabel(eventFollowUpLabels, event.followUp?.status)}
-      </StatusBadge>
+      </StatusBadge>}
       {jobs.flatMap((job) =>
         jobNotes(job).map((note) => (
           <span className="contract-follow-up-note" key={`${job.job}-${note}`}>
@@ -168,6 +169,7 @@ const historyColumns: TableColumn<ContractStatusEvent>[] = [
 ]
 
 export function ContractStatusHistory({ id, compact = false }: { id: string; compact?: boolean }) {
+  const titleId = useId()
   const guideRoot = useRef<HTMLElement>(null)
   const timeline = useRef<HTMLOListElement>(null)
   const [previewCount, setPreviewCount] = useState<number | null>(null)
@@ -220,11 +222,11 @@ export function ContractStatusHistory({ id, compact = false }: { id: string; com
       data-guide-feature="features.contract.contract-tabs.section-3"
       data-guide-target="contract.statusHistory"
       className={`contract-history-panel${compact ? ' contract-history-compact' : ''}`}
-      aria-labelledby="contract-history-title"
+      aria-labelledby={titleId}
     >
       <header className="contract-history-panel-header">
         <div>
-          <h3 id="contract-history-title">
+          <h3 id={titleId}>
             {compact && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M6 6v12m0-6h6a6 6 0 0 0 6-6" /><circle cx="6" cy="4" r="2" /><circle cx="6" cy="20" r="2" /><circle cx="18" cy="4" r="2" /></svg>}
             상태이력
           </h3>
@@ -285,7 +287,7 @@ export function ContractStatusHistory({ id, compact = false }: { id: string; com
               </div>
               <time dateTime={event.effectiveAt}>{dateTime(event.effectiveAt)}</time>
               <span>{reasonText(event)}</span>
-              <FollowUpStatus event={event} />
+              <FollowUpStatus event={event} hideCompleted />
             </li>)}
             {previewCount !== null && <li className="contract-history-demo-label"><span>도움말 예시</span></li>}
             {['미납', '실효', '해지'].slice(0, previewCount ?? 0).map((status, index) => {

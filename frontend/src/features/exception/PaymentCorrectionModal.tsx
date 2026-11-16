@@ -11,7 +11,7 @@ import { ReconciliationJournalModal } from './ReconciliationJournalModal'
 import { RecoveryChecklistModal } from './RecoveryChecklistModal'
 import { Modal } from '../../components/Modal'
 import { apiClient, ApiError } from '../../lib/api/client'
-import { errorText, rateText, won } from '../../lib/format'
+import { errorText, won } from '../../lib/format'
 import { useUnsavedWorkStore } from '../../stores/unsavedWork'
 import { toast } from '../../stores/toasts'
 import { useAuth } from '../auth/useAuth'
@@ -19,6 +19,7 @@ import type { Payment, PaymentPayload, Precheck } from '../transaction/form-api'
 import { applyActionToCache } from './api'
 import type { ExceptionAction, ExceptionCase } from './api'
 import type { components } from '../../lib/api/schema'
+import { DeferredPaymentForm } from './DeferredPaymentForm'
 
 interface Issue { resultId?: number; resultType?: string; resultLabel?: string; expectedAmount?: number; actualAmount?: number; differenceAmount?: number; installmentNo?: number; expectedAgent?: string | null; actualAgent?: string | null; sourceLink?: string }
 interface Context { payments: Payment[]; paymentJournalIds?: Record<string, number>; suggestedPayment?: PaymentPayload | null; capBasis?: components['schemas']['CapCheckBasisResponse'] | null; scheduledBasis?: boolean; scheduleLink?: string | null; policyLink?: string | null; correctionTarget?: 'PAYMENT' | 'SCHEDULE' | 'CONTRACT' | 'RECOVERY' | 'REVIEW'; paymentStage?: string; contractLink?: string | null; remainingIssues?: Issue[]; reconciliationResultType?: string | null; canRegisterPayment?: boolean; deferrableFrom?: string | null }
@@ -99,13 +100,23 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
       void client.invalidateQueries({ queryKey: ['cap-checks'], refetchType: 'none' })
       setMessage(result.message)
       toast(result.message, result.resolved ? 'success' : 'warning')
-      if (result.deferredPayment) toast(`초과분 ${won(result.deferredPayment.amount)}을 ${result.deferredPayment.scheduledPaymentDate} 지급 초안 ${result.deferredPayment.commissionTransactionId}번으로 만들었습니다.`, 'success')
+      if (result.deferredPayment) toast(`${won(result.deferredPayment.amount)}을 ${result.deferredPayment.scheduledPaymentDate} 이연 지급 초안 ${result.deferredPayment.commissionTransactionId}번으로 만들었습니다.`, 'success')
       if (result.resolved) onClose()
       else {
         setSelectedId(String(result.payment.commissionTransactionId))
         await context.refetch()
       }
     },
+  })
+  const deferredPreview = useMutation({
+    mutationKey: ['exception', 'write', item.exceptionCaseId],
+    mutationFn: async (body: PaymentPayload) => {
+      const { data } = await apiClient.request<Precheck>(path + '/precheck', { method: 'POST', body: {
+        paymentId: payment?.commissionTransactionId, payment: body, ...correctionMetadata(body),
+      } })
+      if (!data) throw new Error('검증 결과를 확인하지 못했습니다.')
+      return data
+    }, meta: { errorToast: false },
   })
   const recheck = useMutation({
     mutationKey: ['exception', 'write', item.exceptionCaseId],
@@ -145,6 +156,8 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
     if (dirty()) { toast('입력한 내용을 저장하거나 창을 닫아 버린 뒤 다른 지급 건을 선택하세요.', 'warning'); return }
     setSelectedId(value)
     setMessage('')
+    setPlannedAction('')
+    setDeferredDate('')
   }
   if (amountDifference && context.data) return <ReconciliationJournalModal item={item} payments={context.data.payments}
     paymentJournalIds={context.data.paymentJournalIds ?? {}} onClose={onClose} />
@@ -193,17 +206,24 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
           {externalInsurer && <ReviewPanel item={item} onClosed={onClose} />}
         </section> : <>
         {item.type === 'CAP_VIOLATION' && <section data-guide-feature="features.exception.payment-correction.cap-overage" className="guidance guidance-neutral exception-cap-overage">
-          <strong className="guidance-title">{excess > 0 ? `한도 초과 최소 ${won(excess)} 줄여야 합니다.` : '검출 당시 한도 초과 내역'}</strong>
-          {item.description && <p className="guidance-copy">{rateText(item.description)}</p>}
-          <p className="guidance-copy">지급액과 귀속금액을 함께 조정한 뒤 사전검증을 다시 실행하세요.</p>
+          <strong className="guidance-title">{excess > 0 ? `한도 초과 ${won(excess)}` : '한도 초과 내역'}</strong>
         </section>}
         {missingActual && insurer && <label className="checkbox-label"><input data-guide-feature="features.exception.payment-correction.receipt-confirmed" type="checkbox" checked={receiptConfirmed}
           onChange={event => { setReceiptConfirmed(event.target.checked); useUnsavedWorkStore.getState().mark(scope + 'workflow', event.target.checked) }} />보험사 명세 및 입금 확인 완료</label>}
         {!context.data.scheduledBasis && ['CAP_WARNING', 'CAP_VIOLATION', 'CAP_REVIEW_REQUIRED'].includes(item.type ?? '') && payment && <section data-guide-feature="features.exception.payment-correction.defer-guide" className="exception-correction-workflow">
-          <Field label="감액 및 이연 구분"><select data-guide-feature="features.exception.payment-correction.planned-action" className="select-control" value={plannedAction} disabled={pending} onChange={event => { setPlannedAction(event.target.value); useUnsavedWorkStore.getState().mark(scope + 'workflow', true) }}>
-            <option value="">변경 내용으로 자동 판단</option><option value="REDUCE">초과분 감액</option><option value="DEFER">초과분을 2차년도 이후로 이연</option>
+          <Field label="감액 및 이연 구분"><select data-guide-feature="features.exception.payment-correction.planned-action" className="select-control" value={plannedAction} disabled={pending} onChange={event => {
+            const formDirty = Object.keys(useUnsavedWorkStore.getState().owners).some(owner => owner.startsWith(scope) && owner !== scope + 'workflow')
+            if ((event.target.value === 'DEFER') !== (plannedAction === 'DEFER') && formDirty) {
+              toast('작성 중인 지급 수정이 있습니다. 저장하거나 입력을 버린 뒤 이연으로 전환하세요.', 'warning')
+              return
+            }
+            setPlannedAction(event.target.value)
+            if (event.target.value === 'DEFER') setDeferredDate(context.data?.deferrableFrom ?? '')
+            useUnsavedWorkStore.getState().mark(scope + 'workflow', true)
+          }}>
+            <option value="">변경 내용으로 자동 판단</option><option value="REDUCE">초과분 감액</option><option value="DEFER">2차년도로 이연</option>
           </select></Field>
-          {plannedAction === 'DEFER' && <Field label="초과분 지급 예정일" required helper={`현재 지급액을 잔여 한도 이내로 줄이세요. 차액은 ${context.data.deferrableFrom ?? '계약 2차년도'} 이후 지급 초안으로 분리하며 지금 확정하지 않습니다.`}>
+          {plannedAction === 'DEFER' && <Field className="exception-deferred-date" label="이연 지급 예정일" required helper={`계약 1년 뒤인 ${context.data.deferrableFrom ?? '-'}부터 가능합니다. 귀속일·귀속월·정산월은 예정일에 맞춰 자동 설정됩니다.`}>
             <input data-guide-feature="features.exception.payment-correction.deferred-date" type="date" min={context.data.deferrableFrom ?? undefined} value={deferredDate} disabled={pending} onChange={event => { setDeferredDate(event.target.value); useUnsavedWorkStore.getState().mark(scope + 'workflow', true) }} />
           </Field>}
         </section>}
@@ -222,18 +242,14 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
           </Field>}
           {payment?.journalHeaderId && <Link data-guide-feature="features.exception.payment-correction.journal" to={`/journals?selected=${payment.journalHeaderId}`}>연결된 원장 확인</Link>}
         </section>}
-        {context.data.capBasis && <details className="exception-payment-basis">
-          <summary data-guide-feature="features.exception.payment-correction.basis">검출 당시 실제 산입액 {won(context.data.capBasis.capCheck?.includedAmount)}</summary>
-          <ul>{basisGroups.map(([name, group]) => <li key={name}>{name} {group.count}건 {won(group.amount)}</li>)}</ul>
-        </details>}
-        <Field label="수정할 지급 건">
+        {(context.data.payments.length + (canRegister ? 1 : 0)) > 1 && <Field label="수정할 지급 건">
           <select data-guide-feature="features.exception.payment-correction.payment" className="select-control" value={id} disabled={mutation.isPending} onChange={event => choose(event.target.value)}>
             {context.data.payments.map(p => <option key={p.commissionTransactionId} value={p.commissionTransactionId}>
               지급 {p.commissionTransactionId}  {p.commissionItemName ?? p.commissionItemCode}  {won(p.amount)}  {p.settlementMonth?.slice(0, 7)}
             </option>)}
             {canRegister && <option value="new">누락 지급 신규 등록</option>}
           </select>
-        </Field>
+        </Field>}
         {message && <p role="status" className="exception-correction-result">{message}</p>}
         {context.data.remainingIssues && context.data.remainingIssues.length > 0 && <section data-guide-feature="features.exception.payment-correction.remaining" className="exception-remaining-issues" aria-label="현재 대사 차이">
           <h3>현재 대사 차이</h3>
@@ -252,7 +268,11 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
             </div>
           </div>)}
         </section>}
-        {payment || id === 'new' && canRegister && draft ? <Suspense fallback={<p role="status">지급 입력 화면을 불러오는 중입니다.</p>}><TransactionForm
+        {plannedAction === 'DEFER' && payment ? <DeferredPaymentForm key={id} payment={payment} date={deferredDate} earliestDate={context.data.deferrableFrom} unsavedScope={scope}
+          excess={excess} contractNo={item.contractNo} pending={pending} canProcess={user?.canProcess === true} actionContainer={actionContainer}
+          onPreview={body => deferredPreview.mutateAsync(body)}
+          onSave={async (body, expectedUpdatedAt) => { try { await mutation.mutateAsync({ payment: body, expectedUpdatedAt }) } catch (error) { throw correctionError(error) } }}
+        /> : payment || id === 'new' && canRegister && draft ? <Suspense fallback={<p role="status">지급 입력 화면을 불러오는 중입니다.</p>}><TransactionForm
           key={`${id}:${context.dataUpdatedAt}`} entry={{ contractId: item.contractId ? String(item.contractId) : undefined }}
           initialId={payment ? id : null} draft={draft ?? undefined}
           month={draft?.settlementMonth?.slice(0, 7) ?? item.validationMonth?.slice(0, 7) ?? ''}

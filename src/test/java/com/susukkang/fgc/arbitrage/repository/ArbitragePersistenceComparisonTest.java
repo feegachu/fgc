@@ -151,7 +151,7 @@ class ArbitragePersistenceComparisonTest {
         repository.insertArbitrageCheck(row);
         Long redetectedId = exceptionRepository.insertArbitrageCandidate(row.getValidationRunId(), row.getContractId(), row.getArbitrageCheckId(), "GA_TO_FC", "다시 나옴 근거");
         assertThat(redetectedId).isEqualTo(id);
-        assertThat(jdbc.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id = ?", String.class, id)).isEqualTo("NEW");
+        assertThat(jdbc.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id = ?", String.class, id)).isEqualTo("REVIEW_REQUIRED");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.exception_occurrence WHERE exception_case_id = ?", Long.class, id)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT was_reopened FROM fgc.exception_occurrence WHERE exception_case_id = ? AND validation_run_id = ?", Boolean.class, id, row.getValidationRunId())).isTrue();
         Long reviewId = exceptionRepository.insertArbitrageReviewCase("DATA_QUALITY", row.getValidationRunId(), row.getContractId(), row.getArbitrageCheckId(), "GA_TO_FC", "확인 필요", "기준일 이하 계약 금융 스냅샷이 없습니다.");

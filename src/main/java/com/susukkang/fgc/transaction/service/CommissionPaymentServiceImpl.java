@@ -88,6 +88,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     // FUN-061·운영정책서 제51조 "지급 건과 계약귀속" — 등록·수정·확정과 같은 트랜잭션에서 감사행을 남긴다.
     // after JSON 에 지급단계·포함/제외 판단·정착지원금 귀속·배부정책·증빙(REG-20·22)을 함께 담는다.
     private static final String FIELD = "field";
+    private static final String SCHEDULED_PAYMENT_DATE = "scheduledPaymentDate";
+    private static final String ATTRIBUTION_DATE = "attributionDate";
     private static final String REASON = "reason";
     private static final String REASON_CODE = "reasonCode";
     private static final String AUDIT_ENTITY_TYPE = "COMMISSION_PAYMENT";
@@ -979,7 +981,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 paymentStage,
                 request.attributionMethod()
         );
-        validateSettlementSupportDueDate(request.attributionMethod(), settlementMonth, dueDate);
+        validateSettlementSupportDueDate(request.attributionMethod(), settlementMonth, dueDate, request.attributionDate());
         Long allocationPolicyId = resolveAllocationPolicy(
                 policyVersionId,
                 request.allocationBasis(),
@@ -1110,12 +1112,16 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private void validateSettlementSupportDueDate(
             AttributionMethod attributionMethod,
             LocalDate settlementMonth,
-            LocalDate dueDate
+            LocalDate dueDate,
+            LocalDate attributionDate
     ) {
+        if (attributionMethod == AttributionMethod.DEFERRED_CONTRACT && !Objects.equals(dueDate, attributionDate)) {
+            invalid(SCHEDULED_PAYMENT_DATE, "이연 지급 예정일과 귀속일은 같아야 합니다.");
+        }
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 && dueDate != null
                 && dueDate.isBefore(YearMonth.from(settlementMonth).atDay(1))) {
-            invalid("scheduledPaymentDate", "정착지원금 지급예정일은 모집월(정산월) 1일 이후여야 합니다.");
+            invalid(SCHEDULED_PAYMENT_DATE, "정착지원금 지급예정일은 모집월(정산월) 1일 이후여야 합니다.");
         }
     }
 
@@ -1161,11 +1167,15 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             requireContract(sourceContractId, "contractId");
         }
 
-        // REG-20: 지급일을 이연해도 정착지원금 귀속은 원래 모집월에 남는다.
+        // 일반 정착지원금은 모집월 귀속을 유지한다. DEFERRED_CONTRACT는 별도 가상 GA 이연 시나리오다.
+        if (attributionMethod == AttributionMethod.DEFERRED_CONTRACT
+                && invalidDeferredAttribution(target.contractDate(), attributionDate, settlementMonth)) {
+            invalid(ATTRIBUTION_DATE, "이연 귀속일은 계약일 1년 뒤부터 가능하며 정산월과 귀속월이 같아야 합니다.");
+        }
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 && (!YearMonth.from(target.contractDate()).equals(YearMonth.from(settlementMonth))
                 || !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)))) {
-            invalid("attributionDate", "정착지원금은 모집월(정산월)의 신계약에 실제 귀속해야 합니다.");
+            invalid(ATTRIBUTION_DATE, "정착지원금은 모집월(정산월)의 신계약에 실제 귀속해야 합니다.");
         }
 
         if (attributionMethod == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD) {
@@ -1446,8 +1456,20 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return failures;
     }
 
+    private static boolean invalidDeferredAttribution(LocalDate contractDate, LocalDate attributionDate, LocalDate settlementMonth) {
+        return contractDate != null && attributionDate != null
+                && (attributionDate.isBefore(contractDate.plusYears(1))
+                || settlementMonth != null && !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)));
+    }
+
     private List<GateFailure> attributionFailures(ConfirmationData data) {
         List<GateFailure> failures = new ArrayList<>();
+        if (data.attributionMethod() == AttributionMethod.DEFERRED_CONTRACT
+                && invalidDeferredAttribution(data.contractDate(), data.attributionDate(), data.scheduledPaymentDate())) {
+            failures.add(new GateFailure(data, ExceptionType.DATA_QUALITY, "HIGH",
+                    "이연 귀속일 확인 필요", "이연 귀속일은 계약일 1년 뒤부터 가능하며 정산월과 귀속월이 같아야 합니다.",
+                    FgcErrorCode.TRAN_008, Map.of()));
+        }
         boolean nonContractNewcomer = isNonContractNewcomerAttribution(data);
         if (data.attributedAmount() == null
                 || (data.contractId() == null
@@ -1463,9 +1485,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ));
         }
         // 2026-10-13 #477 - 산입 분류(1,200%) 검토필요는 규제 대상 계약에만 걸린다.
-        // 보장성이 아닌 계약은 한도 판정 대상이 아니므로 분류 때문에 확정을 막지 않는다.
+        // 보장성이 아닌 일반 계약은 분류 때문에 막지 않지만, 이연 초안의 근거 검토는 별도로 필요하다.
         // 귀속금액·계약일·배부근거 같은 별도 검사는 그대로 유지한다.
-        if ((data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED && !isOutsideCapScope(data))
+        if ((data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED
+                && (data.attributionMethod() == AttributionMethod.DEFERRED_CONTRACT || !isOutsideCapScope(data)))
                 || (data.contractId() == null && !nonContractNewcomer)) {
             failures.add(new GateFailure(
                     data,
@@ -1551,9 +1574,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
               Map.of(
                   REASON_CODE,
                   CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
-                  "attributionDate",
+                  ATTRIBUTION_DATE,
                   data.attributionDate().toString(),
-                  "scheduledPaymentDate",
+                  SCHEDULED_PAYMENT_DATE,
                   paymentDate,
                   "firstYearEndExclusive",
                   data.contractDate().plusMonths(12).toString())));
@@ -1812,7 +1835,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .filter(row -> Objects.equals(row.contractId(), data.contractId()) && row.paymentStage() == data.paymentStage())
                 .map(row -> Map.of("transactionAttributionId", row.transactionAttributionId(),
                         "classification", "EXCLUDED", "signedAmount", row.excludedAmount(),
-                        "attributionDate", row.attributionDate().toString(),
+                        ATTRIBUTION_DATE, row.attributionDate().toString(),
                         "firstYearStartInclusive", row.firstYearStartInclusive().toString(),
                         "firstYearEndExclusive", row.firstYearEndExclusive().toString(),
                         REASON_CODE, row.reasonCode(), REASON, row.reason())).toList());
@@ -1853,7 +1876,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         Map<String, Object> candidate = new LinkedHashMap<>();
         candidate.put("transactionAttributionId", row.transactionAttributionId());
     candidate.put(
-        "attributionDate", row.attributionDate() == null ? null : row.attributionDate().toString());
+        ATTRIBUTION_DATE, row.attributionDate() == null ? null : row.attributionDate().toString());
     candidate.put("amount", row.attributedAmount() == null ? null : roundedAttributedAmount(row));
         candidate.put("cashflowType", row.cashflowType());
         candidate.put("classification", row.inclusionDecisionStatus());
@@ -2220,6 +2243,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
         for (CommissionPaymentAttributionRequest attribution : attributions) {
             if (attribution.attributionMethod() == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
+                    || attribution.attributionMethod() == AttributionMethod.DEFERRED_CONTRACT
                     || attribution.attributionMethod() == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD
                     || attribution.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT) {
                 invalid("attributionMethod", "보험회사→GA 지급 건에는 설계사 지원 귀속방식을 사용할 수 없습니다.");
@@ -2308,6 +2332,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         for (CommissionPaymentAttributionRequest attribution : attributions) {
             AttributionMethod method = attribution.attributionMethod();
             boolean settlementMethod = method == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
+                    || method == AttributionMethod.DEFERRED_CONTRACT
                     || method == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD;
             if (settlementMethod != "SETTLEMENT_SUPPORT".equals(itemCode)) {
                 invalid("attributionMethod", "정착지원금 전용 귀속방식은 SETTLEMENT_SUPPORT 항목에만 사용할 수 있습니다.");

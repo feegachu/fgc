@@ -46,7 +46,7 @@ import java.time.OffsetDateTime;
                 @ColumnResult(name = "validationMonth", type = LocalDate.class),
                 @ColumnResult(name = "incompleteRunCount", type = Integer.class),
                 @ColumnResult(name = "journalImbalanceCount", type = Long.class),
-                @ColumnResult(name = "unresolvedCriticalExceptionCount", type = Long.class),
+                @ColumnResult(name = "unresolvedExceptionCount", type = Long.class),
                 @ColumnResult(name = "unresolvedPolicyExceptionCount", type = Long.class),
                 @ColumnResult(name = "attributionImbalanceCount", type = Long.class),
                 @ColumnResult(name = "capDetailMismatchCount", type = Long.class),

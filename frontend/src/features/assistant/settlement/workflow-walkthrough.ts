@@ -93,8 +93,8 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
   if (path === '/exceptions' && ['reconciliation.review', 'ledger.review', 'exception.resolve'].includes(stage)) {
     if (selectedException) return [{
       id: 'exception.reference', selector: '[data-guide-target="exception.reference"]', scope: 'dialog',
-      title: '참조 버튼에서 원인 확인', concise: true,
-      instruction: '참조 또는 계산근거 열기 버튼으로 원자료와 검출 이유를 확인할 수 있습니다.',
+      title: '예외 원인과 계산근거 확인', concise: true,
+      instruction: '상세 설명에서 검출 이유를 확인하고, 계산근거가 있으면 열어 지급 상태와 한도를 확인하세요.',
       interaction: '필요한 처리와 정정은 담당자가 직접 진행합니다. 전체 업무 가이드는 여기서 마칩니다.',
       presentation: { fixedCard: 'center', includeTarget: '[data-guide-target="exception.basis"]' },
     }]
@@ -170,9 +170,11 @@ function sharedSteps(screen: string): WorkflowExplanation[] {
 }
 
 function menuHandoff(id: string, screen: string, label: string, destination: WorkflowDestination): WorkflowExplanation {
+  const finalConsonant = (label.charCodeAt(label.length - 1) - 0xac00) % 28
+  const direction = finalConsonant > 0 && finalConsonant !== 8 ? '으로' : '로' // ㄹ 받침은 '로'
   return {
     id, selector: '[data-guide-feature="navigation.menu.' + screen + '"]', scope: 'shell',
-    title: label + '로 이어가기', concise: true, destination,
+    title: label + direction + ' 이어가기', concise: true, destination,
     instruction: '왼쪽 사이드바의 ' + label + ' 메뉴를 누르세요.',
     interaction: destination === 'validation-list' ? '선택한 지급 건을 모두 확정한 뒤 월 검증을 진행합니다.' : '이동한 화면의 도움말로 안내를 이어갑니다.',
     presentation: { side: 'right', preserveCardPosition: true, ...(destination === 'validation-list' ? { cardAlign: 'top' as const } : {}) },

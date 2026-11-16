@@ -176,7 +176,7 @@ test('한도 초과 거절 → 예외함 조치 → CAP 계산근거', async ({ 
     })
   await exceptionRow.getByRole('button', { name: String(exception.exceptionCaseId), exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`selected=${exception.exceptionCaseId}(?:&|$)`))
-  await expect(page.locator('.exception-detail-grid')).toContainText('지급 건')
+  await expect(page.getByRole('button', { name: '1,200% 계산근거 열기' })).toBeVisible()
   await page.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
   await page.getByLabel('처리 사유').fill('한도 초과 검출 근거와 지급 초안을 검토합니다.')
   await page.getByLabel('증빙', { exact: true }).fill('E2E-418-CAP')
@@ -185,27 +185,30 @@ test('한도 초과 거절 → 예외함 조치 → CAP 계산근거', async ({ 
   await successful(action)
   await expect(page.getByText('1. 검토 시작')).toBeVisible()
   await expect(exceptionRow.getByText('검토중')).toBeVisible()
-  const capLink = page.getByRole('link', { name: '1,200% 계산근거 열기' })
-  expect(new URL((await capLink.getAttribute('href'))!, page.url()).searchParams.get('capCheckId')).toBe(
-    String(exception.capCheckId),
-  )
-  const basisResponse = responseFor(page, `/cap-checks/${exception.capCheckId}/details`, 'GET')
-  await capLink.click()
-  const basis = await successful(basisResponse)
+  const parentUrl = page.url()
+  const capButton = page.getByRole('button', { name: '1,200% 계산근거 열기' })
+  const basisResponse = responseFor(page, `/exceptions/${exception.exceptionCaseId}/cap-basis`, 'GET')
+  await capButton.click()
+  const basis = (await successful(basisResponse)).detectedBasis
   expect(basis.capCheck.capCheckId).toBe(exception.capCheckId)
   expect(basis.capCheck.contractNo).toBe(contractNo)
   expect(basis.capCheck.resultStatus).toBe('VIOLATION')
-  await expect(page.getByRole('dialog')).toBeVisible()
-  await expect(page.getByRole('dialog')).toContainText(contractNo)
-  const capUrl = page.url()
-  expect(new URL(capUrl).searchParams.get('capCheckId')).toBe(String(exception.capCheckId))
+  const modal = page.getByRole('dialog', { name: '계산근거', exact: true })
+  await expect(modal).toBeVisible()
+  await expect(modal).toContainText(contractNo)
+  expect(page.url()).toBe(parentUrl)
+  await modal.getByRole('button', { name: '뒤로가기' }).click()
+  await expect(modal).toHaveCount(0)
+  await expect(page.getByRole('dialog', { name: /^예외 상세/ })).toBeVisible()
   await page.reload()
-  await expect(page.getByRole('dialog')).toBeVisible()
-  await expect(page.getByRole('dialog')).toContainText(contractNo)
-  expect(new URL(page.url()).searchParams.get('capCheckId')).toBe(String(exception.capCheckId))
+  await capButton.click()
+  await expect(modal).toContainText(contractNo)
+  expect(page.url()).toBe(parentUrl)
 })
 
 test('월 검증 생성 및 실행 및 8개 조건 및 GA_ADMIN 확정', async ({ page }) => {
+  // 긴급 3건뿐 아니라 해당 월의 모든 미처리 업무를 UI에서 검토한다.
+  test.setTimeout(300_000)
   await login(page, 'settle01', '/validation-runs?month=2026-07')
   const created = responseFor(page, '/validation-runs')
   await page.getByRole('button', { name: '실행 생성' }).click()
@@ -228,7 +231,7 @@ test('월 검증 생성 및 실행 및 8개 조건 및 GA_ADMIN 확정', async (
   }
   const checklist = await api(page, `/validation-runs/${run.validationRunId}/finalize-checklist`)
   expect(checklist.conditions).toHaveLength(8)
-  // The checked-in seed deliberately produces critical exceptions. Exercise the real gate and the
+  // The checked-in seed deliberately produces unresolved work. Exercise the real gate and the
   // existing review workflow; never change the checklist response or force FINALIZED in SQL.
   expect(checklist.conditions[2].passed).toBe(false)
   await expect(page.getByRole('button', { name: '확정', exact: true })).toBeDisabled()
@@ -247,21 +250,37 @@ test('월 검증 생성 및 실행 및 8개 조건 및 GA_ADMIN 확정', async (
   await expect(page.getByRole('button', { name: '확정', exact: true })).toBeDisabled()
   const pending = await api(
     page,
-    '/exceptions?validationMonth=2026-07-01&severity=CRITICAL&status=OPEN&page=1&size=100',
+    '/exceptions?validationMonth=2026-07-01&status=OPEN&page=1&size=100',
   )
   expect(pending.content.length).toBeGreaterThan(0)
-  await login(page, 'gaadmin', '/exceptions?month=2026-07&severity=CRITICAL&status=OPEN')
-  for (const item of pending.content) {
-    await page
-      .getByRole('table', { name: '예외 목록' })
-      .getByRole('button', { name: String(item.exceptionCaseId), exact: true })
-      .click()
+  expect(pending.totalElements).toBe(checklist.conditions[2].count)
+  await login(page, 'gaadmin', '/exceptions?month=2026-07&validationMonth=2026-07-01&status=OPEN')
+  const remaining = new Map<number, (typeof pending.content)[number]>(pending.content.map((item: { exceptionCaseId: number }) => [item.exceptionCaseId, item]))
+  while (remaining.size > 0) {
+    const table = page.getByRole('table', { name: '예외 목록' })
+    const buttons = table.getByRole('button', { name: /^\d+$/ })
+    await expect(buttons.first()).toBeVisible()
+    const id = (await buttons.allTextContents()).map(Number).find(candidate => remaining.has(candidate))
+    if (id === undefined) {
+      // 처리한 행은 모달을 닫아도 캐시에 남는다. 다음 페이지 조회 시 실제 OPEN 목록을 다시 읽는다.
+      const next = page.getByRole('navigation', { name: '예외 목록 페이지 선택' }).getByRole('button', { name: /^\d+$/ }).first()
+      await expect(next).toBeEnabled()
+      await Promise.all([
+        page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/exceptions' && response.request().method() === 'GET'),
+        next.click(),
+      ])
+      continue
+    }
+    const item = remaining.get(id)!
+    await table.getByRole('button', { name: String(id), exact: true }).click()
     const detail = page.getByRole('dialog', { name: /^예외 상세/ })
-    await detail.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
-    await detail.getByLabel('처리 사유').fill('월 검증에서 발견한 긴급 예외의 근거를 검토합니다.')
-    const started = responseFor(page, `/exceptions/${item.exceptionCaseId}/actions`)
-    await detail.getByRole('button', { name: '처리 저장', exact: true }).click()
-    expect((await successful(started)).toStatus).toBe('IN_REVIEW')
+    if (item.status !== 'IN_REVIEW') {
+      await detail.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
+      await detail.getByLabel('처리 사유').fill('월 검증에서 발견한 미처리 예외의 근거를 검토합니다.')
+      const started = responseFor(page, `/exceptions/${item.exceptionCaseId}/actions`)
+      await detail.getByRole('button', { name: '처리 저장', exact: true }).click()
+      expect((await successful(started)).toStatus).toBe('IN_REVIEW')
+    }
 
     await detail.getByLabel('검토 메모 및 종결 근거').fill('격리 데모에서 검출 근거를 검토했으며 이 검증의 추가 지급은 승인하지 않음')
     await detail.getByLabel('근거 문서 및 관리번호').fill(`E2E-418-${item.exceptionCaseId}`)
@@ -270,6 +289,7 @@ test('월 검증 생성 및 실행 및 8개 조건 및 GA_ADMIN 확정', async (
     expect((await successful(rejected)).toStatus).toBe('REJECTED')
     await expect(detail.getByText('반려', { exact: true })).toBeVisible()
     await detail.getByRole('button', { name: '창 닫기' }).click()
+    remaining.delete(id)
   }
   const ready = await api(page, `/validation-runs/${run.validationRunId}/finalize-checklist`)
   expect(ready.passed, JSON.stringify(ready.conditions)).toBe(true)

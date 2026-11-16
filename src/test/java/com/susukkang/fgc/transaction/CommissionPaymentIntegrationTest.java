@@ -180,12 +180,12 @@ class CommissionPaymentIntegrationTest {
     @Test
     void deleteDraftResolvesDashboardViolationAndPreservesRejectedCapEvidence() {
         Long runId = checklistRun();
-        long criticalBefore = validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedCriticalExceptionCount();
+        long criticalBefore = validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedExceptionCount();
         long dashboardBefore = dashboardQueryRepository.countCapViolation(LocalDate.of(2026, 7, 1));
         var viewBefore = jdbcTemplate.queryForList("SELECT cap_check_id FROM fgc.vw_latest_cap_check WHERE contract_id=1 AND payment_stage='GA_TO_FC'", Long.class);
         var created = commissionPaymentService.create(request("IT-607-" + UUID.randomUUID(), new BigDecimal("1300000")));
         assertCapViolation(created.paymentId());
-        assertThat(validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedCriticalExceptionCount()).isGreaterThan(criticalBefore);
+        assertThat(validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedExceptionCount()).isGreaterThan(criticalBefore);
         // 미처리 지급 초안의 위반도 대시보드에 보이며, 아래 삭제 후에는 원래 건수로 돌아간다.
         assertThat(dashboardQueryRepository.countCapViolation(LocalDate.of(2026, 7, 1))).isEqualTo(dashboardBefore + 1);
         var before = capCheckQueryRepository.findLatestByContractAndStage(1L, "GA_TO_FC");
@@ -199,7 +199,7 @@ class CommissionPaymentIntegrationTest {
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_case WHERE cap_check_id=?", Long.class, capId)).isEqualTo(exceptionCount);
         var after = capCheckQueryRepository.findLatestByContractAndStage(1L, "GA_TO_FC");
         assertThat(after == null ? null : after.getCapCheckId()).isEqualTo(before == null ? null : before.getCapCheckId());
-        assertThat(validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedCriticalExceptionCount()).isEqualTo(criticalBefore);
+        assertThat(validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedExceptionCount()).isEqualTo(criticalBefore);
         assertThat(dashboardQueryRepository.countCapViolation(LocalDate.of(2026, 7, 1))).isEqualTo(dashboardBefore);
         assertThat(jdbcTemplate.queryForList("SELECT cap_check_id FROM fgc.vw_latest_cap_check WHERE contract_id=1 AND payment_stage='GA_TO_FC'", Long.class)).isEqualTo(viewBefore);
         assertThat(jdbcTemplate.queryForList("SELECT status FROM fgc.exception_case WHERE cap_check_id=?", String.class, capId)).isNotEmpty().containsOnly("RESOLVED");
@@ -236,7 +236,7 @@ class CommissionPaymentIntegrationTest {
         commissionPaymentService.deleteDraft(created.paymentId());
         assertThat(jdbcTemplate.queryForList("SELECT action_type FROM fgc.exception_action WHERE exception_case_id=?", String.class, open)).containsExactly("CANCEL");
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id IN (?, ?, ?)", Integer.class, resolved, rejected, unrelated)).isZero();
-        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, unrelated)).isEqualTo("NEW");
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, unrelated)).isEqualTo("REVIEW_REQUIRED");
         assertThatThrownBy(() -> exceptionCaseService.action(rejected,
                 new com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest(ExceptionActionType.REOPEN, "재검토", null), null, "test"))
                 .isInstanceOfSatisfying(FgcBusinessException.class, ex -> assertThat(ex.getErrorCode()).isEqualTo(FgcErrorCode.EXCP_003));
@@ -262,7 +262,7 @@ class CommissionPaymentIntegrationTest {
                 status.setRollbackOnly();
             });
             assertThat(commissionPaymentService.get(created.paymentId()).attributions()).hasSize(1);
-            assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, exceptionId)).isEqualTo("NEW");
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, exceptionId)).isEqualTo("REVIEW_REQUIRED");
             assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id=?", Integer.class, exceptionId)).isZero();
             assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='EXCEPTION_ACTION' AND entity_id=?", Integer.class, exceptionId.toString())).isZero();
             assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='PAYMENT_DELETED' AND entity_id=?", Long.class, created.paymentId().toString())).isZero();

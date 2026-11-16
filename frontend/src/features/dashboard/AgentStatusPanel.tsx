@@ -287,7 +287,7 @@ function BranchDetails({
       metric === 'AGENTS'
         ? { ACTIVE: '활동', INACTIVE: '비활동', TERMINATED: '해촉' }
         : metric === 'EXCEPTIONS'
-          ? { NEW: '신규', IN_REVIEW: '검토 중' }
+          ? { NEW: '미처리', REVIEW_REQUIRED: '검토대상', IN_REVIEW: '검토중' }
           : contractStatusLabels
     return labels[row.status ?? ''] ?? '-'
   }

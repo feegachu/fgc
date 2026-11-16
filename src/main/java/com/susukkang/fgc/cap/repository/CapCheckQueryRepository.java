@@ -283,8 +283,14 @@ public class CapCheckQueryRepository {
                    ccd.classification_snapshot AS classification,
                    ccd.amount                  AS amount,
                    ccd.decision_reason         AS "decisionReason",
-                   ccd.evidence_ref            AS "evidenceRef"
+                   ccd.evidence_ref            AS "evidenceRef",
+                   COALESCE(ct.status, ccd.payment_status_snapshot) AS "paymentStatus",
+                   ccd.payment_status_snapshot AS "paymentStatusSnapshot"
               FROM fgc.cap_check_detail ccd
+              LEFT JOIN fgc.transaction_attribution ta
+                ON ta.transaction_attribution_id = ccd.transaction_attribution_id
+              LEFT JOIN fgc.commission_transaction ct
+                ON ct.commission_transaction_id = ta.commission_transaction_id
              WHERE ccd.cap_check_id = :capCheckId
              ORDER BY ccd.detail_seq
             """;
@@ -585,8 +591,10 @@ public class CapCheckQueryRepository {
         query.addScalar("amount", BigDecimal.class);
         query.addScalar("decisionReason", String.class);
         query.addScalar("evidenceRef", String.class);
+        query.addScalar("paymentStatus", String.class);
+        query.addScalar("paymentStatusSnapshot", String.class);
         return query.setTupleTransformer((tuple, aliases) -> new CapCheckDetailLine(
-                (Integer) tuple[0], (Long) tuple[1], (String) tuple[2], (String) tuple[3], (Long) tuple[4], (Integer) tuple[5], (String) tuple[6], (BigDecimal) tuple[7], (String) tuple[8], (String) tuple[9]))
+                (Integer) tuple[0], (Long) tuple[1], (String) tuple[2], (String) tuple[3], (Long) tuple[4], (Integer) tuple[5], (String) tuple[6], (BigDecimal) tuple[7], (String) tuple[8], (String) tuple[9], (String) tuple[10], (String) tuple[11]))
                 .getResultList();
     }
 

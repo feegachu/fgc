@@ -41,6 +41,7 @@ export function FinalizeDialogs({
         onClose={() => !pending && onCancel()}
         closeOnBackdrop
         className="vrun-modal"
+        headerActions={saveGuide && <ScreenHelp screenId="VRUN-W02" variant="finalize" saveGuide={saveGuide} outcome="finalization" />}
         footer={
           <>
             <Button data-guide-feature="features.validation.finalize-dialogs.button" variant="secondary" disabled={pending} onClick={onCancel}>
@@ -52,7 +53,6 @@ export function FinalizeDialogs({
           </>
         }
       >
-        {saveGuide && <ScreenHelp screenId="VRUN-W02" variant="finalize" saveGuide={saveGuide} outcome="finalization" />}
         <p data-guide-target="validation.finalizeWarning" className="vrun-modal-description">
           확정하면 이 실행의 검증 결과와 그때 쓰인 규칙/계산근거가 잠깁니다. <strong>되돌릴 수 없습니다.</strong>
         </p>

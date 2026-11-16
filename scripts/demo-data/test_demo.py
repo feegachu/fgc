@@ -254,15 +254,51 @@ class DockerRoundTripTest(unittest.TestCase):
                     loader.verify_api_database(target, client)
                 snapshot = target.backup()
                 demo.validate_snapshot(snapshot, 'local')
+                target.sql('CREATE FUNCTION fgc.after_snapshot() RETURNS int LANGUAGE sql AS $$ SELECT 42 $$;'
+                           'CREATE TABLE fgc.after_snapshot_table(id int);')
                 target.sql(demo.TRUNCATE)
                 self.assertEqual(target.sql('SELECT count(*) FROM fgc.insurance_contract'), '0')
                 self.assertEqual(target.sql('SELECT id FROM fgc.policy'), '7')
+                # 같은 월/runNo의 완료 이력이 남으면 다음 적재가 launch에서 거절된다.
+                target.sql('CREATE TABLE fgc.batch_job_instance(id int PRIMARY KEY, job_key text UNIQUE);'
+                           'CREATE TABLE fgc.batch_job_execution(id int PRIMARY KEY, '
+                           'job_instance_id int REFERENCES fgc.batch_job_instance(id));'
+                           "INSERT INTO fgc.batch_job_instance VALUES(1,'2026-07/MONTHLY/1');"
+                           'INSERT INTO fgc.batch_job_execution VALUES(1,1);')
+                batch_snapshot = target.backup()
+                target.sql(demo.TRUNCATE)
+                self.assertEqual(target.sql('SELECT count(*) FROM fgc.batch_job_instance'), '0')
+                self.assertEqual(target.sql('SELECT count(*) FROM fgc.batch_job_execution'), '0')
+                self.assertEqual(target.sql('SELECT id FROM fgc.policy'), '7')
+                target.sql("INSERT INTO fgc.batch_job_instance VALUES(2,'2026-07/MONTHLY/1');")
+                target.restore(batch_snapshot)
+                self.assertEqual(target.sql('SELECT id FROM fgc.batch_job_instance'), '1')
+                self.assertEqual(target.sql('SELECT job_instance_id FROM fgc.batch_job_execution'), '1')
+                # 최초 백업과 동일한 스키마로 되돌린 뒤 기존 복원도 확인한다.
+                target.sql('DROP TABLE fgc.batch_job_execution, fgc.batch_job_instance;')
                 (args.files / 'notice.pdf').write_bytes(b'changed')
                 (args.files / 'new.pdf').write_bytes(b'extra')
                 target.restore(snapshot)
                 self.assertEqual(target.sql('SELECT id FROM fgc.insurance_contract'), '1')
+                self.assertEqual(target.sql("SELECT to_regprocedure('fgc.after_snapshot()') IS NULL"), 't')
+                self.assertEqual(target.sql("SELECT to_regclass('fgc.after_snapshot_table') IS NULL"), 't')
                 self.assertEqual((args.files / 'notice.pdf').read_bytes(), b'original PDF')
                 self.assertFalse((args.files / 'new.pdf').exists())
+                # 정리가 실행된 뒤 SQL 복원이 실패해도 스키마와 기존 데이터가 모두 롤백된다.
+                target.sql('CREATE FUNCTION fgc.rollback_marker() RETURNS int LANGUAGE sql AS $$ SELECT 42 $$')
+
+                def fail_restore_sql(command, **kwargs):
+                    if 'pg_restore' in command:
+                        kwargs['stdout'].write(b'SELECT 1 / 0;\n')
+                        kwargs['stdout'].flush()
+                        return subprocess.CompletedProcess(command, 0)
+                    return run(command, **kwargs)
+
+                with patch.object(demo, 'run', side_effect=fail_restore_sql):
+                    with self.assertRaises(subprocess.CalledProcessError):
+                        target.restore(snapshot)
+                self.assertEqual(target.sql('SELECT id FROM fgc.insurance_contract'), '1')
+                self.assertEqual(target.sql('SELECT fgc.rollback_marker()'), '42')
                 # EC2와 같은 named volume 경로도 실제 Docker로 검증한다.
                 volume = name + '-files'
                 run(['docker', 'volume', 'create', volume])
