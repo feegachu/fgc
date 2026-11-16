@@ -255,9 +255,24 @@ test('월 검증 생성 및 실행 및 8개 조건 및 GA_ADMIN 확정', async (
   expect(pending.content.length).toBeGreaterThan(0)
   expect(pending.totalElements).toBe(checklist.conditions[2].count)
   await login(page, 'gaadmin', '/exceptions?month=2026-07&validationMonth=2026-07-01&status=OPEN')
-  for (const item of pending.content) {
-    // 전체 업무는 여러 페이지에 걸칠 수 있다. 목록과 같은 월/상태를 유지한 실제 상세 URL로 연다.
-    await page.goto(`/exceptions?month=2026-07&validationMonth=2026-07-01&status=OPEN&selected=${item.exceptionCaseId}`)
+  const remaining = new Map<number, (typeof pending.content)[number]>(pending.content.map((item: { exceptionCaseId: number }) => [item.exceptionCaseId, item]))
+  while (remaining.size > 0) {
+    const table = page.getByRole('table', { name: '예외 목록' })
+    const buttons = table.getByRole('button', { name: /^\d+$/ })
+    await expect(buttons.first()).toBeVisible()
+    const id = (await buttons.allTextContents()).map(Number).find(candidate => remaining.has(candidate))
+    if (id === undefined) {
+      // 처리한 행은 모달을 닫아도 캐시에 남는다. 다음 페이지 조회 시 실제 OPEN 목록을 다시 읽는다.
+      const next = page.getByRole('navigation', { name: '예외 목록 페이지 선택' }).getByRole('button', { name: /^\d+$/ }).first()
+      await expect(next).toBeEnabled()
+      await Promise.all([
+        page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/exceptions' && response.request().method() === 'GET'),
+        next.click(),
+      ])
+      continue
+    }
+    const item = remaining.get(id)!
+    await table.getByRole('button', { name: String(id), exact: true }).click()
     const detail = page.getByRole('dialog', { name: /^예외 상세/ })
     if (item.status !== 'IN_REVIEW') {
       await detail.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
@@ -274,6 +289,7 @@ test('월 검증 생성 및 실행 및 8개 조건 및 GA_ADMIN 확정', async (
     expect((await successful(rejected)).toStatus).toBe('REJECTED')
     await expect(detail.getByText('반려', { exact: true })).toBeVisible()
     await detail.getByRole('button', { name: '창 닫기' }).click()
+    remaining.delete(id)
   }
   const ready = await api(page, `/validation-runs/${run.validationRunId}/finalize-checklist`)
   expect(ready.passed, JSON.stringify(ready.conditions)).toBe(true)
