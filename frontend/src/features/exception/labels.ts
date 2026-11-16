@@ -1,4 +1,4 @@
-import { screenMessage, withoutMiddleDots } from '../../lib/screenText'
+import { paymentEvidenceText, screenMessage, withoutMiddleDots } from '../../lib/screenText'
 import type { ExceptionSearchResult } from './api'
 
 type ExceptionType = NonNullable<NonNullable<ExceptionSearchResult['summary']>[number]['type']>
@@ -53,6 +53,13 @@ export function sourceReference(type?: string, contractNo?: string) {
   return type === 'INSURANCE_CONTRACT' && contractNo ? `${sourceLabels[type]} ${contractNo}` : sourceLabels[type]
 }
 
+/** 한도 검출 설명의 각 수치를 줄별로 읽을 수 있게 표시한다. 저장된 원문은 바꾸지 않는다. */
+export function exceptionDescription(value: string) {
+  return /^지급단계\s/.test(value)
+    ? value.replace(/\s*\/\s*(?=실제\s)/g, '\n').replace(/\s+(?=(?:기준일|한도액|산입액|잔여|사용률|초과액|예상|실제|차액)\s)/g, '\n')
+    : value
+}
+
 export function exceptionSummaryDescription(type?: string) {
   return type && Object.hasOwn(summaryDescriptions, type)
     ? summaryDescriptions[type as ExceptionType]
@@ -77,6 +84,7 @@ export function exceptionHistoryReason(reason?: string | null) {
     return `환수액 ${amount}원을 수수료에서 차감하고 확정했습니다.`
   }
   return reason == null ? reason : withoutMiddleDots(reason.replace(correctionReference, '$1'))
+    .replace(/\s+(?=(?:정산월|지급예정일|초과분|이연 예정일)\s)/g, '\n')
 }
 
 export function exceptionHistoryEvidence(evidence?: string | null) {
@@ -85,7 +93,7 @@ export function exceptionHistoryEvidence(evidence?: string | null) {
   if (calculation) return `환수 계산 결과 (${calculation[1]}차)`
   const notice = /^환수 통지서 (.+) 차감 (?:CLAWBACK-RECOVERY|EXCP-RECOVERY):[\d:]+$/.exec(normalized ?? '')
   if (notice) return `환수 통지서 ${notice[1]}`
-  return evidence && !internalEvidence.test(evidence.trim()) ? evidence : null
+  return evidence && !internalEvidence.test(evidence.trim()) ? paymentEvidenceText(evidence) : null
 }
 
 

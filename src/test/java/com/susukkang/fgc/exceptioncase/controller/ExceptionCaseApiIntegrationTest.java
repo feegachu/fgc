@@ -120,7 +120,7 @@ class ExceptionCaseApiIntegrationTest {
                 .andExpect(jsonPath("$.data.content[0].actions.length()").value(1))
                 .andExpect(jsonPath("$.data.content[0].actions[0].exceptionActionId").isNumber())
                 .andExpect(jsonPath("$.data.content[0].actions[0].actionSeq").value(1))
-                .andExpect(jsonPath("$.data.content[0].actions[0].fromStatus").value("NEW"))
+                .andExpect(jsonPath("$.data.content[0].actions[0].fromStatus").value("REVIEW_REQUIRED"))
                 .andExpect(jsonPath("$.data.content[0].actions[0].actionAt").value(endsWith("+09:00")));
     }
 

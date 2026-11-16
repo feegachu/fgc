@@ -299,7 +299,7 @@ describe('CONT-W02 계약 상세', () => {
     const dialog = await screen.findByRole('dialog', { name: '계산근거' })
     await within(dialog).findByRole('cell', { name: '초회수수료' })
     expect(router.state.location.search).toContain('capCheckId=32')
-    await actions.click(within(dialog).getByRole('button', { name: '닫기' }))
+    await actions.click(within(dialog).getByRole('button', { name: '뒤로가기' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(router.state.location.search).not.toContain('capCheckId')
     expect(open).toHaveFocus()

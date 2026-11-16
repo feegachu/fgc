@@ -25,6 +25,30 @@ public class ExceptionPaymentRepository {
     public record ReconciliationSource(String resultType, BigDecimal expectedAmount, PaymentStage stage,
             Long contractId, Long expectedAgentId, Long commissionItemId, LocalDate month, Integer installmentNo, String itemCode) {}
 
+    /** 예외 자체의 정정 감사기록에 연결된 지급만 조회한다. 다른 검증 실행의 최신값으로 바꾸지 않는다. */
+    public Long correctedCapCheckId(Long id, CapScope scope) {
+        var rows = em.createNativeQuery("""
+                SELECT c.cap_check_id FROM fgc.audit_log a
+                JOIN fgc.cap_check c ON c.candidate_transaction_id = (a.after_value->>'paymentId')::bigint
+                WHERE a.entity_type='EXCEPTION_CASE' AND a.entity_id=:id
+                  AND a.action_code='EXCEPTION_PAYMENT_CORRECTION'
+                  AND c.contract_id=:contract AND c.payment_stage=:stage
+                ORDER BY a.audit_log_id DESC, c.checked_at DESC, c.cap_check_id DESC LIMIT 1
+                """).setParameter("id", id.toString()).setParameter("contract", scope.contractId())
+                .setParameter("stage", scope.stage().name()).getResultList();
+        return rows.isEmpty() ? null : number(rows.getFirst());
+    }
+
+    public List<Long> deferredPaymentIds(Long id) {
+        return em.createNativeQuery("""
+                SELECT DISTINCT (after_value->>'deferredPaymentId')::bigint
+                FROM fgc.audit_log WHERE entity_type='EXCEPTION_CASE' AND entity_id=:id
+                  AND action_code='EXCEPTION_PAYMENT_DEFERRED'
+                  AND after_value->>'deferredPaymentId' IS NOT NULL
+                ORDER BY 1
+                """, Long.class).setParameter("id", id.toString()).getResultList();
+    }
+
     public LocalDate deferrableFrom(Long contractId) {
         if (contractId == null) return null;
         var values = em.createNativeQuery("SELECT CAST(contract_date+interval '12 months' AS date) FROM fgc.insurance_contract WHERE contract_id=:id")
@@ -105,7 +129,7 @@ public class ExceptionPaymentRepository {
                 JOIN fgc.exception_case warning ON warning.cap_check_id = recheck.cap_check_id
                 WHERE violation.exception_case_id = :exceptionId AND original.result_status = 'VIOLATION'
                   AND recheck.cap_check_id IN (:capCheckIds) AND recheck.result_status = 'WARNING'
-                  AND warning.exception_type = 'CAP_WARNING' AND warning.status = 'NEW'
+                  AND warning.exception_type = 'CAP_WARNING' AND warning.status IN ('NEW', 'REVIEW_REQUIRED')
                   AND warning.source_entity_type = 'COMMISSION_TRANSACTION' AND warning.source_entity_id = :paymentId
                 ORDER BY warning.exception_case_id
                 """, CorrectedViolationWarning.class)

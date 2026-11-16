@@ -84,6 +84,60 @@ class ReconciliationResultQueryIntegrationTest {
         assertThat(detail.detailSnapshot().get("paymentStage").asText()).isEqualTo("GA_TO_FC");
     }
 
+    @Test
+    void contractFilterKeepsPagingCountAndOtherContractsSeparate() {
+        var contracts = jdbcTemplate.queryForList("SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 2", Long.class);
+        assertThat(contracts).hasSize(2);
+        jdbcTemplate.update("UPDATE fgc.reconciliation_result SET contract_id = ? WHERE reconciliation_result_id = ?", contracts.getFirst(), firstResultId);
+        jdbcTemplate.update("UPDATE fgc.reconciliation_result SET contract_id = ? WHERE reconciliation_run_id = ? AND reconciliation_result_id <> ?", contracts.getLast(), runId, firstResultId);
+        var page = queryService.search(runId, null, contracts.getFirst(), 1, 1, "createdAt,asc");
+        assertThat(page.items().content()).extracting("reconciliationResultId").containsExactly(firstResultId);
+        assertThat(page.items().totalElements()).isEqualTo(1);
+        assertThat(queryService.search(runId, null, contracts.getFirst(), 2, 1, "createdAt,asc").items().content()).isEmpty();
+        assertThat(queryService.search(runId, "MATCHED", contracts.getFirst(), 1, 20, "createdAt,asc").items().totalElements()).isZero();
+        assertThat(queryService.search(runId, null, 9223372036854775807L, 1, 20, "createdAt,asc").items().content()).isEmpty();
+    }
+
+    @Test
+    void basisFollowsOnlyCompletedCorrectionChainAndPreservesDetection() {
+        Long second = revision(runId, true);
+        Long latest = revision(second, false);
+        Long unrelated = revision(null, false);
+        Long corrected = revisedResult(latest, "FUN-049:GOLDEN:1", 1000);
+        revisedResult(unrelated, "FUN-049:GOLDEN:1", 999999);
+        var basis = queryService.basis(firstResultId);
+        assertThat(basis.currentRunId()).isEqualTo(latest);
+        assertThat(basis.currentResults()).extracting("reconciliationResultId").containsExactly(corrected);
+        assertThat(basis.currentResults().getFirst().actualTotalAmount()).isEqualByComparingTo("1000");
+        assertThat(basis.detected().actualTotalAmount()).isEqualByComparingTo("900");
+        assertThat(basis.detected().resultType()).isEqualTo("JOURNAL_IMBALANCE");
+        jdbcTemplate.update("UPDATE fgc.reconciliation_result SET match_group_key='FUN-049:GOLDEN:REMOVED' WHERE reconciliation_result_id=?", corrected);
+        var removed = queryService.basis(firstResultId);
+        assertThat(removed.currentRunId()).isEqualTo(latest);
+        assertThat(removed.currentResults()).isEmpty();
+    }
+
+    private Long revision(Long prior, boolean superseded) {
+        if (prior != null) jdbcTemplate.update("UPDATE fgc.reconciliation_run SET superseded_yn=true WHERE reconciliation_run_id=?", prior);
+        Long insurer = prior == null ? jdbcTemplate.queryForObject("SELECT min(insurer_id) FROM fgc.insurer", Long.class)
+                : jdbcTemplate.queryForObject("SELECT insurer_id FROM fgc.reconciliation_run WHERE reconciliation_run_id=?", Long.class, prior);
+        Long id = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_run(settlement_month,payment_stage,corrects_reconciliation_run_id,insurer_id)
+                VALUES (?, 'GA_TO_FC', ?, ?) RETURNING reconciliation_run_id
+                """, Long.class, TEST_MONTH, prior, insurer);
+        jdbcTemplate.update("UPDATE fgc.reconciliation_run SET status='RUNNING', started_at=clock_timestamp() WHERE reconciliation_run_id=?", id);
+        jdbcTemplate.update("UPDATE fgc.reconciliation_run SET status='COMPLETED', completed_at=clock_timestamp(), superseded_yn=? WHERE reconciliation_run_id=?", superseded, id);
+        return id;
+    }
+
+    private Long revisedResult(Long run, String key, int actual) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_result(reconciliation_run_id,match_group_key,result_type,
+                    expected_total_amount,actual_total_amount,difference_amount,primary_reason_code,detail_snapshot)
+                VALUES (?,?,'MATCHED',1000,?,0,'MATCHED','{}'::jsonb) RETURNING reconciliation_result_id
+                """, Long.class, run, key, actual);
+    }
+
     private void cleanTestRun() {
         jdbcTemplate.update("""
                 DELETE FROM fgc.reconciliation_match

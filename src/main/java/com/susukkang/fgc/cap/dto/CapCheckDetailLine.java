@@ -21,6 +21,15 @@ public record CapCheckDetailLine(
         String classification,
         BigDecimal amount,
         String decisionReason,
-        String evidenceRef
+        String evidenceRef,
+        String paymentStatus,
+        String paymentStatusSnapshot
 ) {
+    /** 계산 시점에는 지급 상태를 채우지 않고 상세 조회에서 현재 상태를 결합한다. */
+    public CapCheckDetailLine(int detailSeq, Long commissionItemId, String itemCode, String itemName,
+                              Long scheduleLineId, Integer contractMonthNo, String classification,
+                              BigDecimal amount, String decisionReason, String evidenceRef) {
+        this(detailSeq, commissionItemId, itemCode, itemName, scheduleLineId, contractMonthNo,
+                classification, amount, decisionReason, evidenceRef, null, null);
+    }
 }

@@ -1089,6 +1089,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exceptions/{id}/cap-basis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["findExceptionCapBasis"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exceptions/{id}/journal-correction": {
         parameters: {
             query?: never;
@@ -1536,6 +1552,23 @@ export interface paths {
         };
         /** 대사 결과 상세 조회 (IF-API-41) */
         get: operations["getResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliations/results/{reconciliationResultId}/basis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 검출 당시 및 정정 후 대사 결과 조회 */
+        get: operations["getResultBasis"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2541,6 +2574,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseExceptionCapBasisResponse: {
+            data?: components["schemas"]["ExceptionCapBasisResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseExceptionCaseSearchResponse: {
             data?: components["schemas"]["ExceptionCaseSearchResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2809,6 +2847,11 @@ export interface components {
         };
         ApiResponseReconciliationExceptionBulkCreateResponse: {
             data?: components["schemas"]["ReconciliationExceptionBulkCreateResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseReconciliationResultBasisResponse: {
+            data?: components["schemas"]["ReconciliationResultBasisResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -3310,6 +3353,8 @@ export interface components {
             /** Format: int32 */
             detailSeq?: number;
             evidenceRef?: string;
+            paymentStatus?: string;
+            paymentStatusSnapshot?: string;
         };
         CapCheckItemResponse: {
             /** Format: date */
@@ -3710,7 +3755,7 @@ export interface components {
             /** Format: date */
             attributionDate: string;
             /** @enum {string} */
-            attributionMethod: "DIRECT" | "SETTLEMENT_SUPPORT_MONTHLY" | "FIRST_CONTRACT_CARRY_FORWARD" | "APPROVED_ALLOCATION" | "MANUAL_REVIEW" | "NEWCOMER_NON_CONTRACT";
+            attributionMethod: "DIRECT" | "SETTLEMENT_SUPPORT_MONTHLY" | "FIRST_CONTRACT_CARRY_FORWARD" | "DEFERRED_CONTRACT" | "APPROVED_ALLOCATION" | "MANUAL_REVIEW" | "NEWCOMER_NON_CONTRACT";
             /** Format: int64 */
             contractId?: number;
             evidenceRef?: string;
@@ -3726,7 +3771,7 @@ export interface components {
             /** Format: date */
             attributionDate?: string;
             /** @enum {string} */
-            attributionMethod?: "DIRECT" | "SETTLEMENT_SUPPORT_MONTHLY" | "FIRST_CONTRACT_CARRY_FORWARD" | "APPROVED_ALLOCATION" | "MANUAL_REVIEW" | "NEWCOMER_NON_CONTRACT";
+            attributionMethod?: "DIRECT" | "SETTLEMENT_SUPPORT_MONTHLY" | "FIRST_CONTRACT_CARRY_FORWARD" | "DEFERRED_CONTRACT" | "APPROVED_ALLOCATION" | "MANUAL_REVIEW" | "NEWCOMER_NON_CONTRACT";
             /** Format: date */
             attributionMonth?: string;
             /** Format: int32 */
@@ -4532,17 +4577,22 @@ export interface components {
             /** Format: int64 */
             exceptionActionId?: number;
             /** @enum {string} */
-            fromStatus?: "NEW" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+            fromStatus?: "NEW" | "REVIEW_REQUIRED" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
             fromStatusLabel?: string;
             reason?: string;
             /** @enum {string} */
-            toStatus?: "NEW" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+            toStatus?: "NEW" | "REVIEW_REQUIRED" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
             toStatusLabel?: string;
         };
         ExceptionAssigneeRow: {
             loginId?: string;
             /** Format: int64 */
             userId?: number;
+        };
+        ExceptionCapBasisResponse: {
+            currentBasis?: components["schemas"]["CapCheckBasisResponse"];
+            deferredPayments?: components["schemas"]["CommissionPaymentResponse"][];
+            detectedBasis?: components["schemas"]["CapCheckBasisResponse"];
         };
         ExceptionCaseResponseDTO: {
             actions?: components["schemas"]["ExceptionActionResponse"][];
@@ -4584,7 +4634,7 @@ export interface components {
             sourceEntityType?: string;
             sourceLink?: string | null;
             /** @enum {string} */
-            status?: "NEW" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+            status?: "NEW" | "REVIEW_REQUIRED" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
             statusLabel?: string;
             title?: string;
             /** @enum {string} */
@@ -4998,7 +5048,7 @@ export interface components {
             correctionGroupKey?: string;
             evidenceRef?: string;
             /** @enum {string} */
-            fromStatus?: "NEW" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+            fromStatus?: "NEW" | "REVIEW_REQUIRED" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
             /** Format: int64 */
             originalJournalHeaderId?: number;
             reason?: string;
@@ -5007,9 +5057,9 @@ export interface components {
             /** Format: int64 */
             reversalJournalHeaderId?: number;
             /** @enum {string} */
-            status?: "NEW" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+            status?: "NEW" | "REVIEW_REQUIRED" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
             /** @enum {string} */
-            toStatus?: "NEW" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+            toStatus?: "NEW" | "REVIEW_REQUIRED" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
         };
         JournalCorrectionExceptionRequest: {
             evidenceRef?: string;
@@ -5021,7 +5071,7 @@ export interface components {
             exceptionCaseId?: number;
             redirectUrl?: string;
             /** @enum {string} */
-            status?: "NEW" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+            status?: "NEW" | "REVIEW_REQUIRED" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
         };
         JournalCorrectionResult: {
             correctionGroupKey?: string;
@@ -6150,6 +6200,12 @@ export interface components {
         ReconciliationReasonResponse: {
             code?: string;
             label?: string;
+        };
+        ReconciliationResultBasisResponse: {
+            currentResults?: components["schemas"]["ReconciliationResultDetailResponse"][];
+            /** Format: int64 */
+            currentRunId?: number;
+            detected?: components["schemas"]["ReconciliationResultDetailResponse"];
         };
         ReconciliationResultDetailResponse: {
             actualAgent?: components["schemas"]["Agent"];
@@ -8690,6 +8746,28 @@ export interface operations {
             };
         };
     };
+    findExceptionCapBasis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponseExceptionCapBasisResponse"];
+                };
+            };
+        };
+    };
     journalCorrection: {
         parameters: {
             query?: never;
@@ -9550,6 +9628,28 @@ export interface operations {
             };
         };
     };
+    getResultBasis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reconciliationResultId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseReconciliationResultBasisResponse"];
+                };
+            };
+        };
+    };
     bulkCreateExceptions: {
         parameters: {
             query?: never;
@@ -9576,6 +9676,7 @@ export interface operations {
         parameters: {
             query?: {
                 resultType?: string;
+                contractId?: number;
                 page?: number;
                 size?: number;
                 sort?: string;

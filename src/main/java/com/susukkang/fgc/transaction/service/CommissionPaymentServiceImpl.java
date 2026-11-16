@@ -979,7 +979,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 paymentStage,
                 request.attributionMethod()
         );
-        validateSettlementSupportDueDate(request.attributionMethod(), settlementMonth, dueDate);
+        validateSettlementSupportDueDate(request.attributionMethod(), settlementMonth, dueDate, request.attributionDate());
         Long allocationPolicyId = resolveAllocationPolicy(
                 policyVersionId,
                 request.allocationBasis(),
@@ -1110,8 +1110,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private void validateSettlementSupportDueDate(
             AttributionMethod attributionMethod,
             LocalDate settlementMonth,
-            LocalDate dueDate
+            LocalDate dueDate,
+            LocalDate attributionDate
     ) {
+        if (attributionMethod == AttributionMethod.DEFERRED_CONTRACT && !Objects.equals(dueDate, attributionDate)) {
+            invalid("scheduledPaymentDate", "이연 지급 예정일과 귀속일은 같아야 합니다.");
+        }
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 && dueDate != null
                 && dueDate.isBefore(YearMonth.from(settlementMonth).atDay(1))) {
@@ -1162,6 +1166,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
 
         // REG-20: 지급일을 이연해도 정착지원금 귀속은 원래 모집월에 남는다.
+        if (attributionMethod == AttributionMethod.DEFERRED_CONTRACT
+                && (attributionDate.isBefore(target.contractDate().plusYears(1))
+                || !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)))) {
+            invalid("attributionDate", "이연 귀속일은 계약일 1년 뒤부터 가능하며 정산월과 귀속월이 같아야 합니다.");
+        }
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 && (!YearMonth.from(target.contractDate()).equals(YearMonth.from(settlementMonth))
                 || !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)))) {
@@ -2220,6 +2229,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
         for (CommissionPaymentAttributionRequest attribution : attributions) {
             if (attribution.attributionMethod() == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
+                    || attribution.attributionMethod() == AttributionMethod.DEFERRED_CONTRACT
                     || attribution.attributionMethod() == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD
                     || attribution.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT) {
                 invalid("attributionMethod", "보험회사→GA 지급 건에는 설계사 지원 귀속방식을 사용할 수 없습니다.");
@@ -2308,6 +2318,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         for (CommissionPaymentAttributionRequest attribution : attributions) {
             AttributionMethod method = attribution.attributionMethod();
             boolean settlementMethod = method == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
+                    || method == AttributionMethod.DEFERRED_CONTRACT
                     || method == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD;
             if (settlementMethod != "SETTLEMENT_SUPPORT".equals(itemCode)) {
                 invalid("attributionMethod", "정착지원금 전용 귀속방식은 SETTLEMENT_SUPPORT 항목에만 사용할 수 있습니다.");

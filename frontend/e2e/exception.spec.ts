@@ -89,6 +89,7 @@ test(`예외 담당자를 ${assignee.loginId}에게 배정하고 본인 배정�
 
   await page.goto('exceptions')
   await expect(page.getByRole('heading', { name: '예외함' })).toBeVisible()
+  await expect(page.getByLabel('상태', { exact: true }).locator('option')).toHaveText(['전체', '미처리', '검토대상', '검토중', '해결', '반려'])
   await expect(page.getByRole('link', { name: '1,200% 위반 1건' })).toBeVisible()
   expect(new URL(searchUrls[0]).searchParams.get('status')).toBe('')
 

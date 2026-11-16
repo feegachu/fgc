@@ -13,7 +13,7 @@ export type JournalAccount = Schemas['JournalAccountRow']
 export type JournalDetail = Schemas['JournalDetailResponse']
 export type JournalCorrectionRequest = Schemas['JournalCorrectionActionRequest']
 export type JournalCorrectionResult = Schemas['JournalCorrectionActionResponse']
-export type ExceptionStatus = 'NEW' | 'IN_REVIEW' | 'RESOLVED' | 'REJECTED'
+export type ExceptionStatus = 'NEW' | 'REVIEW_REQUIRED' | 'IN_REVIEW' | 'RESOLVED' | 'REJECTED'
 
 export const PAGE_SIZE = 20
 /** 화면의 상태 select 값. API 에서는 OPEN 이 미처리 묶음이고 빈 값이 전체다. */

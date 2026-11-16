@@ -219,8 +219,8 @@ class CapCheckControllerTest {
 
     private CapCheckBasisResponse sampleBasisResponse() {
         List<CapCheckDetailResponse> details = List.of(
-                new CapCheckDetailResponse(1, "FC 기본수수료", "INCLUDED", 650000L, "산입", null),
-                new CapCheckDetailResponse(2, "교육비", "EXCLUDED", 50000L, "제외", "SRC-004"));
+                new CapCheckDetailResponse(1, "FC 기본수수료", "INCLUDED", 650000L, "산입", null, "CONFIRMED"),
+                new CapCheckDetailResponse(2, "교육비", "EXCLUDED", 50000L, "제외", "SRC-004", "DRAFT"));
 
         // basePremiumAmount는 월납 원액(100,000)이다 — limitAmount(1,200,000)와는 다른 값이다.
         CapCheckItemResponse capCheck = new CapCheckItemResponse(

@@ -108,6 +108,7 @@ public class ReconciliationRunController {
     public ApiResponse<ReconciliationResultSearchResponse> searchResults(
             @PathVariable long reconciliationRunId,
             @RequestParam(required = false) String resultType,
+            @RequestParam(required = false) Long contractId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort
@@ -119,8 +120,9 @@ public class ReconciliationRunController {
                 invalid("resultType");
             }
         }
-        return ApiResponse.success(reconciliationResultQueryService.search(
-                reconciliationRunId, resultType, page, size, sort));
+        return ApiResponse.success(contractId == null
+                ? reconciliationResultQueryService.search(reconciliationRunId, resultType, page, size, sort)
+                : reconciliationResultQueryService.search(reconciliationRunId, resultType, contractId, page, size, sort));
     }
 
     @Operation(summary = "불일치 예외 일괄 생성 (IF-API-42)")
@@ -139,6 +141,13 @@ public class ReconciliationRunController {
             @PathVariable long reconciliationResultId
     ) {
         return ApiResponse.success(reconciliationResultQueryService.get(reconciliationResultId));
+    }
+
+    @Operation(summary = "검출 당시 및 정정 후 대사 결과 조회")
+    @GetMapping("/results/{reconciliationResultId}/basis")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<ReconciliationResultBasisResponse> getResultBasis(@PathVariable long reconciliationResultId) {
+        return ApiResponse.success(reconciliationResultQueryService.basis(reconciliationResultId));
     }
 
     private static LocalDate parseSettlementMonth(String value) {

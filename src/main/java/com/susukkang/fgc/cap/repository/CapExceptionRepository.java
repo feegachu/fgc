@@ -69,7 +69,7 @@ public class CapExceptionRepository {
                        title = EXCLUDED.title,
                        description = EXCLUDED.description,
                        updated_at = clock_timestamp()
-                 WHERE existing.status IN ('NEW', 'IN_REVIEW')
+                 WHERE existing.status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW')
                 """).unwrap(NativeQuery.class);
         int affectedRows = query.setParameter("exceptionKey", command.getExceptionKey(), String.class)
                 .setParameter("exceptionType", command.getExceptionType().name(), String.class)
@@ -105,7 +105,7 @@ public class CapExceptionRepository {
                     :title, :description
                 )
                 ON CONFLICT (exception_key) DO UPDATE
-                   SET status = 'NEW', reason_code = EXCLUDED.reason_code,
+                   SET severity = EXCLUDED.severity, reason_code = EXCLUDED.reason_code,
                        validation_month = COALESCE(EXCLUDED.validation_month, existing.validation_month),
                        title = EXCLUDED.title, description = EXCLUDED.description,
                        updated_at = clock_timestamp()
@@ -197,12 +197,11 @@ public class CapExceptionRepository {
                  WHERE e.sourceEntityType = 'COMMISSION_TRANSACTION'
                    AND e.sourceEntityId = :paymentId
                    AND e.exceptionType = :exceptionType
-                   AND e.status IN (:newStatus, :reviewStatus)
+                   AND e.status IN (:openStatuses)
                 """, Long.class)
                 .setParameter("paymentId", String.valueOf(paymentId))
                 .setParameter("exceptionType", ExceptionType.CAP_VIOLATION)
-                .setParameter("newStatus", ExceptionStatus.NEW)
-                .setParameter("reviewStatus", ExceptionStatus.IN_REVIEW)
+                .setParameter("openStatuses", ExceptionStatus.dbStatuses(ExceptionStatus.OPEN_FILTER))
                 .setMaxResults(1)
                 .getResultList().isEmpty();
     }
@@ -221,12 +220,11 @@ public class CapExceptionRepository {
                  WHERE e.sourceEntityType = 'COMMISSION_TRANSACTION'
                    AND e.sourceEntityId = :paymentId
                    AND e.exceptionType = :exceptionType
-                   AND e.status IN (:newStatus, :reviewStatus)
+                   AND e.status IN (:openStatuses)
                 """, Long.class)
                 .setParameter("paymentId", String.valueOf(paymentId))
                 .setParameter("exceptionType", ExceptionType.CAP_VIOLATION)
-                .setParameter("newStatus", ExceptionStatus.NEW)
-                .setParameter("reviewStatus", ExceptionStatus.IN_REVIEW)
+                .setParameter("openStatuses", ExceptionStatus.dbStatuses(ExceptionStatus.OPEN_FILTER))
                 .getResultList();
     }
 }

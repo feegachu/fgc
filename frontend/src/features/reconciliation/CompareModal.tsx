@@ -30,6 +30,7 @@ export function CompareModal({
       title="대사 비교 상세"
       className="modal-large reco-react-modal"
       onClose={onClose}
+      headerActions={<ScreenHelp screenId="RECO-W02" variant="detail" />}
       footer={
         <Button data-guide-feature="features.reconciliation.compare-modal.button" variant="secondary" onClick={onClose}>
           닫기
@@ -37,7 +38,6 @@ export function CompareModal({
       }
     >
       <Failure error={detail.error} />
-      <ScreenHelp screenId="RECO-W02" variant="detail" />
       {detail.isPending ? (
         <p role="status">불러오는 중입니다.</p>
       ) : (

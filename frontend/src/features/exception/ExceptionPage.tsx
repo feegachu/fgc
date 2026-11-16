@@ -22,6 +22,7 @@ import type { ShellContext } from '../../app/shell/AppShell'
 import { withMonth } from '../../stores/workspace'
 import { useAuth, usePermission } from '../auth/useAuth'
 import { ActionPanel, ExceptionDetail } from './ActionPanel'
+import { ContractStatusContext } from './ContractStatusContext'
 import { JournalCorrectionModal } from './JournalCorrectionModal'
 import { PaymentCorrectionModal } from './PaymentCorrectionModal'
 import { ReviewPanel } from './ReviewPanel'
@@ -110,7 +111,7 @@ export function ExceptionPage() {
     : !canHandle ? '예외를 처리할 권한이 없습니다.'
     : selected?.status === 'RESOLVED' ? '이미 해결된 예외입니다.'
     : selected?.status === 'REJECTED' ? '종결된 예외입니다. 먼저 재검토를 시작하세요.'
-    : selected?.status === 'NEW' ? '먼저 검토 시작을 저장하거나 담당자를 배정하세요.'
+    : selected?.status === 'NEW' || selected?.status === 'REVIEW_REQUIRED' ? '먼저 검토 시작을 저장하거나 담당자를 배정하세요.'
     : !selected?.assigneeLoginId ? '검토 시작을 저장해 담당자를 지정하세요.'
     : !ownReview ? `${selected.assigneeLoginId} 담당자가 검토중입니다. 담당자만 처리할 수 있습니다.`
     : paymentCorrection && !user?.canProcess ? '수수료 지급 건을 등록 및 수정할 권한이 없습니다.'
@@ -223,7 +224,7 @@ export function ExceptionPage() {
       width: '5.75rem',
       align: 'center',
       render: (row) => (
-        <StatusBadge optionCount={4} tone={statusTone(row.status)} tablePresentation="dot">
+        <StatusBadge optionCount={5} tone={statusTone(row.status)} tablePresentation="dot">
           {row.statusLabel ?? '-'}
         </StatusBadge>
       ),
@@ -429,6 +430,7 @@ export function ExceptionPage() {
                   {selected ? <History item={selected} /> : <p className="text-secondary exception-placeholder">-</p>}
                 </div>
               </section>
+              {selected?.contractId != null && <ContractStatusContext contractId={selected.contractId} />}
               </div>
             </div>
           </Modal>
@@ -543,6 +545,7 @@ function FilterForm({
         onChange={(event) => set(key)(event.target.value)}
       >
         {all && <option value="">전체</option>}
+        {key === 'status' && draft.status === OPEN_STATUS && <option value={OPEN_STATUS} hidden disabled>요약 조건</option>}
         {items.map((item) => (
           <option key={item.value} value={item.value}>
             {item.label}

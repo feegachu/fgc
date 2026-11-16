@@ -178,16 +178,17 @@ public class ExceptionPaymentCorrectionService {
         if ("DEFER".equals(request.plannedAction())) {
             var a = body.attributions().getFirst();
             var date = request.deferredPaymentDate();
-            boolean settlementSupport = a.attributionMethod() == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY;
+            boolean settlementSupport = a.attributionMethod() == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
+                    || a.attributionMethod() == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD
+                    || a.attributionMethod() == AttributionMethod.DEFERRED_CONTRACT;
             deferred = payments.create(new CommissionPaymentCreateRequest("GA_MANUAL_PAYMENT", "EXCP:" + id + ":DEFER:" + old.paymentId(),
                     body.contractId(), body.agentId(), body.commissionItemId(), request.deferredAmount(),
-                    settlementSupport ? body.settlementMonth() : date.withDayOfMonth(1), body.cashflowType(),
+                    date.withDayOfMonth(1), body.cashflowType(),
                     date, body.paymentStage(), null, List.of(new CommissionPaymentAttributionRequest(a.contractId(),
-                    settlementSupport ? a.attributionDate() : date, request.deferredAmount(),
-                    settlementSupport ? InclusionDecisionStatus.REVIEW_REQUIRED : a.inclusionDecisionStatus(),
-                    settlementSupport ? ExclusionType.NONE : a.exclusionType(),
-                    settlementSupport ? "정착지원금 지급일 이연 모집월 귀속과 한도 산입 재검토" : a.inclusionDecisionReason(),
-                    a.allocationBasis(), a.evidenceRef(), a.attributionMethod())),
+                    date, request.deferredAmount(),
+                    a.inclusionDecisionStatus(), a.exclusionType(),
+                    "계약 2차년도 이후 초과분 이연", a.allocationBasis(), a.evidenceRef(),
+                    settlementSupport ? AttributionMethod.DEFERRED_CONTRACT : a.attributionMethod())),
                     body.evidenceRef(), "예외 " + id + "의 초과분 이연 원 지급 " + old.paymentId()));
             reason += " 초과분 " + request.deferredAmount() + "원 → " + date + " 지급 초안 " + deferred.paymentId();
             audit.record(AuditLogService.AuditEvent.builder().actionCode("EXCEPTION_PAYMENT_DEFERRED").entityType("EXCEPTION_CASE")

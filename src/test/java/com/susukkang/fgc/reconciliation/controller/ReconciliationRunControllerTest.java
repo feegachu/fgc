@@ -229,6 +229,15 @@ class ReconciliationRunControllerTest {
     }
 
     @Test
+    void contractFilterIsPassedToResultQuery() throws Exception {
+        mockMvc.perform(get("/api/v1/reconciliations/41/results")
+                        .with(user(principal("COMPLIANCE")))
+                        .queryParam("contractId", "3"))
+                .andExpect(status().isOk());
+        verify(reconciliationResultQueryService).search(41L, null, 3L, 1, 20, "createdAt,desc");
+    }
+
+    @Test
     void unauthenticatedUserCannotReadResultDetail() throws Exception {
         mockMvc.perform(get("/api/v1/reconciliations/results/99"))
                 .andExpect(status().isUnauthorized());

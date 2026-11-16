@@ -15,15 +15,24 @@ import { Link } from 'react-router'
 import { applyActionToCache, exceptionOptionsQueryOptions, postAction } from './api'
 import type { ActionInput, ExceptionCase } from './api'
 import { availableActions, isActionable, severityTone, statusTone, typeTone } from './rules'
-import { sourceReference } from './labels'
+import { exceptionDescription, sourceReference } from './labels'
 import { JournalCorrectionModal } from './JournalCorrectionModal'
 import { decisionReasonText } from '../arbitrage/utils'
+import { CapDetailModal } from '../cap/CapDetailModal'
+import { ExceptionReconciliationModal } from './ExceptionReconciliationModal'
+import { contractStateLabel, useExceptionContract } from './ContractStatusContext'
 
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 
 export function ExceptionDetail({ item }: { item: ExceptionCase }) {
+  const [basisOpen, setBasisOpen] = useState(false)
+  const [reconciliationOpen, setReconciliationOpen] = useState(false)
+  const reconciliationId = item.sourceEntityType === 'RECONCILIATION_RESULT' ? String(item.sourceEntityId ?? '') : ''
+  const contract = useExceptionContract(reconciliationId ? item.contractId : undefined)
+  const basisId = item.capCheckId ?? new URL(item.capBasisLink ?? '', 'http://workspace.local').searchParams.get('capCheckId')
   const reference = sourceReference(item.sourceEntityType, item.contractNo)
-  return (
+  const showReference = item.sourceEntityType !== 'COMMISSION_TRANSACTION'
+  return (<>
     <dl className="exception-detail-grid">
       <div>
         <dt>예외 번호</dt>
@@ -71,15 +80,19 @@ export function ExceptionDetail({ item }: { item: ExceptionCase }) {
         <dt>제목</dt>
         <dd>{rateText(dash(item.title))}</dd>
       </div>
-      <div className="exception-detail-wide">
+      <div className="exception-detail-wide" data-guide-target="exception.reference">
         <dt>설명</dt>
         {/* 차익거래 예외는 판정 사유 원문을 설명으로 저장한다. 개발 용어 구절만 쉬운 말로 바꾼다. */}
-        <dd>{rateText(decisionReasonText(item.description))}</dd>
+        <dd className="exception-detail-description">{reconciliationId && <>
+          <span>현재 계약 상태: {contractStateLabel(contract.data?.contractStatus, contract.data?.contractStatusLabel)}{'\n'}</span>
+        </>}{exceptionDescription(rateText(decisionReasonText(item.description)))}</dd>
       </div>
-      <div className="exception-detail-wide" data-guide-target="exception.reference">
+      {showReference && <div className="exception-detail-wide">
         <dt>참조</dt>
         <dd className="tabular-nums">
-          {item.sourceLink ? (
+          {reconciliationId ? <Button data-guide-feature="features.exception.reconciliation-open" variant="secondary" onClick={() => setReconciliationOpen(true)}>
+            <svg className="exception-reference-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7h16m-4-4 4 4-4 4M21 17H5m4-4-4 4 4 4" /></svg>대사 결과 열기
+          </Button> : item.sourceLink ? (
             <Link data-guide-feature="features.exception.action-panel.link" className="button button-secondary" to={item.sourceLink}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 open_in_new
@@ -90,22 +103,24 @@ export function ExceptionDetail({ item }: { item: ExceptionCase }) {
             reference
           )}
         </dd>
-      </div>
+      </div>}
       {item.capBasisLink && (
         <div className="exception-detail-wide" data-guide-target="exception.basis">
           <dt>계산근거</dt>
           <dd>
-            <Link data-guide-feature="features.exception.action-panel.link-2" className="button button-secondary" to={item.capBasisLink}>
+            <Button data-guide-feature="features.exception.action-panel.link-2" variant="secondary" disabled={basisId == null} onClick={() => setBasisOpen(true)}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 calculate
               </span>
               <span>1,200% 계산근거 열기</span>
-            </Link>
+            </Button>
           </dd>
         </div>
       )}
     </dl>
-  )
+    <CapDetailModal capCheckId={basisOpen ? basisId : null} exceptionCaseId={item.exceptionCaseId} onClose={() => setBasisOpen(false)} />
+    {reconciliationOpen && <ExceptionReconciliationModal key={reconciliationId} resultId={reconciliationId} onClose={() => setReconciliationOpen(false)} />}
+  </>)
 }
 
 function ActionForm({ item, helpContainer }: { item: ExceptionCase; helpContainer: HTMLElement | null }) {
@@ -140,7 +155,7 @@ function ActionForm({ item, helpContainer }: { item: ExceptionCase; helpContaine
     onSuccess: async (action, input) => {
       clearUnsaved()
       try {
-        if (action.actionType !== input.actionType || action.fromStatus !== item.status || !['NEW', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].includes(action.toStatus ?? '') || !Number.isSafeInteger(action.actionSeq) || Number(action.actionSeq) <= 0) throw new Error('처리 결과를 확인하지 못했습니다. 처리 이력을 확인하세요.')
+        if (action.actionType !== input.actionType || action.fromStatus !== item.status || !['NEW', 'REVIEW_REQUIRED', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].includes(action.toStatus ?? '') || !Number.isSafeInteger(action.actionSeq) || Number(action.actionSeq) <= 0) throw new Error('처리 결과를 확인하지 못했습니다. 처리 이력을 확인하세요.')
         if (mounted.current) await saveGuide.saved(Number(action.actionSeq))
       } catch {
         // The POST already succeeded: never expose a retry for an unverified receipt.

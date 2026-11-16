@@ -162,7 +162,7 @@ export function AttributionEditor({
               <option
                 key={value}
                 value={value}
-                disabled={insurer && ['SETTLEMENT_SUPPORT_MONTHLY', 'FIRST_CONTRACT_CARRY_FORWARD'].includes(value)}
+                disabled={insurer && ['SETTLEMENT_SUPPORT_MONTHLY', 'FIRST_CONTRACT_CARRY_FORWARD', 'DEFERRED_CONTRACT'].includes(value)}
               >
                 {name}
               </option>

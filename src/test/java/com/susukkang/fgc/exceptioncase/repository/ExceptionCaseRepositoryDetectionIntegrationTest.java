@@ -144,7 +144,7 @@ class ExceptionCaseRepositoryDetectionIntegrationTest {
         assertThat(exceptionCaseRepository.insertArbitrageCandidate(
                 secondRunId, contractId, secondResultId, "GA_TO_FC", null)).isEqualTo(caseId);
         assertThat(entityManager.contains(loaded)).isFalse();
-        assertThat(exceptionCaseRepository.findById(caseId).orElseThrow().getStatus()).isEqualTo(ExceptionStatus.NEW);
+        assertThat(exceptionCaseRepository.findById(caseId).orElseThrow().getStatus()).isEqualTo(ExceptionStatus.REVIEW_REQUIRED);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT was_reopened FROM fgc.exception_occurrence
                  WHERE exception_case_id=? AND validation_run_id=?

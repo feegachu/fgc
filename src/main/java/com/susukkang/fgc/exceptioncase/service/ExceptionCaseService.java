@@ -295,7 +295,7 @@ public class ExceptionCaseService {
         String reason = "지급 초안 삭제로 종결, 지급 건 " + paymentId;
         for (var target : targets) {
             ExceptionStatus status = ExceptionStatus.valueOf(target.getStatus());
-            if (status == ExceptionStatus.NEW) {
+            if (status.isInitial()) {
                 actionInternal(target.getExceptionCaseId(),
                         new ExceptionActionRequest(ExceptionActionType.START_REVIEW, reason, null),
                         userId, loginId, false);

@@ -553,6 +553,8 @@
 
 .exception-history-reason {
   margin-top: var(--space-1);
+  white-space: pre-line;
+  line-height: 1.65;
 }
 
 .exception-evidence {
@@ -654,3 +656,65 @@
 }
 
 .exception-cap-overage .guidance-title { font-size: 0.9375rem; line-height: 1.5rem; }
+.exception-detail-description {
+  white-space: pre-line;
+  line-height: 1.65;
+}
+.exception-contract-status .contract-history-panel { border: 0; background: transparent; overflow: visible; }
+.exception-reference-icon { flex: 0 0 auto; display: block; }
+.exception-contract-status .contract-history-timeline { max-height: 22rem; }
+.exception-reconciliation-modal { width: min(1250px, calc(100vw - 32px)); }
+.exception-reconciliation-content { display: grid; gap: 1.25rem; }
+.exception-reco-basis-controls { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-bottom: 1.25rem; }
+.exception-reco-basis-controls [aria-pressed='true'] { background: var(--color-fgc-blue); color: white; border-color: var(--color-fgc-blue); }
+.exception-reco-cause { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.5rem; align-items: start; border: 1px solid var(--color-border-default); border-radius: var(--radius-8); padding: 1.25rem; }
+.exception-reco-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.exception-reco-heading h3 { margin: 0; }
+.exception-reco-cause p { margin: 0.75rem 0 0; line-height: 1.65; }
+.exception-reco-current-status { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; min-width: 10rem; }
+.exception-reco-current-status > span { color: var(--color-text-secondary); font-size: 0.875rem; }
+:root .exception-reco-current-status > .status-badge { height: auto; min-height: 2.5rem; padding: 0; gap: 0.55rem; border: 0; border-radius: 0; background: transparent; font-size: 1.5rem; line-height: 1.4; font-weight: 600; }
+:root .exception-reco-current-status > .status-badge[data-table-presentation='dot']::before { display: inline-block; width: 12px; height: 12px; flex: 0 0 12px; border-radius: 50%; background: currentColor; content: ''; }
+.exception-reco-explanation { white-space: pre-line; font-size: 1.0625rem; }
+.exception-reco-amounts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 0; }
+.exception-reco-difference { color: var(--color-danger, #b3261e); font-weight: 700; }
+.exception-reco-table-scroll { overflow-x: auto; }
+.exception-reco-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.exception-reco-table th, .exception-reco-table td { padding: 0.35rem 0.8rem; border-bottom: 1px solid var(--color-border-default); text-align: left; white-space: nowrap; line-height: 1.4; }
+.exception-reco-table th { padding-block: 0.6rem; }
+.exception-reco-table th { background: var(--color-bg-subtle, #f3f5f9); }
+.exception-reco-table td:nth-child(3), .exception-reco-table td:nth-child(4), .exception-reco-table td:nth-child(5) { text-align: right; font-variant-numeric: tabular-nums; }
+.exception-reco-table tbody tr, .exception-reco-table tbody tr:hover { background: var(--color-bg-surface, #fff); }
+.exception-reco-table .button { height: 28px; min-height: 28px; padding: 0.2rem 0.65rem; }
+@media (max-width: 600px) { .exception-reco-cause { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .exception-reco-amounts { grid-template-columns: minmax(0, 1fr); } }
+.exception-deferred-date input {
+  width: 12rem;
+  max-width: 100%;
+}
+.exception-deferred-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 1fr);
+  gap: var(--space-4);
+}
+.exception-deferred-summary {
+  padding: var(--space-4);
+}
+.exception-deferred-summary dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.exception-deferred-summary dd {
+  margin: var(--space-2) 0 0;
+  font-weight: 700;
+}
+@media (max-width: 900px) {
+  .exception-deferred-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.exception-reco-amounts .kpi-card, .exception-reco-amounts .kpi-card *, .exception-reco-amounts .kpi-card::before { animation: none !important; transition: none !important; }
+.exception-contract-status .contract-history-panel-header h3 { flex-direction: row; font-size: 0.875rem; }

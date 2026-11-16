@@ -11,6 +11,7 @@ type Schemas = components['schemas']
 export type Run = Schemas['ReconciliationRunHistoryResponse'] & { validationRunNo?: number | null }
 export type Result = Schemas['ReconciliationResultListItemResponse']
 export type Detail = Schemas['ReconciliationResultDetailResponse']
+export type ResultBasis = Schemas['ReconciliationResultBasisResponse']
 export type Match = Schemas['Match']
 export type Summary = Schemas['ReconciliationSummaryResponse']
 export type History = Omit<Schemas['ReconciliationRunSearchResponse'], 'content'> & { content?: Run[] }
@@ -144,6 +145,30 @@ export const detailQuery = (resultId: string) =>
     enabled: !!resultId,
     meta: { errorToast: false },
   })
+export const resultBasisQuery = (resultId: string) => queryOptions({
+  queryKey: ['reconciliations', 'basis', resultId],
+  queryFn: ({ signal }) => get<ResultBasis>(`/api/v1/reconciliations/results/${resultId}/basis`, signal),
+  enabled: Boolean(resultId),
+  staleTime: 0,
+  meta: { errorToast: false },
+})
+/** 같은 실행·계약의 항목만 서버에서 조회한다. 여러 페이지여도 빠짐없이 표시한다. */
+export const contractResultsQuery = (runId: string, contractId: string) => queryOptions({
+  queryKey: ['reconciliations', 'contract-results', runId, contractId],
+  enabled: Boolean(runId && contractId),
+  queryFn: async ({ signal }) => {
+    const query = new URLSearchParams({ contractId, page: '1', size: '100', sort: 'commissionItemName,asc' })
+    const first = await get<Results>(`/api/v1/reconciliations/${runId}/results?${query}`, signal)
+    const rows = [...(first.items?.content ?? [])]
+    for (let page = 2; page <= (first.items?.totalPages ?? 1); page++) {
+      query.set('page', String(page))
+      const next = await get<Results>(`/api/v1/reconciliations/${runId}/results?${query}`, signal)
+      rows.push(...(next.items?.content ?? []))
+    }
+    return rows
+  },
+  meta: { errorToast: false },
+})
 export async function createRun(input: RunInput) {
   const query = new URLSearchParams({ month: input.month, status: 'COMPLETED', page: '1', size: '1' })
   const latest = await get<Schemas['ValidationRunSearchResponse']>(`/api/v1/validation-runs?${query}`)

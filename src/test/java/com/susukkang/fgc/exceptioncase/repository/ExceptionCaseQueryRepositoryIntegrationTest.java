@@ -93,7 +93,7 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
         String migration = new org.springframework.core.io.ClassPathResource("db/migration/V85__arbitrage_candidate_warning_severity.sql")
                 .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         jdbcTemplate.execute(migration);
-        assertThat(jdbcTemplate.queryForList("SELECT severity FROM fgc.exception_case WHERE contract_id=? AND status IN ('NEW','IN_REVIEW')", String.class, contractId))
+        assertThat(jdbcTemplate.queryForList("SELECT severity FROM fgc.exception_case WHERE contract_id=? AND status IN ('NEW','REVIEW_REQUIRED','IN_REVIEW')", String.class, contractId))
                 .containsExactlyInAnyOrder("WARNING", "WARNING");
         assertThat(jdbcTemplate.queryForObject("SELECT severity FROM fgc.exception_case WHERE contract_id=? AND status='RESOLVED'", String.class, contractId))
                 .isEqualTo("HIGH");
@@ -188,12 +188,15 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
         long before = dashboardService.summarize(LocalDate.of(2026, 10, 1)).kpis().openException();
         jdbcTemplate.update("UPDATE fgc.exception_case SET exception_type='ARBITRAGE_CANDIDATE',severity='WARNING' WHERE contract_id=?", contractId);
         var criteria = ExceptionCaseSearchDTO.builder().contractNo(contractNo).build();
-        for (String status : List.of("OPEN", "NEW", "IN_REVIEW")) {
+        for (String status : List.of("OPEN", "NEW")) {
             var statuses = ExceptionStatus.dbStatuses(status);
             assertThat(repository.search(criteria, statuses, 0, 100)).isEmpty();
             assertThat(repository.count(criteria, statuses)).isZero();
             assertThat(repository.countByTypeAndSeverity(criteria, statuses)).isEmpty();
         }
+        // 개별 상태 필터에서는 검토대상과 검토중인 모니터링 건도 찾아볼 수 있다.
+        assertThat(repository.count(criteria, ExceptionStatus.dbStatuses("REVIEW_REQUIRED"))).isEqualTo(1);
+        assertThat(repository.count(criteria, ExceptionStatus.dbStatuses("IN_REVIEW"))).isEqualTo(1);
         assertThat(repository.search(criteria, List.of(), 0, 100)).hasSize(3);
         assertThat(dashboardService.summarize(LocalDate.of(2026, 10, 1)).kpis().openException()).isEqualTo(before - 2);
     }
@@ -605,7 +608,7 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
         assertThat(result.assignedTo()).isEqualTo(userId);
         assertThat(result.actions()).hasSize(1);
         assertThat(result.actions().getFirst().actionAt().toInstant()).isEqualTo(at.toInstant());
-        assertThat(saved.getStatus()).isEqualTo(ExceptionStatus.NEW); // 벌크 갱신 후 오래된 관리 엔티티
+        assertThat(saved.getStatus()).isEqualTo(ExceptionStatus.REVIEW_REQUIRED); // 벌크 갱신 후 오래된 관리 엔티티
 
         String loginId = jdbcTemplate.queryForObject("SELECT login_id FROM fgc.app_user WHERE user_id = ?",
                 String.class, userId);

@@ -25,12 +25,14 @@ import static org.assertj.core.api.Assertions.*;
 @Transactional
 @WithMockUser(roles = "GA_ADMIN")
 class PaymentJournalCorrectionIntegrationTest {
+    @Autowired com.susukkang.fgc.exceptioncase.service.ExceptionCapBasisService exceptionBasis;
     private static final LocalDate TEST_MONTH = LocalDate.of(2087, 11, 1);
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired JournalCorrectionService corrections;
     @Autowired CommissionPaymentService payments;
     @Autowired ReconciliationExecutionService execution;
     @Autowired ReconciliationExceptionService detection;
+    @Autowired ReconciliationResultQueryService reconciliationBasis;
     @Autowired com.susukkang.fgc.reconciliation.repository.ReconciliationRunHistoryRepository history;
     @Autowired org.springframework.transaction.support.TransactionTemplate transactions;
     @Autowired com.susukkang.fgc.validation.batch.contract.JournalPostingPort posting;
@@ -201,7 +203,7 @@ class PaymentJournalCorrectionIntegrationTest {
         assertThat(id("SELECT count(*) FROM fgc.journal_header WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND journal_type='CONFIRMED_FC_PAYOUT' AND status='POSTED'", draft.paymentId().toString())).isEqualTo(1);
         Long latest = id("SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE validation_run_id=? AND NOT superseded_yn ORDER BY reconciliation_run_id DESC LIMIT 1", validationRunId);
         assertThat(resultType(latest)).isEqualTo("MATCHED");
-        assertThat(id("SELECT count(*) FROM fgc.exception_case WHERE contract_id=? AND status IN ('NEW','IN_REVIEW')", contractId)).isZero();
+        assertThat(id("SELECT count(*) FROM fgc.exception_case WHERE contract_id=? AND status IN ('NEW','REVIEW_REQUIRED','IN_REVIEW')", contractId)).isZero();
     }
 
     @Test
@@ -217,7 +219,7 @@ class PaymentJournalCorrectionIntegrationTest {
                 WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND exception_type='CAP_VIOLATION'
                 """, draft.paymentId().toString());
         startException(exception);
-        long openBefore = id("SELECT count(*) FROM fgc.exception_case WHERE contract_id=? AND exception_type IN ('CAP_VIOLATION','CAP_WARNING') AND status IN ('NEW','IN_REVIEW')", contractId);
+        long openBefore = id("SELECT count(*) FROM fgc.exception_case WHERE contract_id=? AND exception_type IN ('CAP_VIOLATION','CAP_WARNING') AND status IN ('NEW','REVIEW_REQUIRED','IN_REVIEW')", contractId);
         var cap = exceptionPayments.preview(exception, new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
                 draft.paymentId(), null, paymentBody(draft, "1", TEST_MONTH)), 1L).capPreview().getFirst();
         String correctedAmount = Long.toString(cap.limitAmount() - cap.existingIncludedAmount());
@@ -233,7 +235,7 @@ class PaymentJournalCorrectionIntegrationTest {
                 """, result.payment().paymentId().toString());
         assertThat(status(warning)).isEqualTo("RESOLVED");
         // 한도 정정으로 기존 지급에 추가 지급이 확정되므로 대사 예외는 별도로 재검출될 수 있다.
-        assertThat(id("SELECT count(*) FROM fgc.exception_case WHERE contract_id=? AND exception_type IN ('CAP_VIOLATION','CAP_WARNING') AND status IN ('NEW','IN_REVIEW')", contractId)).isEqualTo(openBefore - 1);
+        assertThat(id("SELECT count(*) FROM fgc.exception_case WHERE contract_id=? AND exception_type IN ('CAP_VIOLATION','CAP_WARNING') AND status IN ('NEW','REVIEW_REQUIRED','IN_REVIEW')", contractId)).isEqualTo(openBefore - 1);
         assertThat(id("SELECT count(*) FROM fgc.journal_header WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND journal_type='CONFIRMED_FC_PAYOUT' AND status='POSTED'", result.payment().paymentId().toString())).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("SELECT superseded_yn FROM fgc.reconciliation_run WHERE reconciliation_run_id=?", Boolean.class, fixture.run())).isTrue();
         // FGC-FUN-053: 회차 정보가 부족한 원천은 REVIEW_REQUIRED로 남기되, 새 금액과 재검출 이력을 검증한다.
@@ -244,7 +246,7 @@ class PaymentJournalCorrectionIntegrationTest {
                 .isEqualByComparingTo("100000");
         assertThat(results.stream().map(r -> (BigDecimal) r.get("actual_amount")).reduce(BigDecimal.ZERO, BigDecimal::add))
                 .isEqualByComparingTo(new BigDecimal(correctedAmount).add(new BigDecimal("50000")));
-        assertThat(id("SELECT count(*) FROM fgc.exception_case e JOIN fgc.exception_occurrence o USING(exception_case_id) JOIN fgc.reconciliation_result r ON o.source_entity_type='RECONCILIATION_RESULT' AND o.source_entity_id=r.reconciliation_result_id::text WHERE e.contract_id=? AND e.exception_type='RECONCILIATION_MISMATCH' AND e.status IN ('NEW','IN_REVIEW') AND r.reconciliation_run_id=?", contractId, refreshed)).isEqualTo(2);
+        assertThat(id("SELECT count(*) FROM fgc.exception_case e JOIN fgc.exception_occurrence o USING(exception_case_id) JOIN fgc.reconciliation_result r ON o.source_entity_type='RECONCILIATION_RESULT' AND o.source_entity_id=r.reconciliation_result_id::text WHERE e.contract_id=? AND e.exception_type='RECONCILIATION_MISMATCH' AND e.status IN ('NEW','REVIEW_REQUIRED','IN_REVIEW') AND r.reconciliation_run_id=?", contractId, refreshed)).isEqualTo(2);
     }
 
     @ParameterizedTest
@@ -331,13 +333,22 @@ class PaymentJournalCorrectionIntegrationTest {
         assertThat(result.deferredPayment().amount()).isEqualByComparingTo("999999999");
         assertThat(result.deferredPayment().status()).isEqualTo(CommissionPaymentStatus.DRAFT);
         assertThat(result.deferredPayment().scheduledPaymentDate()).isEqualTo(TEST_MONTH.plusMonths(12));
+        var displayed = exceptionBasis.find(exception);
+        assertThat(displayed.currentBasis()).isNotNull();
+        assertThat(displayed.currentBasis().capCheck().includedAmount()).isLessThan(displayed.detectedBasis().capCheck().includedAmount());
+        assertThat(displayed.deferredPayments()).singleElement().satisfies(p -> {
+            assertThat(p.amount()).isEqualByComparingTo("999999999");
+            assertThat(p.scheduledPaymentDate()).isEqualTo(TEST_MONTH.plusMonths(12));
+            assertThat(p.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        });
+        assertThat(result.deferredPayment().settlementMonth()).isEqualTo(TEST_MONTH.plusMonths(12));
+        assertThat(result.deferredPayment().attributions().getFirst().attributionDate()).isEqualTo(TEST_MONTH.plusMonths(12));
         if (settlementSupport) {
-            assertThat(result.deferredPayment().settlementMonth()).isEqualTo(TEST_MONTH);
             var deferredAttribution = result.deferredPayment().attributions().getFirst();
-            assertThat(deferredAttribution.attributionMethod()).isEqualTo(AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY);
-            assertThat(deferredAttribution.attributionDate()).isEqualTo(TEST_MONTH);
-            assertThat(deferredAttribution.inclusionDecisionStatus()).isEqualTo(InclusionDecisionStatus.REVIEW_REQUIRED);
-            assertThat(payments.precheck(result.deferredPayment().paymentId()).confirmable()).isFalse();
+            assertThat(deferredAttribution.attributionMethod()).isEqualTo(AttributionMethod.DEFERRED_CONTRACT);
+            assertThat(deferredAttribution.inclusionDecisionStatus()).isEqualTo(InclusionDecisionStatus.INCLUDED);
+            assertThat(payments.precheck(result.deferredPayment().paymentId()).blockers())
+                    .noneSatisfy(blocker -> assertThat(blocker.code()).isEqualTo("FGC-CAP-002"));
         }
     }
 
@@ -539,6 +550,13 @@ class PaymentJournalCorrectionIntegrationTest {
         Long current = id("SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE corrects_reconciliation_run_id=?", f.run());
         assertThat(resultType(current)).isEqualTo("MATCHED");
         assertThat(resultType(f.run())).isEqualTo("AMOUNT_DIFFERENCE");
+        Long detectedResult = id("SELECT reconciliation_result_id FROM fgc.reconciliation_result WHERE reconciliation_run_id=? AND contract_id=?", f.run(), contractId);
+        var basis = reconciliationBasis.basis(detectedResult);
+        assertThat(basis.currentRunId()).isEqualTo(current);
+        assertThat(basis.currentResults()).hasSize(1);
+        assertThat(basis.currentResults().getFirst().resultType()).isEqualTo("MATCHED");
+        assertThat(basis.currentResults().getFirst().actualTotalAmount()).isEqualByComparingTo("100000");
+        assertThat(basis.detected().actualTotalAmount()).isEqualByComparingTo("50000");
         assertThat(jdbcTemplate.queryForObject("SELECT superseded_yn FROM fgc.reconciliation_run WHERE reconciliation_run_id=?", Boolean.class, f.run())).isTrue();
         var versions = history.search(TEST_MONTH,"GA_TO_FC",null,"desc",0,100);
         assertThat(versions.stream().filter(v -> v.getReconciliationRunId().equals(f.run())).findFirst().orElseThrow().isSuperseded()).isTrue();

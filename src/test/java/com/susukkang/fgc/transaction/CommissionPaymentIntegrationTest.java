@@ -236,7 +236,7 @@ class CommissionPaymentIntegrationTest {
         commissionPaymentService.deleteDraft(created.paymentId());
         assertThat(jdbcTemplate.queryForList("SELECT action_type FROM fgc.exception_action WHERE exception_case_id=?", String.class, open)).containsExactly("CANCEL");
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id IN (?, ?, ?)", Integer.class, resolved, rejected, unrelated)).isZero();
-        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, unrelated)).isEqualTo("NEW");
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, unrelated)).isEqualTo("REVIEW_REQUIRED");
         assertThatThrownBy(() -> exceptionCaseService.action(rejected,
                 new com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest(ExceptionActionType.REOPEN, "재검토", null), null, "test"))
                 .isInstanceOfSatisfying(FgcBusinessException.class, ex -> assertThat(ex.getErrorCode()).isEqualTo(FgcErrorCode.EXCP_003));
@@ -262,7 +262,7 @@ class CommissionPaymentIntegrationTest {
                 status.setRollbackOnly();
             });
             assertThat(commissionPaymentService.get(created.paymentId()).attributions()).hasSize(1);
-            assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, exceptionId)).isEqualTo("NEW");
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, exceptionId)).isEqualTo("REVIEW_REQUIRED");
             assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id=?", Integer.class, exceptionId)).isZero();
             assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='EXCEPTION_ACTION' AND entity_id=?", Integer.class, exceptionId.toString())).isZero();
             assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='PAYMENT_DELETED' AND entity_id=?", Long.class, created.paymentId().toString())).isZero();

@@ -13,8 +13,14 @@ public record CapCheckDetailResponse(
         String classificationSnapshot,
         long amount,
         String decisionReason,
-        String evidenceRef
+        String evidenceRef,
+        String paymentStatus,
+        String paymentStatusSnapshot
 ) {
+    public CapCheckDetailResponse(int detailSeq, String commissionItemName, String classificationSnapshot,
+                                  long amount, String decisionReason, String evidenceRef, String paymentStatus) {
+        this(detailSeq, commissionItemName, classificationSnapshot, amount, decisionReason, evidenceRef, paymentStatus, null);
+    }
     public static CapCheckDetailResponse from(CapCheckDetailLine line) {
         return new CapCheckDetailResponse(
                 line.detailSeq(),
@@ -22,7 +28,9 @@ public record CapCheckDetailResponse(
                 line.classification(),
                 DisplayFormat.won(line.amount()),
                 line.decisionReason(),
-                line.evidenceRef()
+                line.evidenceRef(),
+                line.paymentStatus(),
+                line.paymentStatusSnapshot()
         );
     }
 }

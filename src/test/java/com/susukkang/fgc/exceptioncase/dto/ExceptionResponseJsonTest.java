@@ -50,7 +50,7 @@ class ExceptionResponseJsonTest {
         assertThat(json.get("type").asText()).isEqualTo("CAP_VIOLATION");
         assertThat(json.get("typeLabel").asText()).isEqualTo("1,200% 위반");
         assertThat(json.get("severityLabel").asText()).isEqualTo("높음");
-        assertThat(json.get("statusLabel").asText()).isEqualTo("신규");
+        assertThat(json.get("statusLabel").asText()).isEqualTo("미처리");
         assertThat(json.get("reasonLabel").asText()).isEqualTo("1,200% 한도 초과");
         assertThat(json.get("sourceLink").asText()).isEqualTo("/contracts/3");
         assertThat(json.get("sourceDeleted").asBoolean()).isFalse();
@@ -59,7 +59,7 @@ class ExceptionResponseJsonTest {
         assertThat(json.at("/occurrences/0/evidenceItems/0/label").asText()).isEqualTo("한도액");
         assertThat(json.at("/occurrences/0/evidenceItems/0/value").asText()).isEqualTo("1,200,000원");
         assertThat(json.at("/actions/0/actionTypeLabel").asText()).isEqualTo("검토 시작");
-        assertThat(json.at("/actions/0/fromStatusLabel").asText()).isEqualTo("신규");
+        assertThat(json.at("/actions/0/fromStatusLabel").asText()).isEqualTo("미처리");
         assertThat(json.at("/actions/0/toStatusLabel").asText()).isEqualTo("검토중");
     }
 

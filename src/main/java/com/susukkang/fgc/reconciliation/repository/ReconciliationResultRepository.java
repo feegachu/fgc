@@ -277,6 +277,10 @@ public class ReconciliationResultRepository {
     }
 
     public List<ReconciliationResultListRow> findResults(Long reconciliationRunId, String resultType, ListSort sort, int offset, int limit) {
+        return findResults(reconciliationRunId, resultType, null, sort, offset, limit);
+    }
+
+    public List<ReconciliationResultListRow> findResults(Long reconciliationRunId, String resultType, Long contractId, ListSort sort, int offset, int limit) {
         // 결과 유형·식별자는 바인딩하고 정렬은 허용 목록의 코드 상수 표현식만 쓴다. 동률은 결과 ID가 방향을 따른다.
         String orderBy = SqlSort.orderBy(sort, RESULT_SORTABLE,
                 "result.reconciliation_result_id " + (sort.ascending() ? "ASC" : "DESC"));
@@ -313,24 +317,65 @@ public class ReconciliationResultRepository {
                 ON actual_org.organization_id = actual_agent.organization_id
                 WHERE result.reconciliation_run_id = :reconciliationRunId
                 AND (CAST(:resultType AS varchar) IS NULL OR result.result_type = :resultType)
+                AND (CAST(:contractId AS bigint) IS NULL OR result.contract_id = :contractId)
                 __order__
                 """.replace("__order__", orderBy)).unwrap(NativeQuery.class);
         query.setParameter(RECONCILIATION_RUN_ID_PARAM, reconciliationRunId);
         query.setParameter(RESULT_TYPE_PARAM, resultType);
+        query.setParameter(CONTRACT_ID_PARAM, contractId);
         query.setFirstResult(offset).setMaxResults(limit);
         return ReconciliationNativeProjection.map(query, ReconciliationResultListRow::new, RESULT_COLUMNS).getResultList();
     }
 
     public long countResults(Long reconciliationRunId, String resultType) {
+        return countResults(reconciliationRunId, resultType, null);
+    }
+
+    public long countResults(Long reconciliationRunId, String resultType, Long contractId) {
         NativeQuery<?> query = entityManager.createNativeQuery("""
                 SELECT COUNT(*)
                 FROM fgc.reconciliation_result result
                 WHERE result.reconciliation_run_id = :reconciliationRunId
                 AND (CAST(:resultType AS varchar) IS NULL OR result.result_type = :resultType)
+                AND (CAST(:contractId AS bigint) IS NULL OR result.contract_id = :contractId)
                 """).unwrap(NativeQuery.class);
         query.setParameter(RECONCILIATION_RUN_ID_PARAM, reconciliationRunId);
         query.setParameter(RESULT_TYPE_PARAM, resultType);
+        query.setParameter(CONTRACT_ID_PARAM, contractId);
         return ((Number) query.getSingleResult()).longValue();
+    }
+
+    /** 해당 검출 실행의 정정 체인만 추적한다. 같은 계약의 무관한 실행을 섞지 않는다. */
+    public Long latestRevisionRun(Long resultId) {
+        var ids = entityManager.createNativeQuery("""
+                WITH RECURSIVE revisions(id) AS (
+                    SELECT reconciliation_run_id FROM fgc.reconciliation_result WHERE reconciliation_result_id=:id
+                    UNION
+                    SELECT r.reconciliation_run_id FROM fgc.reconciliation_run r
+                    JOIN revisions p ON r.corrects_reconciliation_run_id=p.id
+                )
+                SELECT r.reconciliation_run_id FROM revisions p
+                JOIN fgc.reconciliation_run r ON r.reconciliation_run_id=p.id
+                WHERE NOT r.superseded_yn AND r.status='COMPLETED'
+                  AND r.reconciliation_run_id <> (SELECT reconciliation_run_id FROM fgc.reconciliation_result WHERE reconciliation_result_id=:id)
+                ORDER BY r.reconciliation_run_id DESC LIMIT 1
+                """, Long.class).setParameter("id", resultId).getResultList();
+        return ids.isEmpty() ? null : (Long) ids.getFirst();
+    }
+
+    public List<Long> revisedResultIds(Long resultId, Long runId) {
+        return entityManager.createNativeQuery("""
+                SELECT n.reconciliation_result_id FROM fgc.reconciliation_result n
+                JOIN fgc.reconciliation_result old ON old.reconciliation_result_id=:id
+                WHERE n.reconciliation_run_id=:runId
+                  AND (n.match_group_key=old.match_group_key OR EXISTS (
+                    SELECT 1 FROM fgc.reconciliation_match om JOIN fgc.reconciliation_match nm
+                      ON (om.schedule_line_id IS NOT NULL AND nm.schedule_line_id=om.schedule_line_id)
+                      OR (om.transaction_attribution_id IS NOT NULL AND nm.transaction_attribution_id=om.transaction_attribution_id)
+                    WHERE om.reconciliation_result_id=old.reconciliation_result_id
+                      AND nm.reconciliation_result_id=n.reconciliation_result_id))
+                ORDER BY n.reconciliation_result_id
+                """, Long.class).setParameter("id", resultId).setParameter("runId", runId).getResultList();
     }
 
     public ReconciliationSummaryRow findSummary(Long reconciliationRunId) {

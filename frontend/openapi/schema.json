@@ -1213,6 +1213,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseExceptionCapBasisResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ExceptionCapBasisResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseExceptionCaseSearchResponse" : {
         "properties" : {
           "data" : {
@@ -2000,6 +2014,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/ReconciliationExceptionBulkCreateResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseReconciliationResultBasisResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ReconciliationResultBasisResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -3165,6 +3193,12 @@
           },
           "evidenceRef" : {
             "type" : "string"
+          },
+          "paymentStatus" : {
+            "type" : "string"
+          },
+          "paymentStatusSnapshot" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -3781,10 +3815,7 @@
             "type" : "integer"
           }
         },
-        "required" : [
-          "calculationVersion",
-          "expectedSourceVersion"
-        ],
+        "required" : [ "calculationVersion", "expectedSourceVersion" ],
         "type" : "object"
       },
       "ClawbackNoticeDocumentResponse" : {
@@ -3972,7 +4003,7 @@
             "type" : "string"
           },
           "attributionMethod" : {
-            "enum" : [ "DIRECT", "SETTLEMENT_SUPPORT_MONTHLY", "FIRST_CONTRACT_CARRY_FORWARD", "APPROVED_ALLOCATION", "MANUAL_REVIEW", "NEWCOMER_NON_CONTRACT" ],
+            "enum" : [ "DIRECT", "SETTLEMENT_SUPPORT_MONTHLY", "FIRST_CONTRACT_CARRY_FORWARD", "DEFERRED_CONTRACT", "APPROVED_ALLOCATION", "MANUAL_REVIEW", "NEWCOMER_NON_CONTRACT" ],
             "type" : "string"
           },
           "contractId" : {
@@ -4014,7 +4045,7 @@
             "type" : "string"
           },
           "attributionMethod" : {
-            "enum" : [ "DIRECT", "SETTLEMENT_SUPPORT_MONTHLY", "FIRST_CONTRACT_CARRY_FORWARD", "APPROVED_ALLOCATION", "MANUAL_REVIEW", "NEWCOMER_NON_CONTRACT" ],
+            "enum" : [ "DIRECT", "SETTLEMENT_SUPPORT_MONTHLY", "FIRST_CONTRACT_CARRY_FORWARD", "DEFERRED_CONTRACT", "APPROVED_ALLOCATION", "MANUAL_REVIEW", "NEWCOMER_NON_CONTRACT" ],
             "type" : "string"
           },
           "attributionMonth" : {
@@ -6061,7 +6092,7 @@
             "type" : "integer"
           },
           "fromStatus" : {
-            "enum" : [ "NEW", "IN_REVIEW", "RESOLVED", "REJECTED" ],
+            "enum" : [ "NEW", "REVIEW_REQUIRED", "IN_REVIEW", "RESOLVED", "REJECTED" ],
             "type" : "string"
           },
           "fromStatusLabel" : {
@@ -6071,7 +6102,7 @@
             "type" : "string"
           },
           "toStatus" : {
-            "enum" : [ "NEW", "IN_REVIEW", "RESOLVED", "REJECTED" ],
+            "enum" : [ "NEW", "REVIEW_REQUIRED", "IN_REVIEW", "RESOLVED", "REJECTED" ],
             "type" : "string"
           },
           "toStatusLabel" : {
@@ -6088,6 +6119,23 @@
           "userId" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ExceptionCapBasisResponse" : {
+        "properties" : {
+          "currentBasis" : {
+            "$ref" : "#/components/schemas/CapCheckBasisResponse"
+          },
+          "deferredPayments" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CommissionPaymentResponse"
+            },
+            "type" : "array"
+          },
+          "detectedBasis" : {
+            "$ref" : "#/components/schemas/CapCheckBasisResponse"
           }
         },
         "type" : "object"
@@ -6193,7 +6241,7 @@
             "type" : [ "string", "null" ]
           },
           "status" : {
-            "enum" : [ "NEW", "IN_REVIEW", "RESOLVED", "REJECTED" ],
+            "enum" : [ "NEW", "REVIEW_REQUIRED", "IN_REVIEW", "RESOLVED", "REJECTED" ],
             "type" : "string"
           },
           "statusLabel" : {
@@ -6616,11 +6664,7 @@
             "type" : "integer"
           }
         },
-        "required" : [
-          "candidateId",
-          "deductionPaymentId",
-          "originalPaymentId"
-        ],
+        "required" : [ "candidateId", "deductionPaymentId", "originalPaymentId" ],
         "type" : "object"
       },
       "ExceptionReviewContext" : {
@@ -7289,7 +7333,7 @@
             "type" : "string"
           },
           "fromStatus" : {
-            "enum" : [ "NEW", "IN_REVIEW", "RESOLVED", "REJECTED" ],
+            "enum" : [ "NEW", "REVIEW_REQUIRED", "IN_REVIEW", "RESOLVED", "REJECTED" ],
             "type" : "string"
           },
           "originalJournalHeaderId" : {
@@ -7308,11 +7352,11 @@
             "type" : "integer"
           },
           "status" : {
-            "enum" : [ "NEW", "IN_REVIEW", "RESOLVED", "REJECTED" ],
+            "enum" : [ "NEW", "REVIEW_REQUIRED", "IN_REVIEW", "RESOLVED", "REJECTED" ],
             "type" : "string"
           },
           "toStatus" : {
-            "enum" : [ "NEW", "IN_REVIEW", "RESOLVED", "REJECTED" ],
+            "enum" : [ "NEW", "REVIEW_REQUIRED", "IN_REVIEW", "RESOLVED", "REJECTED" ],
             "type" : "string"
           }
         },
@@ -7347,7 +7391,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "NEW", "IN_REVIEW", "RESOLVED", "REJECTED" ],
+            "enum" : [ "NEW", "REVIEW_REQUIRED", "IN_REVIEW", "RESOLVED", "REJECTED" ],
             "type" : "string"
           }
         },
@@ -9915,6 +9959,24 @@
           },
           "label" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ReconciliationResultBasisResponse" : {
+        "properties" : {
+          "currentResults" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ReconciliationResultDetailResponse"
+            },
+            "type" : "array"
+          },
+          "currentRunId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "detected" : {
+            "$ref" : "#/components/schemas/ReconciliationResultDetailResponse"
           }
         },
         "type" : "object"
@@ -14438,6 +14500,33 @@
         "tags" : [ "exception-case-controller" ]
       }
     },
+    "/api/v1/exceptions/{id}/cap-basis" : {
+      "get" : {
+        "operationId" : "findExceptionCapBasis",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExceptionCapBasisResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "exception-cap-basis-controller" ]
+      }
+    },
     "/api/v1/exceptions/{id}/journal-correction" : {
       "post" : {
         "operationId" : "journalCorrection",
@@ -14641,17 +14730,15 @@
     "/api/v1/exceptions/{id}/payment-correction/reconcile-recovery" : {
       "post" : {
         "operationId" : "reconcileRecovery",
-        "parameters" : [
-          {
-            "in" : "path",
-            "name" : "id",
-            "required" : true,
-            "schema" : {
-              "format" : "int64",
-              "type" : "integer"
-            }
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
           }
-        ],
+        } ],
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -14674,9 +14761,7 @@
             "description" : "OK"
           }
         },
-        "tags" : [
-          "exception-payment-correction-controller"
-        ]
+        "tags" : [ "exception-payment-correction-controller" ]
       }
     },
     "/api/v1/exceptions/{id}/review" : {
@@ -15051,17 +15136,15 @@
     "/api/v1/journals/repost-number-preview" : {
       "get" : {
         "operationId" : "previewRepostNumbers",
-        "parameters" : [
-          {
-            "in" : "query",
-            "name" : "journalDate",
-            "required" : true,
-            "schema" : {
-              "format" : "date",
-              "type" : "string"
-            }
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "journalDate",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
           }
-        ],
+        } ],
         "responses" : {
           "200" : {
             "content" : {
@@ -15074,9 +15157,7 @@
             "description" : "OK"
           }
         },
-        "tags" : [
-          "journal-correction-controller"
-        ]
+        "tags" : [ "journal-correction-controller" ]
       }
     },
     "/api/v1/journals/{journalHeaderId}" : {
@@ -15185,17 +15266,15 @@
     "/api/v1/journals/{journalId}/reverse-and-repost" : {
       "post" : {
         "operationId" : "reverseAndRepost",
-        "parameters" : [
-          {
-            "in" : "path",
-            "name" : "journalId",
-            "required" : true,
-            "schema" : {
-              "format" : "int64",
-              "type" : "integer"
-            }
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "journalId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
           }
-        ],
+        } ],
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -15218,9 +15297,7 @@
             "description" : "OK"
           }
         },
-        "tags" : [
-          "journal-correction-controller"
-        ]
+        "tags" : [ "journal-correction-controller" ]
       }
     },
     "/api/v1/news/headlines" : {
@@ -15744,6 +15821,34 @@
         "tags" : [ "대사" ]
       }
     },
+    "/api/v1/reconciliations/results/{reconciliationResultId}/basis" : {
+      "get" : {
+        "operationId" : "getResultBasis",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "reconciliationResultId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseReconciliationResultBasisResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "검출 당시 및 정정 후 대사 결과 조회",
+        "tags" : [ "대사" ]
+      }
+    },
     "/api/v1/reconciliations/{reconciliationRunId}/exceptions" : {
       "post" : {
         "operationId" : "bulkCreateExceptions",
@@ -15789,6 +15894,14 @@
           "required" : false,
           "schema" : {
             "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "contractId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         }, {
           "in" : "query",
