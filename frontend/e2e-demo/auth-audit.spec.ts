@@ -1,4 +1,15 @@
-import { test, expect, login, completeMonthly, password, responseFor, successful } from './fixtures'
+import { test, expect, login, completeMonthly, password, responseFor, successful, sql } from './fixtures'
+import type { Page } from '@playwright/test'
+
+async function expectInitialMain(page: Page, agent = false) {
+  const title = agent ? '포트폴리오' : '업무 대시보드'
+  await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
+  await expect(page).toHaveURL(agent ? /\/agent-home\?month=2026-07$/ : /\/\?month=2026-07$/)
+  await expect(page.getByRole('button', { name: '기준 정산월 2026-07', exact: true })).toBeVisible()
+  const tabs = page.getByRole('navigation', { name: '열린 업무 화면' }).getByRole('link')
+  await expect(tabs).toHaveCount(1)
+  await expect(tabs).toContainText(title)
+}
 
 test('로그인 4개 역할, 대시보드, 사용자, 메뉴 및 로그아웃', async ({ browser, baseURL }) => {
   for (const [account, userName, roleName, auditMenu] of [
@@ -13,7 +24,7 @@ test('로그인 4개 역할, 대시보드, 사용자, 메뉴 및 로그아웃', 
     await page.getByLabel(/^아이디/).fill(account)
     await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
     await page.getByRole('button', { name: '로그인', exact: true }).click()
-    await expect(page.getByRole('heading', { name: '업무 대시보드' })).toBeVisible()
+    await expectInitialMain(page)
     await expect(page.locator('.sidebar-user-name')).toHaveText(userName)
     await expect(page.locator('.sidebar-user-role')).toHaveText(roleName)
     await expect(
@@ -31,24 +42,38 @@ test('로그인 4개 역할, 대시보드, 사용자, 메뉴 및 로그아웃', 
     await expect(page).toHaveURL(/\/login/)
     await page.goBack()
     await expect(page).toHaveURL(/\/login/)
+    await page.getByLabel(/^아이디/).fill(account)
+    await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
+    await page.getByRole('button', { name: '로그인', exact: true }).click()
+    await expectInitialMain(page)
     await context.close()
   }
 })
 
-test('비로그인 지급 등록 딥링크 → 로그인 → 쿼리 및 해시 복원', async ({ page }) => {
-  const route = '/transactions/new?month=2026-07&status=ACTIVE#form'
+test('비로그인 지급 등록 딥링크의 새 로그인은 이전 쿼리·해시 대신 초기 메인으로 이동한다', async ({ page }) => {
+  const route = '/transactions/new?month=2026-08&status=ACTIVE#form'
   await page.goto(route.slice(1))
   await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
   expect(new URL(page.url()).searchParams.get('redirect')).toBe(route)
   await page.getByLabel(/^아이디/).fill('settle01')
   await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
   await page.getByRole('button', { name: '로그인', exact: true }).click()
-  await expect(page.getByRole('heading', { name: /지급 (계약 )?건 등록, 귀속, 확정/ })).toBeVisible()
-  await expect(page).toHaveURL(new URL(route, page.url()).href)
+  await expectInitialMain(page)
+  await expect(page.getByRole('heading', { name: /지급 (계약 )?건 등록, 귀속, 확정/ })).toHaveCount(0)
 })
 
-test('중복 로그인은 이전 브라우저를 차단하고 재로그인 후 경로 복원', async ({ page, browser, baseURL }) => {
-  await login(page)
+test('정상 새로고침은 비활성 업무 탭을 유지하고 중복 로그인 후 재로그인은 탭과 선택 월을 초기화한다', async ({ page, browser, baseURL }) => {
+  await login(page, 'settle01', '/schedules?month=2026-08')
+  await expect(page.getByRole('heading', { name: '예상 스케줄 목록', exact: true })).toBeVisible()
+  await page.goto('contracts?month=2026-08')
+  await expect(page.getByRole('heading', { name: '보험계약 목록', exact: true })).toBeVisible()
+  const tabs = page.getByRole('navigation', { name: '열린 업무 화면' })
+  await expect(tabs.getByRole('link')).toHaveCount(3)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '보험계약 목록', exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/contracts\?month=2026-08$/)
+  await expect(tabs.getByRole('link')).toHaveCount(3)
+  await expect(tabs.getByRole('link').filter({ hasText: '예상 스케줄' })).toHaveAttribute('href', '/schedules?month=2026-08')
   const otherContext = await browser.newContext({ baseURL })
   try {
     const other = await otherContext.newPage()
@@ -58,14 +83,25 @@ test('중복 로그인은 이전 브라우저를 차단하고 재로그인 후 �
     await expect(
       page.getByText('다른 곳에서 같은 계정으로 로그인해 로그아웃되었습니다. 다시 로그인하세요.'),
     ).toBeVisible()
+    expect(new URL(page.url()).searchParams.get('redirect')).toBe('/contracts?month=2026-08')
     await expect(other.getByRole('heading', { name: '보험계약 목록', exact: true })).toBeVisible()
     await page.getByLabel(/^아이디/).fill('settle01')
     await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
     await page.getByRole('button', { name: '로그인', exact: true }).click()
-    await expect(page).toHaveURL(/\/contracts\?/)
+    await expectInitialMain(page)
   } finally {
     await otherContext.close()
   }
+})
+
+test('설계사도 이전 계약 주소 대신 기본 정산월의 포트폴리오에서 재로그인을 시작한다', async ({ page }) => {
+  // V64가 비활성화한 계정은 테스트마다 초기화되는 격리 DB에서만 기존 AGENT 역할 그대로 활성화한다.
+  sql("UPDATE fgc.app_user SET account_status='ACTIVE', password_hash=(SELECT password_hash FROM fgc.app_user WHERE login_id='settle01') WHERE login_id='agent01'")
+  await page.goto('login?reason=duplicate&redirect=%2Fcontracts%3Fmonth%3D2026-08%23detail')
+  await page.getByLabel(/^아이디/).fill('agent01')
+  await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
+  await page.getByRole('button', { name: '로그인', exact: true }).click()
+  await expectInitialMain(page, true)
 })
 
 test('AUDT A1–A5 목록, 필터, 페이지 및 키보드 선택, 새로고침 및 API 대조', async ({ page }, info) => {

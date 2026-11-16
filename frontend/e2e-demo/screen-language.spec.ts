@@ -245,9 +245,11 @@ async function walkRole(
   }
 
   begin('/login')
+  // 로그인 도우미가 업무 경로를 열기 전에 현재 문서의 응답 본문을 바로 읽어 둔다.
   const me = page.waitForResponse((response) => pathnameOf(response.url()) === '/api/v1/auth/me' && response.ok())
+    .then((response) => response.json())
   await login(page, loginId, role === 'AGENT' ? `/agent-home?month=${month}` : `/?month=${month}`)
-  const user = (await (await me).json()).data
+  const user = (await me).data
   await settle(page)
   await finish()
 
