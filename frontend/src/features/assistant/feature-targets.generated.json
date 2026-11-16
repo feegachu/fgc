@@ -862,7 +862,7 @@
   {
     "id": "features.agent-home.chatbot.chatbot-modal.top-rank",
     "file": "features/agent-home/chatbot/ChatbotModal.tsx",
-    "element": "section"
+    "element": "span"
   },
   {
     "id": "features.agent-home.chatbot.filter-panel.exclude-cap-overflow",

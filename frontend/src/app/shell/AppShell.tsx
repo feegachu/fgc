@@ -13,7 +13,6 @@ import { useAuth } from '../../features/auth/useAuth'
 import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
 import { DraftNavigationGuard } from './DraftNavigationGuard'
-import { AgentTopbar } from './AgentTopbar'
 import type { HelpVersion } from '../../features/assistant/guide/help-version'
 import './kpi-designs.css'
 import './agent-theme.css'
@@ -35,7 +34,8 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const month = useWorkspaceStore((state) => state.month)
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
-  const revised = user.roleCode !== 'AGENT' || current?.id !== 'AGNT-W01'
+  // 설계사 포트폴리오도 관리자 화면과 같은 탭 헤더·푸터를 쓴다(#961).
+  const revised = true
   const helpVersion: HelpVersion = 'after'
   const errorTitle = useErrorTitleStore((state) => state.title)
   const { loggingOut, logout } = useLogout()
@@ -97,11 +97,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
           loggingOut={loggingOut}
         />
         <header className="app-header app-header-rail">
-          {user.roleCode === 'AGENT' && current?.id === 'AGNT-W01' ? (
-            <AgentTopbar />
-          ) : (
-            <WorkspaceTabs activeId={current?.id} />
-          )}
+          <WorkspaceTabs activeId={current?.id} />
           <div className="app-header-actions">
             <div className="app-header-field">
               <span className="app-header-field-label">기준 정산월</span>
@@ -123,18 +119,12 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
           </div>
         </main>
         <SettlementGuide user={user} month={month} helpVersion={helpVersion} />
-        {!location.pathname.startsWith('/agent-home') && (
-          <footer className="app-footer">
-            {revised ? (
-              <>
-                <p className="app-footer-company">
-                  <span>FGC</span><span>팀 수수깡</span><span>사업자등록번호: 000-00-00000 (가상)</span>
-                </p>
-                <p>Copyright © {new Date().getFullYear()} FGC. All rights reserved.</p>
-              </>
-            ) : 'FGC 수수료 정산 검증 시스템'}
-          </footer>
-        )}
+        <footer className="app-footer">
+          <p className="app-footer-company">
+            <span>FGC</span><span>팀 수수깡</span><span>사업자등록번호: 000-00-00000 (가상)</span>
+          </p>
+          <p>Copyright © {new Date().getFullYear()} FGC. All rights reserved.</p>
+        </footer>
       </div>
       {(import.meta.env.VITE_ASSISTANT_AI === 'true' || import.meta.env.VITE_ASSISTANT_DEMO === 'true') && (
         <Suspense fallback={null}>
