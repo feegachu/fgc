@@ -94,8 +94,9 @@ await apiClient.request('/api/v1/contracts', {
 - 앱 진입점이 화면/조회 훅을 마운트하기 전에 `restoreSession()`을 한 번 호출한다.
   로그인 경로는 제외한다. 실패하면 토큰을 지우고 로그인으로 이동하며 조회 훅을 마운트하지 않는다.
 - 로그인 경로는 Vite `BASE_URL + login`이다. `redirect`는 basename을 제외한 경로와 query/hash다.
-  #404는 `src/lib/api/redirect.ts`의 `safeRedirect()`를 사용해 복귀 경로를 검사한다.
-  중복 로그인은 `reason=duplicate`가 붙는다. base가 `/`로 바뀌어도 같은 함수가 작동한다.
+  기존 `redirect`는 만료 안내용 호환 파라미터로 남기며, 새 로그인 성공 후 이동 주소로 사용하지 않는다.
+  새 로그인은 작업 탭·선택 정산월·캐시를 초기화하고 역할별 메인 화면(내부 사용자 대시보드·설계사 포트폴리오)으로 이동한다.
+  중복 로그인은 `reason=duplicate`가 붙는다. 로그인 후 사용자 정보 재조회에 성공한 경우도 같은 메인 화면으로 이동한다.
 - Access·Refresh를 localStorage/sessionStorage에 저장하지 않는다. UI 설정 저장은 #403 범위다.
 
 TanStack Query는 4xx·취소를 재시도하지 않고 그 밖의 조회 실패만 두 번까지 재시도한다.
@@ -175,7 +176,8 @@ TS 6은 #401 결정을 유지한다. openapi-typescript 7.13.0의 TS 5 peer 요�
 
 사이드바 접힘은 `fgc.sidebar.collapsed.v1`(localStorage), 열린 섹션은
 `fgc.sidebar.open-sections.v1`(sessionStorage)을 사용한다. 탭·기준월·수정 표시는
-`fgc.react.workspace.v1`(sessionStorage)에만 보관하고 로그인 ID가 같을 때만 복원한다.
+`fgc.react.workspace.v1`(sessionStorage)에만 보관하고, 유효한 세션에서 새로고침할 때 로그인 ID가 같으면 복원한다.
+로그아웃·중복 로그인·인증 만료 후 새 로그인은 저장된 탭과 월을 초기화하고 서버 기본 월로 시작한다.
 복원 시 화면 메타데이터·권한을 다시 검사한다. Access Token이나 업무 응답은 저장하지 않는다.
 대시보드는 고정이며 총 10개를 넘으면 가장 오래 열린 업무 탭을 제거한다.
 계약 등록·수정은 기존 화면처럼 CONT-W03 탭 하나를 재사용한다.

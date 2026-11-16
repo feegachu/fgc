@@ -54,6 +54,14 @@ async function login(page: Page) {
   await page.getByLabel(/^비밀번호\s*\*?$/).fill('fixture-password')
   await page.getByRole('button', { name: '로그인', exact: true }).click()
 }
+async function expectInitialDashboard(page: Page) {
+  await expect(page.getByRole('heading', { name: '업무 대시보드' })).toBeVisible()
+  await expect(page).toHaveURL(/\/\?month=2026-07$/)
+  await expect(page.getByRole('button', { name: '기준 정산월 2026-07', exact: true })).toBeVisible()
+  const tabs = page.getByRole('navigation', { name: '열린 업무 화면' }).getByRole('link')
+  await expect(tabs).toHaveCount(1)
+  await expect(tabs).toContainText('업무 대시보드')
+}
 
 for (const role of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN']) {
   test(`${role}: 로그인 후 사용자, 역할 및 메뉴를 표시한다`, async ({ page }) => {
@@ -70,12 +78,14 @@ for (const role of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN']) {
   })
 }
 
-test('보호 딥링크로 복귀하고 로그아웃 뒤 뒤로 가기로 접근할 수 없다', async ({ page }) => {
+test('보호 딥링크의 새 로그인은 초기 대시보드로 시작하고 로그아웃 후에도 작업을 복원하지 않는다', async ({ page }) => {
   await authFixture(page)
   await page.goto('transactions/new?month=2026-08&status=ACTIVE#form')
   await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
   expect(new URL(page.url()).searchParams.get('redirect')).toBe('/transactions/new?month=2026-08&status=ACTIVE#form')
   await login(page)
+  await expectInitialDashboard(page)
+  await page.goto('transactions/new?month=2026-08&status=ACTIVE#form')
   await expect(page.getByRole('heading', { name: /지급 (계약 )?건 등록, 귀속, 확정/ })).toBeVisible()
   await expect(page).toHaveURL(/\/transactions\/new\?month=2026-08&status=ACTIVE#form$/)
   await page.getByRole('link', { name: 'FGC 업무 대시보드' }).click()
@@ -86,6 +96,8 @@ test('보호 딥링크로 복귀하고 로그아웃 뒤 뒤로 가기로 접근�
   await page.goBack()
   await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
   await expect(page.locator('.app-shell')).toHaveCount(0)
+  await login(page)
+  await expectInitialDashboard(page)
 })
 
 test('쓰던 브라우저에서 유효한 쿠키로 로그인 주소를 새로 열면 대시보드로 이동한다', async ({ page }) => {
@@ -113,25 +125,37 @@ test('COMPLIANCE의 지급 등록 딥링크는 403으로 차단한다', async ({
   await authFixture(page, 'COMPLIANCE')
   await page.goto('login?redirect=%2Ftransactions%2Fnew')
   await login(page)
+  await expectInitialDashboard(page)
+  await page.goto('transactions/new')
   await expect(page.getByRole('heading', { name: '권한 없음' })).toBeVisible()
   await expect(page.getByRole('link', { name: '기존 화면으로 이동' })).toHaveCount(0)
 })
 
-test('쿠키 만료 후 재진입 시 로그인으로 이동하고 경로를 보존한다', async ({ page }) => {
+test('유효한 인증의 새로고침은 작업을 유지하고 쿠키 만료 후 재로그인은 초기 대시보드로 시작한다', async ({ page }) => {
   const fixture = await authFixture(page)
-  await page.goto('login?redirect=%2Fcontracts%3Fmonth%3D2026-07')
+  await page.goto('login')
   await login(page)
+  await expectInitialDashboard(page)
+  await page.goto('contracts?month=2026-08')
   await expect(page.getByRole('heading', { name: '보험계약 목록', level: 1, exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '보험계약 목록', level: 1, exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '기준 정산월 2026-08', exact: true })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: '열린 업무 화면' }).getByRole('link')).toHaveCount(2)
   fixture.expire()
   await page.reload()
   await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
-  expect(new URL(page.url()).searchParams.get('redirect')).toBe('/contracts?month=2026-07')
+  expect(new URL(page.url()).searchParams.get('redirect')).toBe('/contracts?month=2026-08')
+  await login(page)
+  await expectInitialDashboard(page)
 })
 
 test('오래 자리를 비운 뒤 다시 열면 쿠키가 있어도 자동 로그아웃한다', async ({ page }) => {
   await authFixture(page)
   await page.goto('login?redirect=%2Fcontracts%3Fmonth%3D2026-07')
   await login(page)
+  await expectInitialDashboard(page)
+  await page.goto('contracts?month=2026-07')
   await expect(page.getByRole('heading', { name: '보험계약 목록', level: 1, exact: true })).toBeVisible()
   const refreshes: string[] = []
   const loggedOut = page.waitForRequest('**/api/v1/auth/logout')
@@ -150,6 +174,8 @@ test('화면을 모두 닫고 3분이 지나 다시 열면 쿠키가 있어도 �
   await authFixture(page)
   await page.goto('login?redirect=%2Fcontracts%3Fmonth%3D2026-07')
   await login(page)
+  await expectInitialDashboard(page)
+  await page.goto('contracts?month=2026-07')
   await expect(page.getByRole('heading', { name: '보험계약 목록', level: 1, exact: true })).toBeVisible()
   const refreshes: string[] = []
   const loggedOut = page.waitForRequest('**/api/v1/auth/logout')
@@ -192,7 +218,7 @@ test('두 탭이 동시에 열려도 refresh를 한 번에 하나씩 보내 둘 
   expect(most).toBe(1)
 })
 
-test('두 브라우저의 중복 로그인: A 안내 및 경로 보존, B 정상, A 재로그인 복귀', async ({ browser, baseURL }) => {
+test('두 브라우저의 중복 로그인: A 작업 종료, B 정상, A 재로그인은 탭과 선택 월을 초기화한다', async ({ browser, baseURL }) => {
   const a = await browser.newContext({ baseURL })
   const b = await browser.newContext({ baseURL })
   try {
@@ -200,18 +226,23 @@ test('두 브라우저의 중복 로그인: A 안내 및 경로 보존, B 정상
     const session = { version: 0 }
     await authFixture(pageA, 'SETTLEMENT', session)
     await authFixture(pageB, 'SETTLEMENT', session)
-    await pageA.goto('login?redirect=%2Fcontracts%3Fmonth%3D2026-07')
+    await pageA.goto('login')
     await login(pageA)
+    await expectInitialDashboard(pageA)
+    await pageA.goto('contracts?month=2026-08')
     await expect(pageA.getByRole('heading', { name: '보험계약 목록', level: 1, exact: true })).toBeVisible()
+    await expect(pageA.getByRole('navigation', { name: '열린 업무 화면' }).getByRole('link')).toHaveCount(2)
+    await expect(pageA.getByRole('button', { name: '기준 정산월 2026-08', exact: true })).toBeVisible()
     await pageB.goto('login')
     await login(pageB)
     await expect(pageB.getByRole('heading', { name: '업무 대시보드' })).toBeVisible()
     await pageA.reload()
     await expect(pageA.getByRole('status')).toHaveText('다른 곳에서 같은 계정으로 로그인해 로그아웃되었습니다. 다시 로그인하세요.')
-    expect(new URL(pageA.url()).searchParams.get('redirect')).toBe('/contracts?month=2026-07')
+    expect(new URL(pageA.url()).searchParams.get('redirect')).toBe('/contracts?month=2026-08')
     await expect(pageB.getByRole('heading', { name: '업무 대시보드' })).toBeVisible()
     await login(pageA)
-    await expect(pageA.getByRole('heading', { name: '보험계약 목록', level: 1, exact: true })).toBeVisible()
+    await expectInitialDashboard(pageA)
+    await expect(pageA.getByRole('heading', { name: '보험계약 목록', level: 1, exact: true })).toHaveCount(0)
   } finally {
     await a.close()
     await b.close()
@@ -239,6 +270,8 @@ test('신규 지급의 실제 입력은 이동 취소 시 유지하고 명시적
   await authFixture(page)
   await page.goto('transactions/new?amount=0&month=2026-08')
   await login(page)
+  await expectInitialDashboard(page)
+  await page.goto('transactions/new?amount=0&month=2026-08')
   await expect(page.getByRole('heading', { name: /지급 (계약 )?건 등록, 귀속, 확정/ })).toBeVisible()
   await page.locator('#bizKey').fill('UNSAVED-UI-ONLY')
   await page.getByRole('link', { name: 'FGC 업무 대시보드' }).click()

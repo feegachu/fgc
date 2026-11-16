@@ -5,7 +5,6 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
 import { apiClient, ApiError } from '../../lib/api/client'
-import { safeRedirect } from '../../lib/api/redirect'
 import { authQueryOptions } from './api'
 import { AuthStatus } from './AuthStatus'
 import { authErrorText } from './errors'
@@ -22,7 +21,6 @@ export function LoginPage() {
   const { logout, loggingOut } = useLogout()
   const [showPassword, setShowPassword] = useState(false)
   const [pending, setPending] = useState(false)
-  const [loginRequested, setLoginRequested] = useState(false)
   const [error, setError] = useState(search.has('error') ? authMessages.invalidCredentials : '')
   const submitting = useRef(false)
   const notice =
@@ -54,14 +52,13 @@ export function LoginPage() {
     const values = new FormData(form)
     submitting.current = true
     setPending(true)
-    setLoginRequested(true)
     setError('')
     clearSessionData(client)
     try {
       await apiClient.login(String(values.get('username')), String(values.get('password')))
       await client.fetchQuery(authQueryOptions())
-      // URLSearchParams가 이미 한 번 디코딩했으므로 다시 디코딩하지 않는다.
-      await navigate(safeRedirect(search.get('redirect')), { replace: true })
+      // 새 로그인은 이전 업무 주소·조회조건을 복원하지 않고 역할별 메인에서 시작한다.
+      await navigate('/', { replace: true })
     } catch (caught) {
       setError(
         caught instanceof ApiError && caught.code === 'FGC-AUTH-001'
@@ -77,15 +74,14 @@ export function LoginPage() {
   }
 
   if (loggingOut) return <AuthStatus />
-  if (auth.user && !pending)
-    return <Navigate to={loginRequested ? safeRedirect(search.get('redirect')) : '/'} replace />
+  if (auth.user && !pending) return <Navigate to="/" replace />
   if (auth.accessToken && !pending) {
     return (
       <AuthStatus
         error={auth.error}
         retry={() => {
           void auth.refetch().then((result) => {
-            if (result.isSuccess) void navigate(safeRedirect(search.get('redirect')), { replace: true })
+            if (result.isSuccess) void navigate('/', { replace: true })
           })
         }}
       />

@@ -122,19 +122,25 @@ describe('AUTH-W01 로그인', () => {
     expect(screen.queryByText(/요청 ID|FGC-COMMON-500/)).toBeNull()
   })
 
-  it.each(['/app', ''])('base=%s: 보호 경로와 query/hash를 보존하여 로그인 후 복귀한다', async (base) => {
+  it.each(['/app', ''])('base=%s: 새 로그인은 이전 경로·조회조건 대신 초기화한 메인 화면으로 이동한다', async (base) => {
     const target = '/transactions/new?month=2026-08&status=ACTIVE#form'
     const { router, actions, client } = renderAt(`${base}${target}`, false, base || '/')
     await screen.findByRole('heading', { name: '로그인' })
     expect(new URLSearchParams(router.state.location.search).get('redirect')).toBe(target)
     client.setQueryData(['private', 'previous-user'], { secret: 'old' })
+    const workspace = useWorkspaceStore.getState()
+    workspace.initialize(user.loginId, user.demoMonth, '2026-08', { canProcess: true })
+    workspace.openTab({ id: 'TRAN-W02', title: '지급 등록', href: target, icon: 'payments' })
+    workspace.markModified('TRAN-W02')
     sessionStorage.setItem('fgc.other.preference', 'old')
     localStorage.setItem('unrelated', 'keep')
     await enterCredentials(actions)
-    await screen.findByRole('heading', { name: '지급 계약 건 등록, 귀속, 확정' })
-    expect(router.state.location.pathname).toBe(`${base}/transactions/new`)
-    expect(router.state.location.search).toBe('?month=2026-08&status=ACTIVE')
-    expect(router.state.location.hash).toBe('#form')
+    await screen.findByRole('heading', { name: '업무 대시보드' })
+    expect(router.state.location.pathname).toBe(`${base}/`)
+    expect(router.state.location.search).toBe('?month=2026-07')
+    expect(router.state.location.hash).toBe('')
+    expect(useWorkspaceStore.getState().month).toBe(user.demoMonth)
+    expect(useWorkspaceStore.getState().tabs.map((tab) => tab.id)).toEqual(['DASH-W01'])
     expect(client.getQueryData(['private', 'previous-user'])).toBeUndefined()
     expect(sessionStorage.getItem('fgc.other.preference')).toBeNull()
     expect(localStorage.getItem('unrelated')).toBe('keep')
@@ -142,6 +148,8 @@ describe('AUTH-W01 로그인', () => {
   })
 
   it.each([
+    '/contracts?month=2026-08&selected=123#detail',
+    '/transactions/new?month=2026-08',
     '//evil.example',
     'https://evil.example',
     '/\\evil.example',
@@ -150,7 +158,7 @@ describe('AUTH-W01 로그인', () => {
     '/LOGIN/',
     '/%6cogin',
     '/contracts/../login',
-  ])('유효하지 않은 redirect=%s는 대시보드로 보낸다', async (target) => {
+  ])('이전 redirect=%s의 유효성과 무관하게 대시보드로 보낸다', async (target) => {
     const { router, actions } = renderAt(`/app/login?redirect=${encodeURIComponent(target)}`)
     await enterCredentials(actions)
     await screen.findByRole('heading', { name: '업무 대시보드' })
@@ -164,18 +172,45 @@ describe('AUTH-W01 로그인', () => {
     expect(apiClient.login).not.toHaveBeenCalled()
   })
 
-  it('중복 로그인 안내를 표시하고 다시 로그인하면 원래 화면으로 돌아간다', async () => {
-    const { router, actions } = renderAt('/app/login?reason=duplicate&redirect=%2Fcontracts%3Fmonth%3D2026-07')
-    expect(screen.getByRole('status')).toHaveTextContent(authMessages.superseded)
+  it.each([
+    ['reason=duplicate', authMessages.superseded],
+    ['reason=idle', authMessages.idleLogout],
+    ['logout', authMessages.loggedOut],
+    ['', authMessages.sessionExpired],
+  ])('%s 안내 뒤 재로그인하면 이전 업무 주소 대신 메인으로 이동한다', async (reason, notice) => {
+    const { router, actions } = renderAt(`/app/login?${reason}&redirect=%2Fcontracts%3Fmonth%3D2026-08%23detail`)
+    expect(screen.getByRole('status')).toHaveTextContent(notice)
     await enterCredentials(actions)
-    await screen.findByRole('heading', { name: '보험계약 목록' })
-    expect(router.state.location.pathname).toBe('/app/contracts')
+    await screen.findByRole('heading', { name: '업무 대시보드' })
+    expect(router.state.location.pathname).toBe('/app/')
+    expect(router.state.location.search).toBe('?month=2026-07')
+    expect(router.state.location.hash).toBe('')
+  })
+
+  it('설계사도 재로그인하면 이전 계약 화면 대신 기본 정산월의 포트폴리오로 이동한다', async () => {
+    vi.mocked(apiClient.request).mockResolvedValue(envelope({ ...user, roleCode: 'AGENT', isAgent: true }))
+    const { router, actions } = renderAt('/app/login?reason=duplicate&redirect=%2Fcontracts%3Fmonth%3D2026-08')
+    await enterCredentials(actions)
+    await screen.findByRole('heading', { name: '포트폴리오' })
+    expect(router.state.location.pathname).toBe('/app/agent-home')
+    expect(router.state.location.search).toBe('?month=2026-07')
+    expect(useWorkspaceStore.getState().tabs.map((tab) => tab.id)).toEqual(['AGNT-W01'])
+  })
+
+  it('로그인 뒤 사용자 정보 조회를 재시도해 성공해도 메인으로 이동한다', async () => {
+    vi.mocked(apiClient.request).mockRejectedValueOnce(new Error('network'))
+    const { router, actions } = renderAt('/app/login?redirect=%2Fcontracts%3Fmonth%3D2026-08')
+    await enterCredentials(actions)
+    await actions.click(await screen.findByRole('button', { name: '다시 시도' }))
+    await screen.findByRole('heading', { name: '업무 대시보드' })
+    expect(router.state.location.pathname).toBe('/app/')
+    expect(router.state.location.search).toBe('?month=2026-07')
   })
 
   it('로그아웃은 토큰·캐시·워크스페이스를 지우고 뒤로 가도 보호 화면을 열지 않는다', async () => {
     const { router, client, actions } = renderAt('/app/contracts', true)
     await screen.findByRole('heading', { name: '보험계약 목록' })
-    await act(() => router.navigate('/transactions?month=2026-07'))
+    await act(() => router.navigate('/transactions?month=2026-08'))
     await screen.findByRole('heading', { name: '수수료 지급 건 목록' })
     client.setQueryData(['private'], 'secret')
     await actions.click(screen.getByRole('button', { name: '로그아웃' }))
@@ -188,6 +223,11 @@ describe('AUTH-W01 로그인', () => {
     await act(() => router.navigate(-1))
     await waitFor(() => expect(router.state.location.pathname).toBe('/app/login'))
     expect(screen.queryByRole('navigation', { name: '주요 업무 메뉴' })).toBeNull()
+    await enterCredentials(actions)
+    await screen.findByRole('heading', { name: '업무 대시보드' })
+    expect(router.state.location.pathname).toBe('/app/')
+    expect(router.state.location.search).toBe('?month=2026-07')
+    expect(useWorkspaceStore.getState().tabs.map((tab) => tab.id)).toEqual(['DASH-W01'])
   })
 
   it('서버 로그아웃 실패 시 보호 화면을 닫고 재시도를 제공한다', async () => {
@@ -205,14 +245,22 @@ describe('AUTH-W01 로그인', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(authMessages.loggedOut))
   })
 
-  it('인증이 사라지면 캐시를 비우고 보호 화면 경로를 보존한다', async () => {
-    const { router, client } = renderAt('/app/contracts?month=2026-07', true)
+  it('인증이 사라지면 작업 상태를 비우고 재로그인 시 메인에서 다시 시작한다', async () => {
+    const { router, client, actions } = renderAt('/app/contracts?month=2026-08', true)
     await screen.findByRole('heading', { name: '보험계약 목록' })
     client.setQueryData(['private'], 'secret')
     act(() => useAuthStore.getState().setAccessToken(null))
     await screen.findByRole('heading', { name: '로그인' })
-    expect(new URLSearchParams(router.state.location.search).get('redirect')).toBe('/contracts?month=2026-07')
+    expect(new URLSearchParams(router.state.location.search).get('redirect')).toBe('/contracts?month=2026-08')
     expect(client.getQueryData(['private'])).toBeUndefined()
+    expect(useWorkspaceStore.getState().owner).toBeNull()
+    expect(useWorkspaceStore.getState().month).toBeNull()
+    expect(sessionStorage.getItem('fgc.react.workspace.v1')).toBeNull()
+    await enterCredentials(actions)
+    await screen.findByRole('heading', { name: '업무 대시보드' })
+    expect(router.state.location.pathname).toBe('/app/')
+    expect(router.state.location.search).toBe('?month=2026-07')
+    expect(useWorkspaceStore.getState().tabs.map((tab) => tab.id)).toEqual(['DASH-W01'])
   })
 })
 
