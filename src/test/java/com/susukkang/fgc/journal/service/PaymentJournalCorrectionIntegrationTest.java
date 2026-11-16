@@ -345,7 +345,8 @@ class PaymentJournalCorrectionIntegrationTest {
         assertThat(result.deferredPayment().settlementMonth()).isEqualTo(TEST_MONTH.plusMonths(12));
         assertThat(result.deferredPayment().attributions().getFirst().attributionDate()).isEqualTo(TEST_MONTH.plusMonths(12));
         assertDeferredSupportReview(result.deferredPayment(), settlementSupport);
-        assertThatThrownBy(() -> payments.deleteDraft(result.deferredPayment().paymentId()))
+        Long deferredPaymentId = result.deferredPayment().paymentId();
+        assertThatThrownBy(() -> payments.deleteDraft(deferredPaymentId))
                 .isInstanceOf(FgcBusinessException.class);
         assertThat(exceptionBasis.find(exception).deferredPayments()).hasSize(1);
         // 최신 정정에 검사 결과가 없으면 이전 정정 검사를 현재 근거로 재사용하지 않는다.

@@ -17,6 +17,7 @@ import java.util.*;
 @Transactional(readOnly = true)
 public class ExceptionPaymentRepository {
     private static final String CONTRACT_PARAM = "contract";
+    private static final String ORIGINAL_PARAM = "original";
     private final EntityManager em;
 
     public record Source(Long id, String type, Long contractId, String sourceType,
@@ -306,14 +307,14 @@ public class ExceptionPaymentRepository {
                 WHERE c.candidate_id=:candidate AND c.version_no=:version
                   AND (CAST(:document AS text) IS NULL OR d.generated_document_id IS NOT NULL)
                 ON CONFLICT DO NOTHING
-                """).setParameter("original", originalPayment).setParameter(CONTRACT_PARAM, source.contractId())
+                """).setParameter(ORIGINAL_PARAM, originalPayment).setParameter(CONTRACT_PARAM, source.contractId())
                 .setParameter("deduction", deductionPayment).setParameter("exception", source.id()).setParameter("candidate", candidate)
                 .setParameter("version", version).setParameter("document", documentNo).executeUpdate();
         return Boolean.TRUE.equals(em.createNativeQuery("""
                 SELECT EXISTS (SELECT 1 FROM fgc.exception_payment_recovery r JOIN fgc.clawback_calculation c USING(clawback_calculation_id)
                   WHERE r.original_payment_id=:original AND r.contract_id=:contract AND r.deduction_payment_id=:deduction
                     AND c.candidate_id=:candidate AND c.version_no=:version)
-                """).setParameter("original", originalPayment).setParameter(CONTRACT_PARAM, source.contractId()).setParameter("deduction", deductionPayment)
+                """).setParameter(ORIGINAL_PARAM, originalPayment).setParameter(CONTRACT_PARAM, source.contractId()).setParameter("deduction", deductionPayment)
                 .setParameter("candidate", candidate).setParameter("version", version).getSingleResult());
     }
 
@@ -328,7 +329,7 @@ public class ExceptionPaymentRepository {
                       AND recovery.deduction_payment_id = :deduction AND deduction.status = 'CONFIRMED'
                       AND calculation.candidate_id = :candidate
                 )
-                """).setParameter("exceptionId", source.id()).setParameter("original", originalPayment)
+                """).setParameter("exceptionId", source.id()).setParameter(ORIGINAL_PARAM, originalPayment)
                 .setParameter("deduction", deductionPayment).setParameter("candidate", candidate).getSingleResult());
     }
 
