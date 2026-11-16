@@ -51,7 +51,7 @@ function renderAt(path: string, roleCode = 'SETTLEMENT') {
   return router
 }
 describe('AppShell·라우트', () => {
-  it('설계사 계약 화면은 이후 UI로 고정하고 포트폴리오와 읽기 권한을 유지한다', async () => {
+  it('설계사 계약 화면과 포트폴리오 모두 같은 탭 헤더·푸터의 이후 UI를 쓰고 읽기 권한을 유지한다', async () => {
     const router = renderAt('/contracts?month=2026-07&contractNo=KEEP', 'AGENT')
     await screen.findByRole('heading', { name: '보험계약 목록' })
     const shell = document.querySelector('.app-shell')!
@@ -61,7 +61,8 @@ describe('AppShell·라우트', () => {
     expect(screen.queryByRole('link', { name: '신규 등록' })).not.toBeInTheDocument()
     await router.navigate('/agent-home?month=2026-07')
     await screen.findByRole('heading', { name: '포트폴리오' })
-    expect(shell).not.toHaveAttribute('data-ui-revision')
+    expect(shell).toHaveAttribute('data-ui-revision', 'after')
+    expect(document.querySelector('.app-footer')).toHaveTextContent('팀 수수깡')
     expect(screen.queryByRole('group', { name: '계약/지급 화면 이전 및 이후 비교' })).not.toBeInTheDocument()
   })
   it('AGENT의 관리자 홈 직접 접근은 관리자 API 호출 없이 포트폴리오로 이동한다', async () => {
