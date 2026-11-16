@@ -173,9 +173,10 @@ export function Trend({ points }: { points: { month: string; count: number; prem
   const T = 30
   const B = 24
   const maxCount = Math.max(1, ...points.map((p) => p.count))
-  const ticks = [0, Math.ceil(maxCount / 3), Math.ceil((maxCount * 2) / 3), maxCount].filter(
-    (v, i, a) => a.indexOf(v) === i,
-  )
+  // 눈금은 항상 같은 간격이어야 오른쪽 보험료 눈금도 같은 간격(1·2·2.5·5 계열)으로 대응한다.
+  const intervals = Math.min(3, maxCount)
+  const countStep = Math.ceil(maxCount / intervals)
+  const ticks = Array.from({ length: intervals + 1 }, (_, i) => i * countStep)
   const top = Math.max(...ticks, 1)
   const step = (W - L - R) / points.length
   const y = (v: number) => T + (H - T - B) * (1 - v / top)
