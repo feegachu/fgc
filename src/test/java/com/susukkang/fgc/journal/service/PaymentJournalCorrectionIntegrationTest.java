@@ -427,6 +427,10 @@ class PaymentJournalCorrectionIntegrationTest {
             assertThat(check.blockers()).isEmpty();
             assertThat(payments.confirm(draft.paymentId(), "SUPPORT-REVIEW-" + draft.paymentId()).status())
                     .isEqualTo(CommissionPaymentStatus.CONFIRMED);
+            Long policy = id("SELECT policy_version_id FROM fgc.commission_transaction WHERE commission_transaction_id=?", f.payment());
+            var direct = insertPayment(contractId, policy, supportItem, f.agent(), 1, "1000", "DRAFT", UUID.randomUUID().toString());
+            jdbcTemplate.update("UPDATE fgc.transaction_attribution SET inclusion_status_snapshot='REVIEW_REQUIRED',attribution_method='SETTLEMENT_SUPPORT_MONTHLY' WHERE transaction_attribution_id=?", direct.attributionId());
+            assertThat(jdbcTemplate.update("UPDATE fgc.commission_transaction SET status='CONFIRMED' WHERE commission_transaction_id=?", direct.transactionId())).isEqualTo(1);
         }
     }
 

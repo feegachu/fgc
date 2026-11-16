@@ -872,7 +872,7 @@ DRAFT 생성
 - 확정 귀속행 수정·추가·삭제
 - 초년도 지급을 13회차로 허위 이연
 
-현재 DB 트리거가 직접 강제하는 범위는 `DRAFT` 생성, 귀속합계=지급액, `REVIEW_REQUIRED` 귀속의 확정 차단, 확정 후 불변성이다. **DB 트리거는 `commission_transaction` 확정 시 `cap_check`를 조회해 1,200% 통과 여부를 자동 확인하지 않는다.** 따라서 서비스는 같은 후보 지급 건을 포함한 `PRE_CONFIRM` 검증을 먼저 생성하고 `VIOLATION`·`REVIEW_REQUIRED`이면 `CONFIRMED` UPDATE를 호출하지 않아야 한다. 이 서비스 게이트가 구현되지 않은 경로에서는 지급확정 기능을 제공하지 않는다.
+현재 DB 트리거가 직접 강제하는 범위는 `DRAFT` 생성, 귀속합계=지급액, 검토필요 귀속의 확정 조건 검사, 확정 후 불변성이다. V93 기준으로 보장성 계약·계약 미상·`DEFERRED_CONTRACT`의 `REVIEW_REQUIRED` 귀속은 확정을 차단한다. 비보장성(`SAVINGS`·`GENERAL`·`AUTO`·`OTHER`) 계약의 일반 지급은 산입 분류 `REVIEW_REQUIRED`만을 이유로 확정을 막지 않으며, 이연 초안은 비보장성이라도 근거 검토 전 확정할 수 없다. 귀속합계·승인배부 정책·불변성 등 나머지 검사는 그대로 적용한다. **DB 트리거는 `commission_transaction` 확정 시 `cap_check`를 조회해 1,200% 통과 여부를 자동 확인하지 않는다.** 따라서 서비스는 규제 대상인 같은 후보 지급 건을 포함한 `PRE_CONFIRM` 검증을 먼저 생성하고 `VIOLATION`·`REVIEW_REQUIRED`이면 `CONFIRMED` UPDATE를 호출하지 않아야 한다. 비보장성 일반 지급도 귀속 누락·증빙·이연 근거 검토 같은 별도 게이트는 유지한다. 이 서비스 게이트가 구현되지 않은 경로에서는 지급확정 기능을 제공하지 않는다.
 
 **게이트 적용 범위.** 이 게이트는 **GA가 돈을 주는 결정**에 건다 — GA→설계사 지급 건과, 원수사→GA 수기 지급 건(`GA_MANUAL_PAYMENT`). 다음은 예외다.
 
