@@ -271,7 +271,7 @@ class OctoberDemo:
             run = self.execute(month)
             require(not self.open_cases(), f'{month}에 예상하지 않은 예외: {self.open_cases()}')
             self.admin.ok('POST', f'/api/v1/validation-runs/{run}/finalize', {}, idem())
-        print(f'{MONTH} 정상 {normal_per_month}건과 오류 시연 4건 준비 (월 검증 미실행)', flush=True)
+        print(f'{MONTH} 정상 {normal_per_month}건과 예외 시연 {october_open_count(self.manifest)}건 준비 (월 검증 미실행)', flush=True)
         self.register_month(MONTH, normal_per_month)
         self.pay_month(MONTH)
         contract = self.manifest['contracts']['RECOVERY']

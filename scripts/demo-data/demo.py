@@ -20,13 +20,20 @@ import socket
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 import urllib.error
 import urllib.request
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
-TRUNCATE = ('BEGIN; TRUNCATE fgc.insurance_contract, fgc.commission_transaction, '
+# 업무 실행 번호를 다시 사용하므로 Spring Batch의 완료 이력도 함께 비운다.
+# 최초 기동 전에는 Batch 메타테이블이 없을 수 있다. 시퀀스와 기준정보는 유지한다.
+TRUNCATE = ("BEGIN; DO $$ BEGIN "
+            "IF to_regclass('fgc.batch_job_instance') IS NOT NULL THEN "
+            "TRUNCATE fgc.batch_job_instance CASCADE; "
+            "END IF; END $$; "
+            'TRUNCATE fgc.insurance_contract, fgc.commission_transaction, '
             'fgc.statement_batch, fgc.validation_run, fgc.exception_case CASCADE; COMMIT;')
 
 
@@ -223,9 +230,17 @@ class Demo:
 
     def restore(self, path):
         # 자동 백업 전에 원본 경로를 확정했으므로 latest가 바뀌어도 올바른 원본을 읽는다.
-        with (path / 'db.dump').open('rb') as stream:
-            run(['docker', 'exec', '-i', self.db, 'pg_restore', '-U', 'fgc', '-d', 'fgc',
-                 '--clean', '--if-exists', '--single-transaction', '--exit-on-error'], stdin=stream)
+        # 오래된 dump의 --clean은 백업 후 생긴 함수·테이블을 알지 못한다.
+        # fgc 정리와 복원 SQL을 한 트랜잭션으로 실행해 새 객체도 제거하고, 실패하면 전부 롤백한다.
+        # SQL 변환이 실패하면 DB에는 접근하지 않는다. 큰 백업도 메모리에 올리지 않는다.
+        with tempfile.TemporaryFile() as sql, (path / 'db.dump').open('rb') as stream:
+            sql.write(b'SET LOCAL client_min_messages = warning;\nDROP SCHEMA IF EXISTS fgc CASCADE;\n')
+            sql.flush()
+            run(['docker', 'exec', '-i', self.db, 'pg_restore', '--clean', '--if-exists',
+                 '--file=-'], stdin=stream, stdout=sql)
+            sql.seek(0)
+            run(['docker', 'exec', '-i', self.db, 'psql', '-X', '-q', '-U', 'fgc', '-d', 'fgc',
+                 '-v', 'ON_ERROR_STOP=1', '--single-transaction', '--file=-'], stdin=sql)
         if self.ec2:
             # /data는 위에서 확인한 PDF 전용 볼륨이다. 다른 Docker 볼륨은 접근하지 않는다.
             self.files_command(path, 'find /data -mindepth 1 -delete; tar -xzf /backup/files.tgz -C /data')
