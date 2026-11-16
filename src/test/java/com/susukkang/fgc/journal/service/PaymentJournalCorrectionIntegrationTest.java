@@ -307,10 +307,12 @@ class PaymentJournalCorrectionIntegrationTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    @org.junit.jupiter.params.provider.CsvSource({"false,1", "true,1", "false,15", "true,15"})
     @WithMockUser(roles="SETTLEMENT")
-    void partialDeferralConfirmsOnlyCurrentAmountAndKeepsTheExcessAsAFutureDraft(boolean settlementSupport) {
+    // FGC-FUN-053: 월중 예정일은 그대로 보존하고 귀속월·정산월만 월초로 정규화한다.
+    void partialDeferralConfirmsOnlyCurrentAmountAndKeepsTheExcessAsAFutureDraft(boolean settlementSupport, int day) {
         Fixture f=fixture();
+        LocalDate deferredDate = TEST_MONTH.plusMonths(12).withDayOfMonth(day);
         jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=? WHERE contract_id=?",TEST_MONTH,contractId);
         var draftBody=paymentBody(payments.get(f.payment()),"1000000000",TEST_MONTH);
         if (settlementSupport) {
@@ -327,23 +329,30 @@ class PaymentJournalCorrectionIntegrationTest {
         Long exception=id("SELECT exception_case_id FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND exception_type='CAP_VIOLATION'",draft.paymentId().toString());
         startException(exception);
         var result=exceptionPayments.correct(exception,new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
-                draft.paymentId(),payments.get(draft.paymentId()).updatedAt(),paymentBody(draft,"1",TEST_MONTH),null,null,"DEFER",new BigDecimal("999999999"),TEST_MONTH.plusMonths(12)),1L,"admin");
+                draft.paymentId(),payments.get(draft.paymentId()).updatedAt(),paymentBody(draft,"1",TEST_MONTH),null,null,"DEFER",new BigDecimal("999999999"),deferredDate),1L,"admin");
         assertThat(result.resolved()).isTrue();
         assertThat(result.action().actionType()).isEqualTo("DEFER");
         assertThat(result.payment().amount()).isEqualByComparingTo("1");
         assertThat(result.deferredPayment().amount()).isEqualByComparingTo("999999999");
         assertThat(result.deferredPayment().status()).isEqualTo(CommissionPaymentStatus.DRAFT);
-        assertThat(result.deferredPayment().scheduledPaymentDate()).isEqualTo(TEST_MONTH.plusMonths(12));
+        assertThat(result.deferredPayment().scheduledPaymentDate()).isEqualTo(deferredDate);
         var displayed = exceptionBasis.find(exception);
         assertThat(displayed.currentBasis()).isNotNull();
         assertThat(displayed.currentBasis().capCheck().includedAmount()).isLessThan(displayed.detectedBasis().capCheck().includedAmount());
         assertThat(displayed.deferredPayments()).singleElement().satisfies(p -> {
             assertThat(p.amount()).isEqualByComparingTo("999999999");
-            assertThat(p.scheduledPaymentDate()).isEqualTo(TEST_MONTH.plusMonths(12));
+            assertThat(p.scheduledPaymentDate()).isEqualTo(deferredDate);
             assertThat(p.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
         });
         assertThat(result.deferredPayment().settlementMonth()).isEqualTo(TEST_MONTH.plusMonths(12));
-        assertThat(result.deferredPayment().attributions().getFirst().attributionDate()).isEqualTo(TEST_MONTH.plusMonths(12));
+        assertThat(result.deferredPayment().attributions().getFirst().attributionDate()).isEqualTo(deferredDate);
+        assertThat(result.deferredPayment().attributions().getFirst().attributionMonth()).isEqualTo(deferredDate.withDayOfMonth(1));
+        var deferredCheck = payments.precheck(result.deferredPayment().paymentId());
+        assertThat(deferredCheck.capPreview()).isEmpty();
+        assertThat(deferredCheck.capExclusions()).singleElement().satisfies(exclusion -> {
+            assertThat(exclusion.reasonCode()).isEqualTo("OUTSIDE_FIRST_YEAR");
+            assertThat(exclusion.excludedAmount()).isEqualTo(999999999L);
+        });
         assertDeferredSupportReview(result.deferredPayment(), settlementSupport);
         Long deferredPaymentId = result.deferredPayment().paymentId();
         assertThatThrownBy(() -> payments.deleteDraft(deferredPaymentId))
@@ -354,6 +363,73 @@ class PaymentJournalCorrectionIntegrationTest {
         assertThat(exceptionPaymentRepository.correctedCapCheckId(exception, exceptionPaymentRepository.capScope(exception))).isNull();
     }
 
+    @Test @WithMockUser(roles = "SETTLEMENT")
+    // FGC-FUN-053: 직접 입력하는 이연액은 초과액보다 커야 하며 지급 총액은 보존한다.
+    void deferralRejectsTheExactExcessAndAcceptsALargerEnteredAmount() {
+        Fixture f = fixture();
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=? WHERE contract_id=?", TEST_MONTH, contractId);
+        var draft = payments.create(paymentBody(payments.get(f.payment()), "1000000000", TEST_MONTH));
+        Long draftId = draft.paymentId();
+        assertThatThrownBy(() -> payments.confirm(draftId, "ENTERED-DEFER-" + draftId)).isInstanceOf(FgcBusinessException.class);
+        Long exception = id("SELECT exception_case_id FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=? AND exception_type='CAP_VIOLATION'", draft.paymentId().toString());
+        startException(exception);
+        var cap = exceptionPayments.context(exception, 1L).capBasis().capCheck();
+        BigDecimal minimum = BigDecimal.valueOf(cap.includedAmount() - cap.limitAmount());
+        for (BigDecimal amount : List.of(minimum.subtract(BigDecimal.ONE), minimum, draft.amount().add(BigDecimal.ONE))) {
+            var request = new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                    draft.paymentId(), draft.updatedAt(), paymentBody(draft, draft.amount().subtract(amount).toPlainString(), TEST_MONTH),
+                    null, null, "DEFER", amount, TEST_MONTH.plusYears(1).plusDays(14));
+            assertThatThrownBy(() -> exceptionPayments.preview(exception, request, 1L)).isInstanceOf(FgcBusinessException.class);
+        }
+        BigDecimal amount = minimum.add(BigDecimal.ONE);
+        var request = new com.susukkang.fgc.exceptioncase.dto.ExceptionPaymentCorrectionRequest(
+                draft.paymentId(), draft.updatedAt(), paymentBody(draft, draft.amount().subtract(amount).toPlainString(), TEST_MONTH),
+                null, null, "DEFER", amount, TEST_MONTH.plusYears(1).plusDays(14));
+        assertThat(exceptionPayments.preview(exception, request, 1L).confirmable()).isTrue();
+        var result = exceptionPayments.correct(exception, request, 1L, "admin");
+        assertThat(result.deferredPayment().amount()).isEqualByComparingTo(amount);
+        assertThat(result.payment().amount().add(result.deferredPayment().amount())).isEqualByComparingTo(draft.amount());
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    @WithMockUser(roles = "SETTLEMENT")
+    // FGC-FUN-053: 저축성 계약도 이연 초안의 근거 검토는 생략할 수 없다.
+    void savingsSupportRequiresReviewOnlyForDeferredContract(boolean deferred) {
+        Fixture f = fixture();
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=? WHERE contract_id=?", TEST_MONTH, contractId);
+        jdbcTemplate.update("""
+                UPDATE fgc.product SET protection_type='SAVINGS' WHERE product_id IN (
+                    SELECT po.product_id FROM fgc.insurance_contract c
+                    JOIN fgc.product_offering po USING(product_offering_id) WHERE c.contract_id=?)
+                """, contractId);
+        var old = payments.get(f.payment());
+        Long supportItem = id("SELECT commission_item_id FROM fgc.commission_item WHERE item_code='SETTLEMENT_SUPPORT'");
+        LocalDate date = deferred ? TEST_MONTH.plusYears(1).plusDays(14) : TEST_MONTH;
+        var body = new com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest(
+                old.sourceType(), "SUPPORT-REVIEW-" + UUID.randomUUID(), contractId, old.agentId(), supportItem,
+                new BigDecimal("1000"), date.withDayOfMonth(1), "PAYMENT", date, old.paymentStage(), old.allocationPolicyVersion(),
+                List.of(new com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionRequest(
+                        contractId, date, new BigDecimal("1000"), InclusionDecisionStatus.REVIEW_REQUIRED, ExclusionType.NONE,
+                        "정착지원금 근거 검토", "월별 신계약 배부", "SUPPORT-EVIDENCE",
+                        deferred ? AttributionMethod.DEFERRED_CONTRACT : AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY)),
+                "SUPPORT-EVIDENCE", null);
+        var draft = payments.create(body);
+        Long draftId = draft.paymentId();
+        var check = payments.precheck(draftId);
+        if (deferred) {
+            assertThat(check.blockers()).anySatisfy(b -> assertThat(b.code()).isEqualTo("FGC-CAP-002"));
+            assertThatThrownBy(() -> payments.confirm(draftId, "SUPPORT-REVIEW-" + draftId))
+                    .isInstanceOf(FgcBusinessException.class);
+            assertThat(payments.get(draft.paymentId()).status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+            assertThatThrownBy(() -> jdbcTemplate.update("UPDATE fgc.commission_transaction SET status='CONFIRMED' WHERE commission_transaction_id=?", draftId))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        } else {
+            assertThat(check.blockers()).isEmpty();
+            assertThat(payments.confirm(draft.paymentId(), "SUPPORT-REVIEW-" + draft.paymentId()).status())
+                    .isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        }
+    }
+
     private void assertDeferredSupportReview(com.susukkang.fgc.transaction.dto.CommissionPaymentResponse deferred, boolean settlementSupport) {
         if (settlementSupport) {
             var deferredAttribution = deferred.attributions().getFirst();
@@ -362,7 +438,7 @@ class PaymentJournalCorrectionIntegrationTest {
             assertThat(payments.precheck(deferred.paymentId()).blockers())
                     .anySatisfy(blocker -> assertThat(blocker.code()).isEqualTo("FGC-CAP-002"));
             for (int days : new int[]{0, -1, 1}) {
-                jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=? WHERE contract_id=?", TEST_MONTH.plusDays(days), contractId);
+                jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=? WHERE contract_id=?", deferred.scheduledPaymentDate().minusYears(1).plusDays(days), contractId);
                 var codes = payments.precheck(deferred.paymentId()).blockers().stream().map(b -> b.code()).toList();
                 if (days == 1) assertThat(codes).contains("FGC-TRAN-008");
                 else assertThat(codes).doesNotContain("FGC-TRAN-008");
@@ -591,6 +667,32 @@ class PaymentJournalCorrectionIntegrationTest {
         assertThat(id("SELECT COUNT(*) FROM fgc.journal_header WHERE journal_type='CONFIRMED_FC_PAYOUT' AND source_entity_id=?",replacement.toString())).isEqualTo(1);
         assertThatThrownBy(() -> corrections.reverseAndRepost(command(f, "100000"))).isInstanceOf(FgcBusinessException.class);
         assertThat(id("SELECT COUNT(*) FROM fgc.payment_journal_correction WHERE original_payment_id=?", f.payment())).isEqualTo(1);
+    }
+
+    @Test
+    @WithMockUser(roles = "SETTLEMENT")
+    // FGC-FUN-049: 대체 지급이 여러 계약에 배부돼도 원 계약의 근거만 반환한다.
+    void correctedBasisDoesNotIncludeOtherContractsSharingTheReplacementPayment() {
+        Fixture f = fixture();
+        Long otherContract = cloneContract();
+        var body = paymentBody(payments.get(f.payment()), "100000", TEST_MONTH);
+        var a = body.attributions().getFirst();
+        var split = List.of(contractId, otherContract).stream().map(contract ->
+                new com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionRequest(
+                        contract, a.attributionDate(), new BigDecimal("50000"), a.inclusionDecisionStatus(),
+                        a.exclusionType(), a.inclusionDecisionReason(), a.allocationBasis(), a.evidenceRef(), a.attributionMethod())).toList();
+        var replacement = new com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest(
+                body.sourceType(), body.sourceBusinessKey(), body.contractId(), body.agentId(), body.commissionItemId(),
+                body.amount(), body.settlementMonth(), body.cashflowType(), body.scheduledPaymentDate(), body.paymentStage(),
+                body.allocationPolicyVersion(), split, body.evidenceRef(), body.note());
+        var command = command(f, "100000");
+        corrections.reverseAndRepost(new ReverseAndRepostJournalCommand(command.reversal(),
+                command.correctedDraft().toBuilder().replacementPayment(replacement).build()));
+        Long current = id("SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE corrects_reconciliation_run_id=?", f.run());
+        assertThat(id("SELECT count(*) FROM fgc.reconciliation_result WHERE reconciliation_run_id=? AND contract_id=?", current, otherContract)).isPositive();
+        Long detected = id("SELECT reconciliation_result_id FROM fgc.reconciliation_result WHERE reconciliation_run_id=? AND contract_id=?", f.run(), contractId);
+        var basis = reconciliationBasis.basis(detected);
+        assertThat(basis.currentResults()).isNotEmpty().allSatisfy(r -> assertThat(r.contractId()).isEqualTo(contractId));
     }
 
     private void assertCorrectedReconciliationBasis(Fixture f, Long current) {

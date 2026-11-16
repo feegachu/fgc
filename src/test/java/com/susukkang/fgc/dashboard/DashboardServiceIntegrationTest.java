@@ -403,11 +403,11 @@ class DashboardServiceIntegrationTest {
         assertThat(result.kpis().journalImbalance()).isEqualTo(1);
     }
 
-    // 5. 미처리 예외: 월 필터 없음, NEW+IN_REVIEW만
+    // 5. 미처리 예외: 월 필터 없음, NEW+REVIEW_REQUIRED+IN_REVIEW
     @Test
     void summarizeCountsOpenExceptionsRegardlessOfMonth() {
         long existingOpenCount = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM fgc.exception_case WHERE status IN ('NEW', 'IN_REVIEW')
+                SELECT COUNT(*) FROM fgc.exception_case WHERE status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW')
                   AND exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING', 'JOURNAL_CORRECTION_REQUIRED')
                 """, Long.class);
         OffsetDateTime old = OffsetDateTime.parse("2026-01-01T09:00:00+09:00");

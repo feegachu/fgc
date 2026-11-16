@@ -386,7 +386,10 @@ public class ReconciliationResultRepository {
                     OR EXISTS (SELECT 1 FROM fgc.reconciliation_match nm
                       JOIN fgc.transaction_attribution a USING(transaction_attribution_id)
                       WHERE nm.reconciliation_result_id=n.reconciliation_result_id
-                        AND a.commission_transaction_id IN (SELECT id FROM corrected_payments)))
+                        AND a.commission_transaction_id IN (SELECT id FROM corrected_payments)
+                        AND a.contract_id IN (SELECT oa.contract_id FROM fgc.reconciliation_match om
+                          JOIN fgc.transaction_attribution oa USING(transaction_attribution_id)
+                          WHERE om.reconciliation_result_id=:id)))
                 ORDER BY n.reconciliation_result_id
                 """, Long.class).setParameter("id", resultId).setParameter("runId", runId).getResultList();
     }

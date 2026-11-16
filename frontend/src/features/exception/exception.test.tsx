@@ -979,7 +979,7 @@ describe('EXCP-W01 예외함', () => {
     const reopened = await screen.findByRole('dialog', { name: '계산근거' })
     expect(await within(reopened).findByRole('table', { name: '항목별 산입 내역' })).toHaveTextContent('158,000원')
   })
-  it('이연 선택으로 초과분과 계약 1년 뒤 날짜를 채우고 날짜 변경만으로 귀속을 연동한다', async () => {
+  it('초과액보다 큰 이연 금액을 직접 입력하고 예정일에 맞춰 귀속을 고정한다', async () => {
     searchResponse = () => search([{ ...baseCase, status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }])
     const payment = { commissionTransactionId: 77, sourceType: 'GA_MANUAL_PAYMENT', sourceBusinessKey: 'SETTLE-77',
       status: 'DRAFT', paymentStage: 'GA_TO_FC', contractId: 3, agentId: 1, commissionItemId: 1, commissionItemName: '정착지원금',
@@ -997,25 +997,45 @@ describe('EXCP-W01 예외함', () => {
       return original(path, init)
     }) as typeof apiClient.request)
     postResponse = (path, body) => {
-      expect(body).toMatchObject({ paymentId: 77, plannedAction: 'DEFER', deferredAmount: 52000, deferredPaymentDate: '2027-11-07',
-        payment: { amount: 158000, allocationPolicyVersion: 77, scheduledPaymentDate: '2026-10-25', attributions: [{ amount: 158000, attributionDate: '2026-10-25' }] } })
+      expect(body).toMatchObject({ paymentId: 77, plannedAction: 'DEFER', deferredAmount: 60000, deferredPaymentDate: '2027-11-07',
+        payment: { amount: 150000, allocationPolicyVersion: 77, scheduledPaymentDate: '2026-10-25', attributions: [{ amount: 150000, attributionDate: '2026-10-25' }] } })
       if (path.endsWith('/precheck')) return { confirmable: true, capPreview: [], blockers: [] }
-      return { payment: { ...payment, amount: 158000 }, resolved: true, message: '이연 완료',
+      return { payment: { ...payment, amount: 150000 }, resolved: true, message: '이연 완료',
         action: { actionSeq: 2, fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED', actionType: 'DEFER', actionTypeLabel: '이연', toStatusLabel: '해결' } }
     }
     const { actions } = renderPage('/app/exceptions?selected=11')
     await actions.click(await screen.findByRole('button', { name: '예외 건 처리' }))
     const dialog = await screen.findByRole('dialog', { name: '수수료 지급 건 등록 및 수정' })
     await actions.selectOptions(await within(dialog).findByLabelText('감액 및 이연 구분'), 'DEFER')
-    const dateInput = within(dialog).getByLabelText(/초과분 지급 예정일/)
+    expect(within(dialog).queryByLabelText('수정할 지급 건')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(/검출 당시 실제 산입액/)).not.toBeInTheDocument()
+    const dateInput = within(dialog).getByLabelText(/이연 지급 예정일/)
     expect(dateInput).toHaveValue('2027-10-05')
+    const amountInput = within(dialog).getByLabelText(/이연 금액 \(원\)/)
+    const previewButton = within(dialog).getByRole('button', { name: '사전검증' })
+    expect(previewButton).toBeDisabled()
+    fireEvent.change(amountInput, { target: { value: '52000' } })
+    expect(previewButton).toBeDisabled()
+    fireEvent.change(within(dialog).getByLabelText(/이연 금액 \(원\)/), { target: { value: '210001' } })
+    expect(previewButton).toBeDisabled()
+    const editableAmount = within(dialog).getByLabelText(/이연 금액 \(원\)/)
+    await actions.clear(editableAmount)
+    await actions.type(editableAmount, '60000')
     const planned = within(dialog).getByRole('table', { name: '이연 지급 및 귀속 내역' })
-    expect(planned).toHaveTextContent('2027-10-05')
-    expect(planned).toHaveTextContent('52,000원')
-    expect(within(dialog).queryByLabelText(/금액 \(원\)/)).not.toBeInTheDocument()
+    expect(within(planned).getAllByRole('row')).toHaveLength(4)
+    expect(within(planned).getByLabelText('1번 귀속 내역 귀속금액')).toHaveValue(150000)
+    expect(within(planned).getByLabelText('1번 귀속 내역 귀속일')).toHaveValue('2026-10-25')
+    expect(within(planned).getByLabelText('2번 귀속 내역 귀속일')).toHaveValue('2027-10-05')
+    expect(within(planned).getByLabelText('2번 귀속 내역 귀속금액')).toHaveValue(60000)
+    expect(within(planned).getByLabelText('2번 귀속 내역 귀속금액')).toBeDisabled()
+    expect(within(dialog).getByLabelText(/^지급 관리번호/)).toHaveAttribute('readonly')
+    expect(within(dialog).queryByLabelText(/^금액 \(원\)/)).not.toBeInTheDocument()
     fireEvent.change(dateInput, { target: { value: '2027-11-07' } })
-    expect(within(dialog).getByRole('table', { name: '이연 지급 및 귀속 내역' })).toHaveTextContent('2027-11-07')
-    expect(within(dialog).getByRole('table', { name: '이연 지급 및 귀속 내역' })).toHaveTextContent('2027-11-01')
+    const updatedPlanned = within(dialog).getByRole('table', { name: '이연 지급 및 귀속 내역' })
+    expect(within(updatedPlanned).getByLabelText('2번 귀속 내역 귀속일')).toHaveValue('2027-11-07')
+    expect(within(updatedPlanned).getByLabelText('2번 귀속 내역 귀속월')).toHaveValue('2027-11-01')
+    expect(within(dialog).getByLabelText(/^정산월/)).toHaveValue('2027-11')
+    expect(within(dialog).getByLabelText(/이연 금액 \(원\)/)).toHaveValue(60000)
     await actions.click(within(dialog).getByRole('button', { name: '사전검증' }))
     await waitFor(() => expect(within(dialog).getByRole('button', { name: '이연 저장' })).toBeEnabled())
     fireEvent.change(dateInput, { target: { value: '2027-11-08' } })

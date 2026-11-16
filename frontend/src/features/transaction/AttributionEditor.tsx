@@ -23,6 +23,8 @@ export function AttributionEditor({
   error,
   onChange,
   onAdd,
+  rowLabels,
+  caption = '지급 건에 연결할 계약별 귀속 내역',
 }: {
   rows: AttributionRow[]
   contracts: Contract[]
@@ -36,6 +38,8 @@ export function AttributionEditor({
   error?: { field: string; message: string }
   onChange: (rows: AttributionRow[]) => void
   onAdd: () => void
+  rowLabels?: Record<number, string>
+  caption?: string
 }) {
   const sum = rows.reduce((total, row) => total + (Number(row.amount) || 0), 0)
   const difference = (Number(amount) || 0) - sum
@@ -50,7 +54,7 @@ export function AttributionEditor({
     'aria-describedby': error?.field === `attr-${row.key}-${field}` ? 'err-attributions' : undefined,
   })
   const columns: TableColumn<AttributionRow>[] = [
-    { key: 'index', label: '#', width: '2.5rem', render: (row) => rows.indexOf(row) + 1 },
+    { key: 'index', label: rowLabels ? '구분' : '#', width: rowLabels ? '6rem' : '2.5rem', render: (row) => rowLabels?.[row.key] ?? rows.indexOf(row) + 1 },
     { key: 'scope', label: '귀속 범위', width: '6rem', render: () => (newcomer ? '설계사' : '계약') },
     {
       key: 'contract',
@@ -234,7 +238,7 @@ export function AttributionEditor({
         </Button>
       </header>
       <DataTable
-        caption="지급 건에 연결할 계약별 귀속 내역"
+        caption={caption}
         className="transaction-attribution-table"
         viewportClassName="transaction-attribution-viewport"
         bodyId="attr-body"

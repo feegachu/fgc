@@ -125,7 +125,7 @@ public class ExceptionPaymentCorrectionService {
                 : reco != null && "ACTUAL_MISSING".equals(reco.resultType()) ? ExceptionActionType.RECONCILE_AGAIN
                 : "RECONCILIATION_MISMATCH".equals(source.type()) ? ExceptionActionType.CORRECT : inferAction(old, request.payment());
         String reason = correctionReason(type, old, request.payment());
-        if ("DEFER".equals(request.plannedAction())) reason += " 초과분 " + request.deferredAmount() + "원 이연 예정일 " + request.deferredPaymentDate();
+        if ("DEFER".equals(request.plannedAction())) reason += " 이연액 " + request.deferredAmount() + "원 이연 예정일 " + request.deferredPaymentDate();
         if (reco != null && "AMOUNT_DIFFERENCE".equals(reco.resultType())) {
             reason += " " + ("SETTLEMENT_COMPLETED".equals(request.correctionMode())
                     ? "추가 송금 및 반환 확인: " + request.settlementEvidence().trim() : "기록 오류 정정");
@@ -187,10 +187,10 @@ public class ExceptionPaymentCorrectionService {
                     date, body.paymentStage(), body.allocationPolicyVersion(), List.of(new CommissionPaymentAttributionRequest(a.contractId(),
                     date, request.deferredAmount(),
                     settlementSupport ? InclusionDecisionStatus.REVIEW_REQUIRED : a.inclusionDecisionStatus(), a.exclusionType(),
-                    "계약 2차년도 이후 초과분 이연", a.allocationBasis(), a.evidenceRef(),
+                    "계약 2차년도 이후 지급 이연", a.allocationBasis(), a.evidenceRef(),
                     settlementSupport ? AttributionMethod.DEFERRED_CONTRACT : a.attributionMethod())),
-                    body.evidenceRef(), "예외 " + id + "의 초과분 이연 원 지급 " + old.paymentId()));
-            reason += " 초과분 " + request.deferredAmount() + "원 → " + date + " 지급 초안 " + deferred.paymentId();
+                    body.evidenceRef(), "예외 " + id + "의 이연 원 지급 " + old.paymentId()));
+            reason += " 이연액 " + request.deferredAmount() + "원 → " + date + " 지급 초안 " + deferred.paymentId();
             audit.record(AuditLogService.AuditEvent.builder().actionCode("EXCEPTION_PAYMENT_DEFERRED").entityType("EXCEPTION_CASE")
                     .entityId(id.toString()).userId(actor).after(Map.of("deferredPaymentId", deferred.paymentId(), "amount", request.deferredAmount(), "date", date))
                     .reason(reason).build());
@@ -382,10 +382,19 @@ public class ExceptionPaymentCorrectionService {
             var old = payments.get(request.paymentId());
             if (request.payment().amount().compareTo(old.amount()) >= 0) throw invalid("plannedAction");
             if ("DEFER".equals(request.plannedAction()) && (request.deferredAmount() == null || request.deferredAmount().signum() <= 0
+                    || request.deferredAmount().compareTo(old.amount()) > 0
                     || request.deferredPaymentDate() == null || request.payment().attributions().size() != 1
                     || request.payment().amount().add(request.deferredAmount()).compareTo(old.amount()) != 0
                     || repository.deferrableFrom(source.contractId()) == null
                     || request.deferredPaymentDate().isBefore(repository.deferrableFrom(source.contractId())))) throw invalid("deferredPayment");
+            if ("DEFER".equals(request.plannedAction())) {
+                var scope = repository.capScope(source.id());
+                var cap = scope == null ? null : capChecks.findDetail(scope.checkId()).orElseThrow().capCheck();
+                if (cap == null || cap.includedAmount() == null || cap.limitAmount() == null
+                        || request.deferredAmount().compareTo(BigDecimal.valueOf(Math.max(0, cap.includedAmount() - cap.limitAmount()))) <= 0) {
+                    throw invalid("deferredAmount");
+                }
+            }
         }
         if (request.paymentId() == null) {
             if (reco == null || !"ACTUAL_MISSING".equals(reco.resultType())) throw invalid("newPaymentNotMissing");
@@ -453,8 +462,9 @@ public class ExceptionPaymentCorrectionService {
             case "missingPaymentScope" -> "누락 지급은 예상 스케줄의 계약, 수령인, 항목, 회차, 정산월 및 금액에 맞춰 등록하세요.";
             case "correctionMode" -> "기록 오류 정정인지 실제 지급 차이 정산 후 정정인지 선택하세요.";
             case "settlementEvidence" -> "추가 송금 또는 반환 처리 증빙을 입력하세요.";
-            case "plannedAction" -> "한도 초과 지급의 기존 금액을 줄이고 감액 또는 초과분 이연을 선택하세요.";
+            case "plannedAction" -> "한도 초과 지급의 기존 금액을 줄이고 감액 또는 2차년도 이연을 선택하세요.";
             case "deferredPayment" -> "현재 지급액과 이연액의 합계는 원 지급액이어야 하며, 이연 지급일은 계약 2차년도 이후여야 합니다.";
+            case "deferredAmount" -> "이연 금액은 한도 초과액보다 크고 원 지급액 이하여야 합니다.";
             default -> "예외와 연결된 지급 원천 및 최신 상태를 확인하세요.";
         };
         return new FgcBusinessException(FgcErrorCode.COMMON_002, Map.of("field", field, "reason", reason));

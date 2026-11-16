@@ -1485,9 +1485,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ));
         }
         // 2026-10-13 #477 - 산입 분류(1,200%) 검토필요는 규제 대상 계약에만 걸린다.
-        // 보장성이 아닌 계약은 한도 판정 대상이 아니므로 분류 때문에 확정을 막지 않는다.
+        // 보장성이 아닌 일반 계약은 분류 때문에 막지 않지만, 이연 초안의 근거 검토는 별도로 필요하다.
         // 귀속금액·계약일·배부근거 같은 별도 검사는 그대로 유지한다.
-        if ((data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED && !isOutsideCapScope(data))
+        if ((data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED
+                && (data.attributionMethod() == AttributionMethod.DEFERRED_CONTRACT || !isOutsideCapScope(data)))
                 || (data.contractId() == null && !nonContractNewcomer)) {
             failures.add(new GateFailure(
                     data,

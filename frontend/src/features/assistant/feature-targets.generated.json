@@ -2145,6 +2145,41 @@
     "element": "div"
   },
   {
+    "id": "features.exception.deferred-payment.agent",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.deferred-payment.amount",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.deferred-payment.business-key",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.deferred-payment.cashflow",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.deferred-payment.evidence",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.deferred-payment.item",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.deferred-payment.month",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "input"
+  },
+  {
     "id": "features.exception.deferred-payment.preview",
     "file": "features/exception/DeferredPaymentForm.tsx",
     "element": "Button"
@@ -2153,6 +2188,16 @@
     "id": "features.exception.deferred-payment.save",
     "file": "features/exception/DeferredPaymentForm.tsx",
     "element": "Button"
+  },
+  {
+    "id": "features.exception.deferred-payment.source",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.deferred-payment.stage",
+    "file": "features/exception/DeferredPaymentForm.tsx",
+    "element": "select"
   },
   {
     "id": "features.exception.deferred-payment.summary",
@@ -2343,11 +2388,6 @@
     "id": "features.exception.payment-correction.amount-guide",
     "file": "features/exception/PaymentCorrectionModal.tsx",
     "element": "section"
-  },
-  {
-    "id": "features.exception.payment-correction.basis",
-    "file": "features/exception/PaymentCorrectionModal.tsx",
-    "element": "summary"
   },
   {
     "id": "features.exception.payment-correction.cancel-duplicate",
