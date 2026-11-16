@@ -650,7 +650,7 @@ function Result({
         </div>
       ))}
       <ExcludedList items={ranking.excludedItems} />
-      <section className="cb-table-wrap" aria-label="참고 순위 표">
+      <div className="cb-table-wrap" role="region" aria-label="참고 순위 표">
         <table data-guide-feature="features.agent-home.chatbot.chatbot-modal.compare-table" className="cb-table">
           <caption className="visually-hidden">보험사별 비교 표</caption>
           <thead>
@@ -681,9 +681,13 @@ function Result({
             {items.map((item) => {
               const badge = capBadge(item.capImpactPct, item.carryover)
               return (
-                <tr key={item.offeringId} className={item.rank === 1 ? 'is-top' : undefined} data-guide-feature={item.rank === 1 ? 'features.agent-home.chatbot.chatbot-modal.top-rank' : undefined}>
+                <tr key={item.offeringId} className={item.rank === 1 ? 'is-top' : undefined}>
                   <td className={`rank${item.rank === 1 ? ' top' : ''}`}>
-                    {item.rank === 1 ? <span className="cb-rank-pill">1위</span> : item.rank}
+                    {item.rank === 1 ? (
+                      <span data-guide-feature="features.agent-home.chatbot.chatbot-modal.top-rank" className="cb-rank-pill">1위</span>
+                    ) : (
+                      item.rank
+                    )}
                   </td>
                   <td>
                     <div className="cb-muted">{item.insurer}</div>
@@ -704,21 +708,32 @@ function Result({
                     </StatusBadge>
                   </td>
                   <td>
-                    <button data-guide-feature={item.rank === 1 ? 'features.agent-home.chatbot.chatbot-modal.top-evidence' : 'features.agent-home.chatbot.chatbot-modal.row-evidence'}
-                      type="button"
-                      className={`cb-btn small${item.rank === 1 ? ' primary' : ''}`}
-                      aria-label={`${item.insurer} ${item.product} 근거 보기`}
-                      onClick={() => onEvidence(item)}
-                    >
-                      근거
-                    </button>
+                    {item.rank === 1 ? (
+                      <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.top-evidence"
+                        type="button"
+                        className="cb-btn small primary"
+                        aria-label={`${item.insurer} ${item.product} 근거 보기`}
+                        onClick={() => onEvidence(item)}
+                      >
+                        근거
+                      </button>
+                    ) : (
+                      <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.row-evidence"
+                        type="button"
+                        className="cb-btn small"
+                        aria-label={`${item.insurer} ${item.product} 근거 보기`}
+                        onClick={() => onEvidence(item)}
+                      >
+                        근거
+                      </button>
+                    )}
                   </td>
                 </tr>
               )
             })}
           </tbody>
         </table>
-      </section>
+      </div>
       <p className="cb-note">
         보수적 순수령액 = 한도 반영 수령 예상액 − 환수 노출액(해지 시나리오 가정). 협회 등급은 표시만 하며 순위에
         반영하지 않아요. 기준 보험료는 내 계약의 평균 월납환산 초회보험료({won(ranking.basePremium ?? 0)})예요.
