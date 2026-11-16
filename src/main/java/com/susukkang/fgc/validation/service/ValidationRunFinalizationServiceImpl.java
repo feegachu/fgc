@@ -162,10 +162,10 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
                         "/api/v1/journals/imbalances?validationRunId=" + id),
                 // 조건 3·4는 집계 쿼리와 같은 월(validation_month) 기준으로 조회해야
                 // 미충족 건수와 바로가기 목록이 일치한다(#330). 파라미터는 ISO 날짜(월 1일)다.
-                condition(3, "긴급 미처리 예외가 0건인가",
-                        counts.getUnresolvedCriticalExceptionCount(),
+                condition(3, "미처리 예외가 0건인가",
+                        counts.getUnresolvedExceptionCount(),
                         "/exceptions?validationMonth=" + counts.getValidationMonth()
-                                + "&severity=CRITICAL&status=OPEN"),
+                                + "&status=OPEN"),
                 condition(4, "정책 없음 및 정책 중복이 0건인가",
                         counts.getUnresolvedPolicyExceptionCount(),
                         "/exceptions?validationMonth=" + counts.getValidationMonth()

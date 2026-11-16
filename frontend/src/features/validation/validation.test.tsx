@@ -556,13 +556,14 @@ describe('VRUN-W02 상세·실행·확정', () => {
     expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
   })
 
-  it.each([7, 8])('서버 확정 조건 %i 미충족도 표시하고 확정을 차단한다 (#418)', async (no) => {
+  it.each([3, 7, 8])('서버 확정 조건 %i 미충족도 표시하고 확정을 차단한다 (#418)', async (no) => {
     currentUser = gaAdmin
     const checklist = conditions(true)
-    checklist[no - 1] = { ...checklist[no - 1], passed: false, count: 1 }
+    const label = no === 3 ? '미처리 예외가 0건인가' : `조건 ${no}`
+    checklist[no - 1] = { ...checklist[no - 1], label, passed: false, count: no === 3 ? 2 : 1 }
     detailHandlers(run(), checklist)
     renderAt('/app/validation-runs/7')
-    expect(await screen.findByText(`${no}. 조건 ${no}`, { selector: '.table-cell-preview' })).toBeInTheDocument()
+    expect(await screen.findByText(`${no}. ${label}`, { selector: '.table-cell-preview' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
     expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
   })

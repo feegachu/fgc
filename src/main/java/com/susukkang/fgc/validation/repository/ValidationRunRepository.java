@@ -332,9 +332,9 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                    (SELECT COUNT(*)
                       FROM fgc.exception_case exception
                      WHERE exception.validation_month = vr.validation_month
-                       AND exception.severity = 'CRITICAL'
+                       AND exception.exception_type NOT IN ('ARBITRAGE_CANDIDATE', 'CAP_WARNING')
                        AND exception.status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW'))
-                       AS unresolvedCriticalExceptionCount,
+                       AS unresolvedExceptionCount,
                    (SELECT COUNT(*)
                       FROM fgc.exception_case exception
                      WHERE exception.validation_month = vr.validation_month

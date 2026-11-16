@@ -229,7 +229,7 @@ test('월 검증 생성 및 실행 및 8개 조건 및 GA_ADMIN 확정', async (
   }
   const checklist = await api(page, `/validation-runs/${run.validationRunId}/finalize-checklist`)
   expect(checklist.conditions).toHaveLength(8)
-  // The checked-in seed deliberately produces critical exceptions. Exercise the real gate and the
+  // The checked-in seed deliberately produces unresolved work. Exercise the real gate and the
   // existing review workflow; never change the checklist response or force FINALIZED in SQL.
   expect(checklist.conditions[2].passed).toBe(false)
   await expect(page.getByRole('button', { name: '확정', exact: true })).toBeDisabled()
@@ -248,21 +248,24 @@ test('월 검증 생성 및 실행 및 8개 조건 및 GA_ADMIN 확정', async (
   await expect(page.getByRole('button', { name: '확정', exact: true })).toBeDisabled()
   const pending = await api(
     page,
-    '/exceptions?validationMonth=2026-07-01&severity=CRITICAL&status=OPEN&page=1&size=100',
+    '/exceptions?validationMonth=2026-07-01&status=OPEN&page=1&size=100',
   )
   expect(pending.content.length).toBeGreaterThan(0)
-  await login(page, 'gaadmin', '/exceptions?month=2026-07&severity=CRITICAL&status=OPEN')
+  expect(pending.totalElements).toBe(checklist.conditions[2].count)
+  await login(page, 'gaadmin', '/exceptions?month=2026-07&validationMonth=2026-07-01&status=OPEN')
   for (const item of pending.content) {
     await page
       .getByRole('table', { name: '예외 목록' })
       .getByRole('button', { name: String(item.exceptionCaseId), exact: true })
       .click()
     const detail = page.getByRole('dialog', { name: /^예외 상세/ })
-    await detail.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
-    await detail.getByLabel('처리 사유').fill('월 검증에서 발견한 긴급 예외의 근거를 검토합니다.')
-    const started = responseFor(page, `/exceptions/${item.exceptionCaseId}/actions`)
-    await detail.getByRole('button', { name: '처리 저장', exact: true }).click()
-    expect((await successful(started)).toStatus).toBe('IN_REVIEW')
+    if (item.status !== 'IN_REVIEW') {
+      await detail.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
+      await detail.getByLabel('처리 사유').fill('월 검증에서 발견한 미처리 예외의 근거를 검토합니다.')
+      const started = responseFor(page, `/exceptions/${item.exceptionCaseId}/actions`)
+      await detail.getByRole('button', { name: '처리 저장', exact: true }).click()
+      expect((await successful(started)).toStatus).toBe('IN_REVIEW')
+    }
 
     await detail.getByLabel('검토 메모 및 종결 근거').fill('격리 데모에서 검출 근거를 검토했으며 이 검증의 추가 지급은 승인하지 않음')
     await detail.getByLabel('근거 문서 및 관리번호').fill(`E2E-418-${item.exceptionCaseId}`)

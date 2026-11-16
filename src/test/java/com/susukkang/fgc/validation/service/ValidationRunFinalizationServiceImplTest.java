@@ -65,7 +65,7 @@ class ValidationRunFinalizationServiceImplTest {
         assertThat(response.conditions()).extracting("label").containsExactly(
                 "검증 실행이 계산완료 상태인가",
                 "차변과 대변이 다른 분개가 0건인가",
-                "긴급 미처리 예외가 0건인가",
+                "미처리 예외가 0건인가",
                 "정책 없음 및 정책 중복이 0건인가",
                 "귀속합계 오류가 0건인가",
                 "계약별 상세 합계와 실행 요약 합계가 같은가",
@@ -77,7 +77,7 @@ class ValidationRunFinalizationServiceImplTest {
                 "/validation-runs/44",
                 "/api/v1/journals/imbalances?validationRunId=44",
                 // #330: 조건 3·4는 집계와 같은 월 기준으로 이동해야 건수와 목록이 일치한다
-                "/exceptions?validationMonth=2026-08-01&severity=CRITICAL&status=OPEN",
+                "/exceptions?validationMonth=2026-08-01&status=OPEN",
                 "/exceptions?validationMonth=2026-08-01&types=POLICY_MISSING&types=POLICY_DUPLICATE&status=OPEN",
                 "/transactions?settlementMonth=2026-08&attributionImbalanceOnly=true",
                 "/validation-runs/44",
@@ -201,7 +201,7 @@ class ValidationRunFinalizationServiceImplTest {
     @Test
     void rejectsFinalizationWhenAnyChecklistConditionRemains() {
         FinalizeChecklistCounts counts = passingCounts();
-        counts.setUnresolvedCriticalExceptionCount(3);
+        counts.setUnresolvedExceptionCount(3);
         counts.setCapDetailMismatchCount(1);
         when(validationRunRepository.findByIdForUpdate(44L)).thenReturn(Optional.of(run(ValidationRunStatus.COMPLETED, 8)));
         when(validationRunRepository.findFinalizeChecklistCounts(44L)).thenReturn(Optional.of(counts));

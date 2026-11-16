@@ -722,8 +722,8 @@ def verify(demo, manifest, already_completed=False):
     require(Counter((r['type'], r.get('reasonCode'), r.get('contractNo')) for r in detected) == expected,
             '요청한 시나리오 외 예외가 생겼거나 필요한 예외가 누락됐습니다')
     checklist = demo.s.ok('GET', f'/api/v1/validation-runs/{run}/finalize-checklist')
-    critical = next(c for c in checklist['conditions'] if c['no'] == 3)
-    require(not checklist['passed'] and critical['count'] == 1, f'긴급 예외 차단 실패: {checklist}')
+    open_exceptions = next(c for c in checklist['conditions'] if c['no'] == 3)
+    require(not checklist['passed'] and open_exceptions['count'] == len(detected), f'미처리 예외 차단 실패: {checklist}')
     status, result = demo.admin.call('POST', f'/api/v1/validation-runs/{run}/finalize', {}, idem())
     require(status == 422 and result.get('error', {}).get('code') == 'FGC-VRUN-002', f'실제 확정 API가 차단되지 않았습니다: {status} {result}')
     cap = next(r for r in detected if r['type'] == 'CAP_VIOLATION')

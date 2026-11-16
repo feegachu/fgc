@@ -8,7 +8,7 @@ import { safeInternalLink } from './utils'
 const CONDITIONS = [
   { label: '검증 실행이 계산완료 상태인가', step: 8 },
   { label: '차변과 대변이 다른 분개가 0건인가', step: 6 },
-  { label: '긴급 미처리 예외가 0건인가', step: 8 },
+  { label: '미처리 예외가 0건인가', step: 8 },
   { label: '정책 없음 및 정책 중복이 0건인가', step: 3 },
   { label: '귀속합계 오류가 0건인가', step: 7 },
   { label: '계약별 상세 합계와 실행 요약 합계가 같은가', step: 8 },

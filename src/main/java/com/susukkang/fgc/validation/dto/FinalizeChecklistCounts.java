@@ -17,7 +17,7 @@ public class FinalizeChecklistCounts {
     private LocalDate validationMonth;
     private long incompleteRunCount;
     private long journalImbalanceCount;
-    private long unresolvedCriticalExceptionCount;
+    private long unresolvedExceptionCount;
     private long unresolvedPolicyExceptionCount;
     private long attributionImbalanceCount;
     private long capDetailMismatchCount;
