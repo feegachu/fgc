@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, expect, it, vi } from 'vitest'
 import { apiClient } from '../../lib/api/client'
@@ -31,9 +31,9 @@ it('재조회 실패 시 기존 이력을 보존하고 재시도 후 복구하�
   expect(await screen.findByText(/이전 조회 결과를 표시합니다/)).toBeVisible()
   expect(screen.getByText('신규 계약')).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
-  await screen.findByText('신규 계약')
+  await waitFor(() => expect(screen.queryByText(/이전 조회 결과를 표시합니다/)).not.toBeInTheDocument())
   request.mockRejectedValue(new ApiError({ code: 'FGC-AUTH-003', message: '권한 없음' }, 'status-denied', 403))
   await client.refetchQueries({ queryKey: ['contracts', 'detail', '3', 'status-events'] })
-  expect(await screen.findByText('권한 없음')).toBeVisible()
+  expect(await screen.findByText(/권한 없음/)).toBeVisible()
   expect(screen.queryByText('신규 계약')).not.toBeInTheDocument()
 })

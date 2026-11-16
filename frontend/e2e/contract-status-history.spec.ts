@@ -294,7 +294,9 @@ test('처리 중 자동 재조회에도 상태이력과 화면 스크롤을 유�
   await expect(row).not.toContainText('처리 대기', { timeout: 20_000 })
   await expect(row).not.toContainText('완료')
   expect(await viewport.evaluate((element) => element.scrollLeft)).toBe(scrollLeft)
-  expect(await viewport.evaluate(el => el.scrollTop)).toBeCloseTo(timelineScroll, 0)
+  const refreshedScroll = await viewport.evaluate(el => ({ top: el.scrollTop, max: el.scrollHeight - el.clientHeight }))
+  // 완료 배지를 숨기면 마지막 행이 짧아져 브라우저가 새 최대 스크롤로 보정한다.
+  expect(refreshedScroll.top).toBeCloseTo(Math.min(timelineScroll, refreshedScroll.max), 0)
   await page.screenshot({ path: testInfo.outputPath('status-history-refetched.png') })
   // 처리가 끝나 재조회 안내 줄이 사라진 높이만큼만 달라지고 화면 맨 위로 돌아가지 않는다.
   expect(await page.locator('#main-content').evaluate(el => el.scrollTop)).toBeGreaterThan(pageScroll - 50)
