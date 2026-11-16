@@ -275,8 +275,8 @@
 
 | 현재 상태 | 고를 수 있는 조치 | 결과 |
 |---|---|---|
-| 신규 | `검토 시작` | 검토중 |
-| 신규, 검토중 | `담당 배정`, `의견` | 상태 그대로 |
+| 미처리, 검토대상 | `검토 시작`, `담당 배정` | 검토중 |
+| 미처리, 검토대상, 검토중 | `의견` | 상태 그대로 |
 | 검토중 | `정정`, `감액`, `취소`, `이연`, `재대사`, `해결` | 해결 |
 | 검토중 | `예외 아님`, `반려` | 예외 아님/반려 |
 | 예외 아님/반려 | `재검토 시작` | 검토중 |
@@ -545,7 +545,7 @@ Runbook 절차가 남긴 행위 코드: `DEMO_ACCOUNT_PROTECT`, `BATCH_WATERMARK
 |---|---|---|
 | 계약 | `APPLIED`, `ACTIVE`, `UNPAID`, `LAPSED`, `REVIVED`, `CANCELLED`, `TERMINATED`, `MATURED` | 청약, 정상, 미납, 실효, 부활, 청약철회, 해지, 만기 |
 | 검증 실행 | `CREATED`, `RUNNING`, `COMPLETED`, `FAILED`, `FINALIZED` | 화면정의서 §4-2 |
-| 예외 | `NEW`, `IN_REVIEW`, `RESOLVED`, `REJECTED` | 신규, 검토중, 해결, 예외 아님/반려 |
+| 예외 | `NEW`, `REVIEW_REQUIRED`, `IN_REVIEW`, `RESOLVED`, `REJECTED` | 미처리, 검토대상, 검토중, 해결, 예외 아님/반려 |
 | 실행 유형 | `MONTHLY`, `MANUAL_CONTRACT` | 월간, 계약수동 |
 
 ## 부록 B. 이 기준 커밋에 아직 없는 기능
