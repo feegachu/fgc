@@ -158,6 +158,12 @@ export function Donut({
 const compactWon = (value: number) =>
   value ? new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 }).format(value) : '0'
 
+/** 보험료 눈금 간격을 1·2·2.5·5×10^n 중 가장 가까운 큰 값으로 올린다. */
+function niceStep(raw: number) {
+  const base = 10 ** Math.floor(Math.log10(Math.max(raw, 1)))
+  return ([1, 2, 2.5, 5, 10].find((m) => m * base >= raw) ?? 10) * base
+}
+
 export function Trend({ points }: { points: { month: string; count: number; premium: number }[] }) {
   const { tip, show, hide } = useTip()
   const W = 560
@@ -174,7 +180,9 @@ export function Trend({ points }: { points: { month: string; count: number; prem
   const step = (W - L - R) / points.length
   const y = (v: number) => T + (H - T - B) * (1 - v / top)
   const best = points.reduce((b, p, i) => (p.count > points[b].count ? i : b), 0)
-  const premiumTop = Math.max(1, ...points.map((p) => p.premium))
+  // 오른쪽 보험료 축은 왼쪽 건수 축과 눈금 수를 같게 맞춰 가로 눈금선이 두 축에서 일치하게 한다.
+  const premiumSteps = Math.max(1, ticks.length - 1)
+  const premiumTop = niceStep(Math.max(1, ...points.map((p) => p.premium)) / premiumSteps) * premiumSteps
   const yp = (v: number) => T + (H - T - B) * (1 - v / premiumTop)
   // 처음 그릴 때는 바닥에서 올라오고, 필터를 바꾸면 새 값으로 옮겨 간다.
   const shownCounts = useTween(
@@ -209,9 +217,9 @@ export function Trend({ points }: { points: { month: string; count: number; prem
           </g>
         ))}
         <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="#e2e8f0" />
-        {[premiumTop, 0].map((v) => (
-          <text key={v} x={W - R + 6} y={yp(v) + 3} className="ah-axis ah-axis-premium">
-            {compactWon(v)}
+        {ticks.map((t) => (
+          <text key={t} x={W - R + 6} y={y(t) + 3} className="ah-axis ah-axis-premium">
+            {compactWon((premiumTop * t) / top)}
           </text>
         ))}
         {points.map((p, i) => {

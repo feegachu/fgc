@@ -90,7 +90,7 @@ function renderModal(onClose = vi.fn()) {
 const pickHealth = async () => {
   await userEvent.click(await screen.findByRole('button', { name: /건강보험/ }))
 }
-const result = async () => screen.findByRole('region', { name: '참고 순위 1위' }, { timeout: 9000 })
+const result = async () => screen.findByRole('region', { name: '참고 순위 표' }, { timeout: 9000 })
 // 말풍선마다 붙는 피코 모션 이름(PicoMotion 의 data-pico-motion)
 const motions = () => [...document.querySelectorAll('[data-pico-motion]')].map((el) => el.getAttribute('data-pico-motion'))
 

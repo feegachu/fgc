@@ -777,7 +777,8 @@
 
 .app-main {
   min-width: 0;
-  min-height: calc(100dvh - var(--layout-header-height));
+  /* 푸터가 행에 함께 들어가므로 본문은 남는 높이(1fr)만 채운다. 100dvh 로 고정하면 푸터만큼 화면이 넘쳐 스크롤이 생긴다(#961). */
+  min-height: 0;
   grid-column: 2;
   grid-row: 2;
 }
