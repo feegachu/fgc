@@ -485,6 +485,21 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
 })
 
 
+it('처리 후 근거가 없으면 검출 당시 금액과 당시 지급 상태를 함께 표시한다', async () => {
+  vi.spyOn(apiClient, 'request').mockResolvedValue(envelope({
+    detectedBasis: { ...basis, details: [{ ...basis.details![0], paymentStatus: 'CONFIRMED', paymentStatusSnapshot: 'DRAFT' }] },
+    currentBasis: null, deferredPayments: [],
+  }))
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <MemoryRouter><CapDetailModal capCheckId={11} exceptionCaseId={1} onClose={() => {}} /></MemoryRouter>
+  </QueryClientProvider>)
+  const lines = await screen.findByRole('table', { name: '항목별 산입 내역' })
+  expect(within(lines).getByRole('columnheader', { name: '검출 당시 지급 상태' })).toBeVisible()
+  expect(lines).toHaveTextContent('작성중')
+  expect(within(lines).queryByText('확정')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '처리 후 보기' })).not.toBeInTheDocument()
+})
+
 it.each(['NORMAL', 'NOT_APPLICABLE'] as const)(
   'provides one shared guide target for the %s calculation basis', async (resultStatus) => {
     const data: CapBasis = {

@@ -1,6 +1,7 @@
 package com.susukkang.fgc.reconciliation.service;
 
 import com.susukkang.fgc.common.code.ExceptionActionType;
+import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -102,7 +103,7 @@ public class PaymentCorrectionReconciliationService {
         for (Object value : ids) {
             Object[] row = (Object[]) value;
             Long id = ((Number) row[0]).longValue();
-            if ("NEW".equals(row[1])) exceptions.action(id,
+            if (ExceptionStatus.valueOf((String) row[1]).isInitial()) exceptions.action(id,
                     new ExceptionActionRequest(ExceptionActionType.START_REVIEW, reason, groupKey), actor, login);
             var action = row.length > 2 && "ACTUAL_MISSING".equals(row[2]) ? ExceptionActionType.RECONCILE_AGAIN
                     : row.length > 2 && "DUPLICATE".equals(row[2]) && correctionReason != null && correctionReason.startsWith("중복 지급 기록 취소")

@@ -984,7 +984,7 @@ describe('EXCP-W01 예외함', () => {
     const payment = { commissionTransactionId: 77, sourceType: 'GA_MANUAL_PAYMENT', sourceBusinessKey: 'SETTLE-77',
       status: 'DRAFT', paymentStage: 'GA_TO_FC', contractId: 3, agentId: 1, commissionItemId: 1, commissionItemName: '정착지원금',
       settlementMonth: '2026-10-01', scheduledPaymentDate: '2026-10-25', cashflowType: 'PAYMENT', amount: 210000,
-      updatedAt: '2026-10-25T09:00:00+09:00', evidenceRef: 'DOC-1',
+      updatedAt: '2026-10-25T09:00:00+09:00', evidenceRef: 'DOC-1', allocationPolicyVersion: 77,
       attributions: [{ contractId: 3, attributionDate: '2026-10-25', amount: 210000, inclusionDecisionStatus: 'INCLUDED', attributionMethod: 'SETTLEMENT_SUPPORT_MONTHLY' }] }
     const original = vi.mocked(apiClient.request).getMockImplementation()!
     vi.mocked(apiClient.request).mockImplementation((async (path: string, init: Parameters<typeof apiClient.request>[1] = {}) => {
@@ -998,7 +998,7 @@ describe('EXCP-W01 예외함', () => {
     }) as typeof apiClient.request)
     postResponse = (path, body) => {
       expect(body).toMatchObject({ paymentId: 77, plannedAction: 'DEFER', deferredAmount: 52000, deferredPaymentDate: '2027-11-07',
-        payment: { amount: 158000, scheduledPaymentDate: '2026-10-25', attributions: [{ amount: 158000, attributionDate: '2026-10-25' }] } })
+        payment: { amount: 158000, allocationPolicyVersion: 77, scheduledPaymentDate: '2026-10-25', attributions: [{ amount: 158000, attributionDate: '2026-10-25' }] } })
       if (path.endsWith('/precheck')) return { confirmable: true, capPreview: [], blockers: [] }
       return { payment: { ...payment, amount: 158000 }, resolved: true, message: '이연 완료',
         action: { actionSeq: 2, fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED', actionType: 'DEFER', actionTypeLabel: '이연', toStatusLabel: '해결' } }
@@ -1014,8 +1014,14 @@ describe('EXCP-W01 예외함', () => {
     expect(planned).toHaveTextContent('52,000원')
     expect(within(dialog).queryByLabelText(/금액 \(원\)/)).not.toBeInTheDocument()
     fireEvent.change(dateInput, { target: { value: '2027-11-07' } })
-    expect(planned).toHaveTextContent('2027-11-07')
-    expect(planned).toHaveTextContent('2027-11-01')
+    expect(within(dialog).getByRole('table', { name: '이연 지급 및 귀속 내역' })).toHaveTextContent('2027-11-07')
+    expect(within(dialog).getByRole('table', { name: '이연 지급 및 귀속 내역' })).toHaveTextContent('2027-11-01')
+    await actions.click(within(dialog).getByRole('button', { name: '사전검증' }))
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '이연 저장' })).toBeEnabled())
+    fireEvent.change(dateInput, { target: { value: '2027-11-08' } })
+    expect(within(dialog).getByRole('button', { name: '이연 저장' })).toBeDisabled()
+    fireEvent.change(dateInput, { target: { value: '2027-11-07' } })
+    expect(within(dialog).getByRole('button', { name: '이연 저장' })).toBeDisabled()
     await actions.click(within(dialog).getByRole('button', { name: '사전검증' }))
     await waitFor(() => expect(within(dialog).getByRole('button', { name: '이연 저장' })).toBeEnabled())
     await actions.click(within(dialog).getByRole('button', { name: '이연 저장' }))

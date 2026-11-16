@@ -1147,13 +1147,13 @@ LEDG-W01에서 [역분개 + 재기표]
 ## 제41조 예외 상태
 
 ```text
-NEW ──START_REVIEW──▶ IN_REVIEW ──RESOLVE──▶ RESOLVED
+NEW / REVIEW_REQUIRED ──ASSIGN 또는 START_REVIEW──▶ IN_REVIEW ──RESOLVE──▶ RESOLVED
                          │
                          └──REJECT / FALSE_POSITIVE──▶ REJECTED ──REOPEN──▶ IN_REVIEW
-(화살표 위 글자는 조치, 상자는 상태. ASSIGN·COMMENT는 상태를 바꾸지 않는다)
+(화살표 위 글자는 조치, 상자는 상태. COMMENT는 상태를 바꾸지 않으며 ASSIGN은 초기 상태를 검토중으로 바꾼다)
 ```
 
-상태는 `NEW`·`IN_REVIEW`·`RESOLVED`·`REJECTED` 네 개다. `REOPEN`은 상태가 아니라 조치다(`ExceptionStatus`, `ExceptionActionType`).
+상태는 `NEW`(미처리)·`REVIEW_REQUIRED`(검토대상)·`IN_REVIEW`(검토중)·`RESOLVED`(해결)·`REJECTED`(반려) 다섯 개다. 긴급·높음은 NEW, 나머지는 REVIEW_REQUIRED로 시작한다. `REOPEN`은 상태가 아니라 조치다(`ExceptionStatus`, `ExceptionActionType`).
 
 상태변경에는 처리사유가 필수다.
 
@@ -1760,3 +1760,12 @@ DRAFT ──▶ ACTIVE    : DB가 막는다(SRC-049)
 - 독립보험대리점 수수료 관리·정산 관련 공개특허
 - 금융위원회 2026-01-14, 2026-06-30 공식 보도자료
 - 마이데이터 보험업권 정보제공 API 규격(계약 필드명 참고용)
+
+
+## 2026-11-16 사용자 요청 가상 GA 이연 시나리오
+
+이 절은 이번 사용자 요청에 따른 **가상 업무 시나리오 변경**이며 REG-20의 법령 해석을 변경하거나 규정 준수를 인정하는 근거가 아니다. 실제 규제 적용 환경에 채택하기 전 정착지원금의 초년도 귀속·산입에 대한 별도 업무·준법 검토가 필요하다.
+
+기존 SETTLEMENT_SUPPORT_MONTHLY와 FIRST_CONTRACT_CARRY_FORWARD의 모집월 귀속 규칙은 유지한다. 사용자가 예외 처리의 DEFER를 명시적으로 선택한 경로에는 별도 DEFERRED_CONTRACT를 기록한다. 이 경로는 원지급액을 현재 지급액과 초과분으로 나누고 초과분을 미확정 초안으로 생성한다. 이연 지급 예정일은 계약일+1년 이상이며, 이연 귀속일은 예정일과 같고 이연 정산월은 해당 날짜의 1일이다. 현재 지급분의 기존 귀속은 바꾸지 않는다. 정착지원금 계열 이연 초안의 산입 판단은 REVIEW_REQUIRED로 남기고 별도 근거 검토 전에는 확정할 수 없다. 자동으로 이연 초안을 확정하거나 송금하지 않는다.
+
+이 명시적 이연은 모집월을 유지하는 단순 지급일 연기와 다르다. 귀속을 2차년도로 옮기므로 현재 초년도 계산에서 이연 초안이 제외되는 동작도 사용자 요청 범위에 포함한다. 따라서 이 동작을 정착지원금의 규제상 산입 제외가 적법하다는 의미로 해석하거나 표시하지 않는다. 원지급·정정 감사기록·이연 초안과 검출 당시 근거를 모두 남겨 검토자가 전후 차이를 확인할 수 있어야 한다.

@@ -88,6 +88,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     // FUN-061·운영정책서 제51조 "지급 건과 계약귀속" — 등록·수정·확정과 같은 트랜잭션에서 감사행을 남긴다.
     // after JSON 에 지급단계·포함/제외 판단·정착지원금 귀속·배부정책·증빙(REG-20·22)을 함께 담는다.
     private static final String FIELD = "field";
+    private static final String SCHEDULED_PAYMENT_DATE = "scheduledPaymentDate";
+    private static final String ATTRIBUTION_DATE = "attributionDate";
     private static final String REASON = "reason";
     private static final String REASON_CODE = "reasonCode";
     private static final String AUDIT_ENTITY_TYPE = "COMMISSION_PAYMENT";
@@ -1114,12 +1116,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             LocalDate attributionDate
     ) {
         if (attributionMethod == AttributionMethod.DEFERRED_CONTRACT && !Objects.equals(dueDate, attributionDate)) {
-            invalid("scheduledPaymentDate", "이연 지급 예정일과 귀속일은 같아야 합니다.");
+            invalid(SCHEDULED_PAYMENT_DATE, "이연 지급 예정일과 귀속일은 같아야 합니다.");
         }
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 && dueDate != null
                 && dueDate.isBefore(YearMonth.from(settlementMonth).atDay(1))) {
-            invalid("scheduledPaymentDate", "정착지원금 지급예정일은 모집월(정산월) 1일 이후여야 합니다.");
+            invalid(SCHEDULED_PAYMENT_DATE, "정착지원금 지급예정일은 모집월(정산월) 1일 이후여야 합니다.");
         }
     }
 
@@ -1165,16 +1167,15 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             requireContract(sourceContractId, "contractId");
         }
 
-        // REG-20: 지급일을 이연해도 정착지원금 귀속은 원래 모집월에 남는다.
+        // 일반 정착지원금은 모집월 귀속을 유지한다. DEFERRED_CONTRACT는 별도 가상 GA 이연 시나리오다.
         if (attributionMethod == AttributionMethod.DEFERRED_CONTRACT
-                && (attributionDate.isBefore(target.contractDate().plusYears(1))
-                || !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)))) {
-            invalid("attributionDate", "이연 귀속일은 계약일 1년 뒤부터 가능하며 정산월과 귀속월이 같아야 합니다.");
+                && invalidDeferredAttribution(target.contractDate(), attributionDate, settlementMonth)) {
+            invalid(ATTRIBUTION_DATE, "이연 귀속일은 계약일 1년 뒤부터 가능하며 정산월과 귀속월이 같아야 합니다.");
         }
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 && (!YearMonth.from(target.contractDate()).equals(YearMonth.from(settlementMonth))
                 || !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)))) {
-            invalid("attributionDate", "정착지원금은 모집월(정산월)의 신계약에 실제 귀속해야 합니다.");
+            invalid(ATTRIBUTION_DATE, "정착지원금은 모집월(정산월)의 신계약에 실제 귀속해야 합니다.");
         }
 
         if (attributionMethod == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD) {
@@ -1455,8 +1456,20 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return failures;
     }
 
+    private static boolean invalidDeferredAttribution(LocalDate contractDate, LocalDate attributionDate, LocalDate settlementMonth) {
+        return contractDate != null && attributionDate != null
+                && (attributionDate.isBefore(contractDate.plusYears(1))
+                || settlementMonth != null && !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)));
+    }
+
     private List<GateFailure> attributionFailures(ConfirmationData data) {
         List<GateFailure> failures = new ArrayList<>();
+        if (data.attributionMethod() == AttributionMethod.DEFERRED_CONTRACT
+                && invalidDeferredAttribution(data.contractDate(), data.attributionDate(), data.scheduledPaymentDate())) {
+            failures.add(new GateFailure(data, ExceptionType.DATA_QUALITY, "HIGH",
+                    "이연 귀속일 확인 필요", "이연 귀속일은 계약일 1년 뒤부터 가능하며 정산월과 귀속월이 같아야 합니다.",
+                    FgcErrorCode.TRAN_008, Map.of()));
+        }
         boolean nonContractNewcomer = isNonContractNewcomerAttribution(data);
         if (data.attributedAmount() == null
                 || (data.contractId() == null
@@ -1560,9 +1573,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
               Map.of(
                   REASON_CODE,
                   CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
-                  "attributionDate",
+                  ATTRIBUTION_DATE,
                   data.attributionDate().toString(),
-                  "scheduledPaymentDate",
+                  SCHEDULED_PAYMENT_DATE,
                   paymentDate,
                   "firstYearEndExclusive",
                   data.contractDate().plusMonths(12).toString())));
@@ -1821,7 +1834,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .filter(row -> Objects.equals(row.contractId(), data.contractId()) && row.paymentStage() == data.paymentStage())
                 .map(row -> Map.of("transactionAttributionId", row.transactionAttributionId(),
                         "classification", "EXCLUDED", "signedAmount", row.excludedAmount(),
-                        "attributionDate", row.attributionDate().toString(),
+                        ATTRIBUTION_DATE, row.attributionDate().toString(),
                         "firstYearStartInclusive", row.firstYearStartInclusive().toString(),
                         "firstYearEndExclusive", row.firstYearEndExclusive().toString(),
                         REASON_CODE, row.reasonCode(), REASON, row.reason())).toList());
@@ -1862,7 +1875,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         Map<String, Object> candidate = new LinkedHashMap<>();
         candidate.put("transactionAttributionId", row.transactionAttributionId());
     candidate.put(
-        "attributionDate", row.attributionDate() == null ? null : row.attributionDate().toString());
+        ATTRIBUTION_DATE, row.attributionDate() == null ? null : row.attributionDate().toString());
     candidate.put("amount", row.attributedAmount() == null ? null : roundedAttributedAmount(row));
         candidate.put("cashflowType", row.cashflowType());
         candidate.put("classification", row.inclusionDecisionStatus());

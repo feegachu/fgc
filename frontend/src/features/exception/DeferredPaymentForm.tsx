@@ -29,6 +29,7 @@ function DeferredPaymentEditor({ payment, date, earliestDate, excess, contractNo
     const reduced = { ...payment, amount: currentAmount, attributions: payment.attributions!.map(row => ({ ...row, amount: currentAmount })) }
     const payload = buildPayload(initialForm(payment.settlementMonth?.slice(0, 7) ?? '', reduced), draftRows(reduced), false)
     payload.scheduledPaymentDate = payment.scheduledPaymentDate ?? payload.scheduledPaymentDate
+    payload.allocationPolicyVersion = payment.allocationPolicyVersion ?? null
     // 현재 지급분의 귀속은 보존한다. 상단 날짜는 별도로 생성할 초과분 지급과 귀속에만 적용한다.
     payload.attributions[0].inclusionDecisionReason = payment.attributions![0].inclusionDecisionReason ?? payload.attributions[0].inclusionDecisionReason
     return payload

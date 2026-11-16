@@ -1,9 +1,8 @@
 ALTER TABLE fgc.cap_check_detail ADD COLUMN payment_status_snapshot varchar(20)
     CHECK (payment_status_snapshot IN ('DRAFT', 'CONFIRMED', 'CANCELLED'));
 
-UPDATE fgc.cap_check_detail d SET payment_status_snapshot = p.status
-FROM fgc.transaction_attribution a JOIN fgc.commission_transaction p USING (commission_transaction_id)
-WHERE a.transaction_attribution_id = d.transaction_attribution_id;
+-- 기존 행은 당시 지급 상태를 복원할 수 없으므로 NULL(미기록)로 남긴다.
+-- 확정 실행 결과는 불변이며, 현재 지급 상태를 과거 스냅샷으로 백필하지 않는다.
 
 CREATE FUNCTION fgc.snapshot_cap_detail_payment_status() RETURNS trigger
 LANGUAGE plpgsql SET search_path=fgc,pg_temp AS $$

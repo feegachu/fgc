@@ -82,7 +82,7 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.data.recentExceptions[0].severity").value("CRITICAL"))
                 .andExpect(jsonPath("$.data.recentExceptions[0].severityLabel").value("긴급"))
                 .andExpect(jsonPath("$.data.recentExceptions[0].status").value("NEW"))
-                .andExpect(jsonPath("$.data.recentExceptions[0].statusLabel").value("신규"))
+                .andExpect(jsonPath("$.data.recentExceptions[0].statusLabel").value("미처리"))
                 .andExpect(jsonPath("$.data.recentRuns[0].validationRunId").value(100))
                 .andExpect(jsonPath("$.data.recentRuns[0].currentStep").value(8))
                 .andExpect(jsonPath("$.data.recentRuns[0].status").value("COMPLETED"))

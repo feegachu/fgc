@@ -6,6 +6,8 @@ it('0원의 원인을 계약 상태로 단정하지 않고 서버가 분류한 �
   expect(reconciliationExplanation({ expectedTotalAmount: 0, actualTotalAmount: 650000, resultType: 'INVALID_CONTRACT_PAYMENT' })).toBe('')
   expect(reconciliationExplanation({ expectedTotalAmount: 0, actualTotalAmount: 650000, resultType: 'EXPECTED_MISSING' })).toContain('지급 스케줄과 적용 정책도 확인')
   expect(reconciliationExplanation({ expectedTotalAmount: 0, actualTotalAmount: 0, resultType: 'MATCHED' })).toBe('예상 지급액과 실제 지급 자료가 일치합니다.')
+  expect(reconciliationExplanation({ expectedTotalAmount: 0, resultType: 'ACTUAL_MISSING' })).toContain('실제 지급 자료가 없습니다')
+  expect(reconciliationExplanation({ expectedTotalAmount: 0, resultType: 'DUPLICATE' })).toContain('중복으로 기록')
 })
 
 it('금액 차이도 별도 설명 없이 금액 카드로 표시한다', () => {

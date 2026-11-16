@@ -645,7 +645,7 @@ class DashboardServiceIntegrationTest {
         assertThat(recent.get(1)).usingRecursiveComparison()
                 .withComparatorForType(OffsetDateTime.timeLineOrder(), OffsetDateTime.class)
                 .isEqualTo(new RecentExceptionRow(withoutContract, "DATA_QUALITY", "INFO",
-                        null, "dashboard test", "NEW", createdAt));
+                        null, "dashboard test", "REVIEW_REQUIRED", createdAt));
     }
 
     @Test

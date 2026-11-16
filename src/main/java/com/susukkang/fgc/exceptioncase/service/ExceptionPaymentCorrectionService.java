@@ -184,9 +184,9 @@ public class ExceptionPaymentCorrectionService {
             deferred = payments.create(new CommissionPaymentCreateRequest("GA_MANUAL_PAYMENT", "EXCP:" + id + ":DEFER:" + old.paymentId(),
                     body.contractId(), body.agentId(), body.commissionItemId(), request.deferredAmount(),
                     date.withDayOfMonth(1), body.cashflowType(),
-                    date, body.paymentStage(), null, List.of(new CommissionPaymentAttributionRequest(a.contractId(),
+                    date, body.paymentStage(), body.allocationPolicyVersion(), List.of(new CommissionPaymentAttributionRequest(a.contractId(),
                     date, request.deferredAmount(),
-                    a.inclusionDecisionStatus(), a.exclusionType(),
+                    settlementSupport ? InclusionDecisionStatus.REVIEW_REQUIRED : a.inclusionDecisionStatus(), a.exclusionType(),
                     "계약 2차년도 이후 초과분 이연", a.allocationBasis(), a.evidenceRef(),
                     settlementSupport ? AttributionMethod.DEFERRED_CONTRACT : a.attributionMethod())),
                     body.evidenceRef(), "예외 " + id + "의 초과분 이연 원 지급 " + old.paymentId()));

@@ -126,7 +126,7 @@ test('필터 URL, 계산근거 및 Escape 닫기 및 딥링크를 확인한다',
   await expect(lines.locator('tfoot')).toContainText('초과액 50,000원')
   await expect(lines.locator('.cap-react-detail-excess')).toHaveCSS('color', 'rgb(185, 28, 28)')
   await expect(lines.locator('.cap-react-detail-excess')).toHaveCSS('font-weight', '700')
-  await expect(lines.locator('.cap-react-detail-totals')).toHaveCSS('justify-content', 'flex-start')
+  await expect(lines.locator('.cap-react-detail-totals')).toHaveCSS('justify-content', /^(flex-start|flow-start|start)$/)
   await page.screenshot({ path: '../output/settlement-cap-detail.png', fullPage: true })
   await expect(dialog.getByRole('link', { name: '예외 목록 보기' })).toHaveAttribute('href', '/exceptions')
   await page.keyboard.press('Escape')

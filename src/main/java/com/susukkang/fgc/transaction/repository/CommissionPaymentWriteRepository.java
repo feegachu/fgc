@@ -57,6 +57,10 @@ public class CommissionPaymentWriteRepository {
                     UNION ALL
                     SELECT 1 FROM fgc.payment_hold WHERE commission_transaction_id = :id
                     UNION ALL
+                    SELECT 1 FROM fgc.audit_log
+                    WHERE entity_type = 'EXCEPTION_CASE' AND action_code = 'EXCEPTION_PAYMENT_DEFERRED'
+                      AND after_value->>'deferredPaymentId' = CAST(:id AS text)
+                    UNION ALL
                     SELECT 1 FROM fgc.journal_header
                     WHERE source_entity_type = 'COMMISSION_TRANSACTION' AND source_entity_id = CAST(:id AS text)
                     UNION ALL

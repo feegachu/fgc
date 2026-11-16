@@ -214,6 +214,11 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
           onChange={event => { setReceiptConfirmed(event.target.checked); useUnsavedWorkStore.getState().mark(scope + 'workflow', event.target.checked) }} />보험사 명세 및 입금 확인 완료</label>}
         {!context.data.scheduledBasis && ['CAP_WARNING', 'CAP_VIOLATION', 'CAP_REVIEW_REQUIRED'].includes(item.type ?? '') && payment && <section data-guide-feature="features.exception.payment-correction.defer-guide" className="exception-correction-workflow">
           <Field label="감액 및 이연 구분"><select data-guide-feature="features.exception.payment-correction.planned-action" className="select-control" value={plannedAction} disabled={pending} onChange={event => {
+            const formDirty = Object.keys(useUnsavedWorkStore.getState().owners).some(owner => owner.startsWith(scope) && owner !== scope + 'workflow')
+            if ((event.target.value === 'DEFER') !== (plannedAction === 'DEFER') && formDirty) {
+              toast('작성 중인 지급 수정이 있습니다. 저장하거나 입력을 버린 뒤 이연으로 전환하세요.', 'warning')
+              return
+            }
             setPlannedAction(event.target.value)
             if (event.target.value === 'DEFER') setDeferredDate(context.data?.deferrableFrom ?? '')
             useUnsavedWorkStore.getState().mark(scope + 'workflow', true)

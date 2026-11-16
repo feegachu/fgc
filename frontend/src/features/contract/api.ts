@@ -144,7 +144,14 @@ const contractTabQuery = <T>(id: string, tab: string, suffix = `/${tab}`, extraK
     enabled: Boolean(id),
     meta: { errorToast: false },
   })
-export const contractEventsQuery = (id: string) => contractTabQuery<ContractStatusEvent[]>(id, 'status-events')
+export const contractEventsQuery = (id: string) => queryOptions({
+  ...contractTabQuery<ContractStatusEvent[]>(id, 'status-events'),
+  queryFn: async ({ signal }) => {
+    const events = await request<ContractStatusEvent[]>(contractPath(id, '/status-events'), { signal })
+    if (!Array.isArray(events)) throw new Error('계약 상태 이력을 확인할 수 없습니다.')
+    return events
+  },
+})
 export const contractSchedulesQuery = (id: string, paymentStage: string) =>
   contractTabQuery<ContractSchedule>(
     id,

@@ -130,9 +130,9 @@ function ExceptionBasisContent({ data }: { data: ExceptionCapBasis }) {
       <Button data-guide-feature="features.cap.cap-detail-modal.current" variant={detected ? 'secondary' : 'primary'} onClick={() => setDetected(false)}>처리 후 보기</Button>
       <Button data-guide-feature="features.cap.cap-detail-modal.detected" variant={detected ? 'primary' : 'secondary'} onClick={() => setDetected(true)}>검출 당시 보기</Button>
     </div>}
-    <BasisContent data={detected || !current ? data.detectedBasis! : current} historical={detected} />
+    <BasisContent data={detected || !current ? data.detectedBasis! : current} historical={detected || !current} />
     {!detected && !!data.deferredPayments?.length && <section data-guide-feature="features.cap.cap-detail-modal.deferred" className="surface cap-react-detail-lines">
-      <h3>이연 지급 내역 (초년도 산입 합계 제외)</h3>
+      <h3>이연 지급 내역</h3>
       <DataTable caption="이연 지급 내역" rows={data.deferredPayments} rowKey={row => String(row.commissionTransactionId)} columns={[
         { key: 'item', label: '항목', render: row => row.commissionItemName ?? '-' },
         { key: 'amount', label: '이연 금액', align: 'number', render: row => <Amount value={row.amount} /> },

@@ -365,6 +365,15 @@ public class ReconciliationResultRepository {
 
     public List<Long> revisedResultIds(Long resultId, Long runId) {
         return entityManager.createNativeQuery("""
+                WITH RECURSIVE corrected_payments(id) AS (
+                    SELECT a.commission_transaction_id FROM fgc.reconciliation_match m
+                    JOIN fgc.transaction_attribution a USING(transaction_attribution_id)
+                    WHERE m.reconciliation_result_id=:id
+                    UNION
+                    SELECT c.replacement_payment_id FROM fgc.payment_journal_correction c
+                    JOIN corrected_payments p ON c.original_payment_id=p.id
+                    WHERE c.replacement_payment_id IS NOT NULL
+                )
                 SELECT n.reconciliation_result_id FROM fgc.reconciliation_result n
                 JOIN fgc.reconciliation_result old ON old.reconciliation_result_id=:id
                 WHERE n.reconciliation_run_id=:runId
@@ -373,7 +382,11 @@ public class ReconciliationResultRepository {
                       ON (om.schedule_line_id IS NOT NULL AND nm.schedule_line_id=om.schedule_line_id)
                       OR (om.transaction_attribution_id IS NOT NULL AND nm.transaction_attribution_id=om.transaction_attribution_id)
                     WHERE om.reconciliation_result_id=old.reconciliation_result_id
-                      AND nm.reconciliation_result_id=n.reconciliation_result_id))
+                      AND nm.reconciliation_result_id=n.reconciliation_result_id)
+                    OR EXISTS (SELECT 1 FROM fgc.reconciliation_match nm
+                      JOIN fgc.transaction_attribution a USING(transaction_attribution_id)
+                      WHERE nm.reconciliation_result_id=n.reconciliation_result_id
+                        AND a.commission_transaction_id IN (SELECT id FROM corrected_payments)))
                 ORDER BY n.reconciliation_result_id
                 """, Long.class).setParameter("id", resultId).setParameter("runId", runId).getResultList();
     }

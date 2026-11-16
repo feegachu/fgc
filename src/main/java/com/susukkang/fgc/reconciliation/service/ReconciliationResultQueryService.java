@@ -42,12 +42,17 @@ public class ReconciliationResultQueryService {
             int size,
             String sort
     ) {
-        return search(reconciliationRunId, resultType, null, page, size, sort);
+        return searchResults(reconciliationRunId, resultType, null, page, size, sort);
     }
 
     @Transactional(readOnly = true)
     public ReconciliationResultSearchResponse search(long reconciliationRunId, String resultType, Long contractId,
                                                       int page, int size, String sort) {
+        return searchResults(reconciliationRunId, resultType, contractId, page, size, sort);
+    }
+
+    private ReconciliationResultSearchResponse searchResults(long reconciliationRunId, String resultType, Long contractId,
+                                                             int page, int size, String sort) {
         if (contractId != null && contractId <= 0) throw invalid("contractId");
         validatePage(page, size);
         ListSort listSort = ListSort.parse(sort, ReconciliationResultRepository.RESULT_SORT_KEYS,
@@ -76,6 +81,10 @@ public class ReconciliationResultQueryService {
 
     @Transactional(readOnly = true)
     public ReconciliationResultDetailResponse get(long reconciliationResultId) {
+        return readDetail(reconciliationResultId);
+    }
+
+    private ReconciliationResultDetailResponse readDetail(long reconciliationResultId) {
         ReconciliationResultDetailRow row = reconciliationResultRepository.findDetail(reconciliationResultId);
         if (row == null) {
             throw notFound(reconciliationResultId);
@@ -88,10 +97,10 @@ public class ReconciliationResultQueryService {
 
     @Transactional(readOnly = true)
     public ReconciliationResultBasisResponse basis(long resultId) {
-        var detected = get(resultId);
+        var detected = readDetail(resultId);
         var runId = reconciliationResultRepository.latestRevisionRun(resultId);
         var current = runId == null ? List.<ReconciliationResultDetailResponse>of()
-                : reconciliationResultRepository.revisedResultIds(resultId, runId).stream().map(this::get).toList();
+                : reconciliationResultRepository.revisedResultIds(resultId, runId).stream().map(this::readDetail).toList();
         return new ReconciliationResultBasisResponse(detected, runId, current);
     }
 

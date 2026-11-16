@@ -88,16 +88,17 @@ function jobNotes(job: FollowUpJob) {
   }
 }
 
-function FollowUpStatus({ event }: { event: ContractStatusEvent }) {
+function FollowUpStatus({ event, hideCompleted = false }: { event: ContractStatusEvent; hideCompleted?: boolean }) {
   const jobs = event.followUp?.jobs ?? []
+  const showBadge = !hideCompleted || !['NOT_REQUIRED', 'SUCCEEDED'].includes(event.followUp?.status ?? '')
   return (
     <>
-      <StatusBadge
+      {showBadge && <StatusBadge
         optionCount={Object.keys(eventFollowUpLabels).length}
         tone={followUpTones[event.followUp?.status ?? ''] ?? 'neutral'}
       >
         {responseLabel(eventFollowUpLabels, event.followUp?.status)}
-      </StatusBadge>
+      </StatusBadge>}
       {jobs.flatMap((job) =>
         jobNotes(job).map((note) => (
           <span className="contract-follow-up-note" key={`${job.job}-${note}`}>
@@ -286,6 +287,7 @@ export function ContractStatusHistory({ id, compact = false }: { id: string; com
               </div>
               <time dateTime={event.effectiveAt}>{dateTime(event.effectiveAt)}</time>
               <span>{reasonText(event)}</span>
+              <FollowUpStatus event={event} hideCompleted />
             </li>)}
             {previewCount !== null && <li className="contract-history-demo-label"><span>도움말 예시</span></li>}
             {['미납', '실효', '해지'].slice(0, previewCount ?? 0).map((status, index) => {
