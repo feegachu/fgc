@@ -10,7 +10,7 @@ function insertOpenExceptions(count: number) {
 
 test('FUN-080 home: 미처리 숫자를 누르면 같은 건수의 예외함이 열린다', async ({ page }) => {
   insertOpenExceptions(3)
-  const expected = Number(sql("SELECT count(*) FROM fgc.exception_case WHERE status IN ('NEW','IN_REVIEW')"))
+  const expected = Number(sql("SELECT count(*) FROM fgc.exception_case WHERE status IN ('NEW','REVIEW_REQUIRED','IN_REVIEW')"))
   expect(expected).toBeGreaterThanOrEqual(3)
 
   await login(page, 'settle01', '/?month=2026-07')

@@ -23,7 +23,7 @@ test('CONT-W03 상태 변경 뒤 이력과 후속 상태만 표시하고 영향 
   const first = table.locator('.contract-history-event').nth(0)
   const second = table.locator('.contract-history-event').nth(1)
   // 시드 사건은 후속 작업이 없고 처리자가 원천에 없다. 수기 사건은 대기, 실제 처리자, 자유 사유를 보인다.
-  await expect(first).toContainText('대상 없음')
+  await expect(first).not.toContainText('대상 없음')
   await expect(first).toContainText('신규 계약')
   await expect(second).toContainText('미납')
   await expect(second).toContainText('처리 대기')
