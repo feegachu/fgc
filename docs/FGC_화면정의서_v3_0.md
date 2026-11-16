@@ -1820,7 +1820,7 @@ FGC — 설계사
 | --- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | 검증 실행이 계산완료 상태인가               | `validation_run.status='COMPLETED' AND current_step=8`                                                                                                |
 | 2   | 차변과 대변이 다른 분개가 0건인가           | `vw_journal_imbalance` ⋈ `journal_header` **WHERE `validation_run_id`**                                                                               |
-| 3   | 미처리 예외가 0건인가                       | 같은 검증월의 미처리 업무: `NEW`·`REVIEW_REQUIRED`·`IN_REVIEW`, 심각도 제한 없음. 미처리 카드와 동일하게 별도 모니터링 유형 `CAP_WARNING`·`ARBITRAGE_CANDIDATE`는 제외하며 대사 불일치는 포함한다. |
+| 3   | 미처리 예외가 0건인가                       | 같은 검증월의 미처리 업무: `NEW`·`REVIEW_REQUIRED`·`IN_REVIEW`, 심각도 제한 없음. 미처리 카드와 동일하게 별도 모니터링 유형 `CAP_WARNING`·`ARBITRAGE_CANDIDATE`는 제외하며 대사 불일치와 기존 `JOURNAL_CORRECTION_REQUIRED`는 포함한다. 월별 예외 바로가기 목록도 같은 범위를 표시한다. |
 | 4   | 정책 없음 및 정책 중복이 0건인가             | `exception_case.exception_type IN ('POLICY_MISSING','POLICY_DUPLICATE')`                                                                              |
 | 5   | 귀속합계 오류가 0건인가                     | `vw_transaction_attribution_balance` ⋈ `commission_transaction` **WHERE `settlement_month` = 검증월**                                                 |
 | 6   | 계약별 상세 합계와 실행 요약 합계가 같은가  | `cap_check.included_amount` vs `SUM(cap_check_detail.amount WHERE INCLUDED)`                                                                          |

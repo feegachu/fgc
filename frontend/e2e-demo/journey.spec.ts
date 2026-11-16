@@ -207,6 +207,8 @@ test('한도 초과 거절 → 예외함 조치 → CAP 계산근거', async ({ 
 })
 
 test('월 검증 생성 및 실행 및 8개 조건 및 GA_ADMIN 확정', async ({ page }) => {
+  // 긴급 3건뿐 아니라 해당 월의 모든 미처리 업무를 UI에서 검토한다.
+  test.setTimeout(300_000)
   await login(page, 'settle01', '/validation-runs?month=2026-07')
   const created = responseFor(page, '/validation-runs')
   await page.getByRole('button', { name: '실행 생성' }).click()
@@ -254,10 +256,8 @@ test('월 검증 생성 및 실행 및 8개 조건 및 GA_ADMIN 확정', async (
   expect(pending.totalElements).toBe(checklist.conditions[2].count)
   await login(page, 'gaadmin', '/exceptions?month=2026-07&validationMonth=2026-07-01&status=OPEN')
   for (const item of pending.content) {
-    await page
-      .getByRole('table', { name: '예외 목록' })
-      .getByRole('button', { name: String(item.exceptionCaseId), exact: true })
-      .click()
+    // 전체 업무는 여러 페이지에 걸칠 수 있다. 목록과 같은 월/상태를 유지한 실제 상세 URL로 연다.
+    await page.goto(`/exceptions?month=2026-07&validationMonth=2026-07-01&status=OPEN&selected=${item.exceptionCaseId}`)
     const detail = page.getByRole('dialog', { name: /^예외 상세/ })
     if (item.status !== 'IN_REVIEW') {
       await detail.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')

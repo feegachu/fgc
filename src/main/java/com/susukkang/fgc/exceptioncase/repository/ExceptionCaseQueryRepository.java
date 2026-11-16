@@ -300,7 +300,9 @@ public class ExceptionCaseQueryRepository {
     private String buildWhere(ExceptionCaseSearchDTO criteria, List<ExceptionStatus> statuses,
                               Map<String, Object> parameters) {
         StringBuilder where = new StringBuilder(" WHERE 1 = 1");
-        if (criteria.getType() != com.susukkang.fgc.common.code.ExceptionType.JOURNAL_CORRECTION_REQUIRED) {
+        // 월 확정 바로가기는 같은 달의 모든 미처리 업무를 보여야 하므로 기존 원장 정정도 포함한다.
+        if (criteria.getType() != com.susukkang.fgc.common.code.ExceptionType.JOURNAL_CORRECTION_REQUIRED
+                && criteria.getValidationMonth() == null) {
             where.append(" AND ec.exception_type <> 'JOURNAL_CORRECTION_REQUIRED'");
         }
         append(where, parameters, "ec.exception_type = :type", "type", criteria.getType());
