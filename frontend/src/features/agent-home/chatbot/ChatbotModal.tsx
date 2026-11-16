@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { StatusBadge } from '../../../components/StatusBadge'
-import { rate } from '../../../lib/format'
 import { PicoMotion } from '../mascot/PicoMotion'
 import type { PicoMotionName } from '../mascot/PicoMotion'
 import { askCompare, compareCategoriesQuery, compareExplainQuery, newsHeadlinesQuery, rankCompare } from './api'
@@ -625,7 +624,6 @@ function Result({
   }
   const insurerCount = new Set(items.map((i) => i.insurer)).size
   const warnings = ranking.warnings.filter((w) => WARNING_TEXT[w])
-  const top = items[0]
   const why = heroWhy(items)
   return (
     <>
@@ -652,26 +650,7 @@ function Result({
         </div>
       ))}
       <ExcludedList items={ranking.excludedItems} />
-      <section data-guide-feature="features.agent-home.chatbot.chatbot-modal.top-rank" className="cb-hero" aria-label="참고 순위 1위">
-        <div className="cb-hero-main">
-          <span className="cb-rank-pill">1위</span>
-          <div className="cb-muted">{top.insurer}</div>
-          <div className="cb-hero-name">{top.product}</div>
-          <div className="cb-muted">보수적 순수령액</div>
-          <div className="cb-hero-net">{won(top.conservativeNet)}</div>
-        </div>
-        <dl className="cb-stats">
-          <Stat k="수령 예상" v={won(top.cappedReceipt)} />
-          <Stat k="환수 노출" v={`−${won(top.clawbackExposure)}`} neg />
-          <Stat k="한도 영향" v={top.capImpactPct == null ? '자료 없음' : `${rate(top.capImpactPct)}%`} />
-          <Stat k="협회 등급" v={gradeLabel(top.associationGrade)} />
-        </dl>
-        <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.top-evidence" type="button" className="cb-btn primary" onClick={() => onEvidence(top)}>
-          근거 보기
-        </button>
-        {why && <div className="cb-hero-why">{why}</div>}
-      </section>
-      <div className="cb-table-wrap">
+      <div className="cb-table-wrap" role="region" aria-label="참고 순위 표">
         <table data-guide-feature="features.agent-home.chatbot.chatbot-modal.compare-table" className="cb-table">
           <caption className="visually-hidden">보험사별 비교 표</caption>
           <thead>
@@ -702,11 +681,18 @@ function Result({
             {items.map((item) => {
               const badge = capBadge(item.capImpactPct, item.carryover)
               return (
-                <tr key={item.offeringId}>
-                  <td className={`rank${item.rank === 1 ? ' top' : ''}`}>{item.rank}</td>
+                <tr key={item.offeringId} className={item.rank === 1 ? 'is-top' : undefined}>
+                  <td className={`rank${item.rank === 1 ? ' top' : ''}`}>
+                    {item.rank === 1 ? (
+                      <span data-guide-feature="features.agent-home.chatbot.chatbot-modal.top-rank" className="cb-rank-pill">1위</span>
+                    ) : (
+                      item.rank
+                    )}
+                  </td>
                   <td>
                     <div className="cb-muted">{item.insurer}</div>
                     <div className="name">{item.product}</div>
+                    {item.rank === 1 && why && <div className="cb-top-why">{why}</div>}
                   </td>
                   <td className="r">
                     <b>{won(item.conservativeNet)}</b>
@@ -722,14 +708,25 @@ function Result({
                     </StatusBadge>
                   </td>
                   <td>
-                    <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.row-evidence"
-                      type="button"
-                      className="cb-btn small"
-                      aria-label={`${item.insurer} ${item.product} 근거 보기`}
-                      onClick={() => onEvidence(item)}
-                    >
-                      근거
-                    </button>
+                    {item.rank === 1 ? (
+                      <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.top-evidence"
+                        type="button"
+                        className="cb-btn small primary"
+                        aria-label={`${item.insurer} ${item.product} 근거 보기`}
+                        onClick={() => onEvidence(item)}
+                      >
+                        근거
+                      </button>
+                    ) : (
+                      <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.row-evidence"
+                        type="button"
+                        className="cb-btn small"
+                        aria-label={`${item.insurer} ${item.product} 근거 보기`}
+                        onClick={() => onEvidence(item)}
+                      >
+                        근거
+                      </button>
+                    )}
                   </td>
                 </tr>
               )
@@ -746,15 +743,6 @@ function Result({
         환수율로 계산했어요.
       </p>
     </>
-  )
-}
-
-function Stat({ k, v, neg }: { k: string; v: string; neg?: boolean }) {
-  return (
-    <div className="cb-stat">
-      <dt>{k}</dt>
-      <dd className={neg ? 'neg' : undefined}>{v}</dd>
-    </div>
   )
 }
 

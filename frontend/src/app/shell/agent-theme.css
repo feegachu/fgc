@@ -1,6 +1,4 @@
-/* 설계사 화면은 셸 구성은 같고 포인트 색만 보라색이다(#839). 상단 제목 배치는 따로 둔다. */
-.agent-topbar { display: flex; align-items: stretch; gap: 18px; min-width: 0; height: 100%; }
-.agent-top-title { display: flex; align-items: center; padding-left: 24px; font-size: 16px; font-weight: 700; white-space: nowrap; }
+/* 설계사 화면은 셸 구성은 같고 포인트 색만 보라색이다(#839). */
 
 .app-shell.is-agent[data-ui-revision='after'] {
   --color-fgc-blue: #7f57ac;

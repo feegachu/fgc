@@ -207,6 +207,12 @@
 .cb .cb-table .c { padding-left: 24px; padding-right: 24px; text-align: center; }
 .cb .cb-table .rank { font-size: 14px; font-weight: 800; color: var(--cb-t900); }
 .cb .cb-table .rank.top { color: var(--cb-brand-dark); }
+/* 1위 행: 같은 표 형식에서 크기와 포인트 색만 키워 눈에 띄게 한다(#961). */
+.cb .cb-table tr.is-top td { padding-block: 22px; background: var(--cb-brand-50); border-bottom: 1px solid var(--color-blue-100); font-size: 15px; font-weight: 700; color: var(--cb-t900); }
+/* 한 줄에 끝까지 보이도록 줄바꿈 없이 글자를 줄인다. */
+.cb .cb-table .cb-top-why { margin-top: 6px; font-size: 11px; font-weight: 500; line-height: 1.4; color: var(--cb-brand-dark); white-space: nowrap; }
+.cb .cb-table tr.is-top .name { max-width: 280px; font-size: 17px; font-weight: 800; }
+.cb .cb-table tr.is-top td.r b { font-size: 20px; font-weight: 800; color: var(--cb-brand-dark); }
 .cb .cb-table .name { max-width: 240px; overflow: hidden; font-weight: 600; color: var(--cb-t900); text-overflow: ellipsis; }
 .cb .cb-note { margin: 0; font-size: 12px; line-height: 1.6; color: var(--cb-t500); }
 .cb .cb-btn { padding: 10px 26px; border: 1.5px solid #94a3b8; box-shadow: 0 2px 6px rgb(15 23 42 / 12%); border-radius: var(--radius-full); background: #fff; color: var(--cb-t700); font-size: 13px; font-weight: 600; transition: all 0.15s; }
