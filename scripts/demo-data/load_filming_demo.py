@@ -384,9 +384,10 @@ class FilmingOctoberDemo(OctoberDemo):
             products = NON_LIFE if non_life else LIFE
             product = products[(mon + n // 2) % len(products)]
             premium = PREMIUMS[(mon * 2 + n) % len(PREMIUMS)]
-            if self.variant == 'compact' and getattr(self, 'normal_per_month', 10) == 10 and mon == 10 and n == 1:
-                # 10월 손설계 예정 합계 4,000,000원. 기본/시책수수료의 원 단위 반올림을 반영한다.
-                premium = 99_933.33
+            if self.variant == 'compact' and getattr(self, 'normal_per_month', 10) == 10:
+                # 10월 신규 보험료 720,000원, 예정 수수료 4,000,000원.
+                # 1월 정상 계약의 유지수수료를 500원 줄이고 10월 보험료는 정수로 맞춘다.
+                premium = {(1, 0): 75000, (10, 1): 100000}.get((mon, n), premium)
             contract = self.register(f'SON_{mon:02d}_{n+1:02d}', f'2026-{mon:02d}-{3+n*3:02d}',
                 len(self.manifest['contracts']) + 1, product, premium=premium)
             rows.append({'contractId': contract['contractId'], 'contractNo': contract['contractNo'],
@@ -913,7 +914,14 @@ def main():
             "AND sh.schedule_purpose='OPERATIONAL' AND sh.active_yn AND sl.line_status='PLANNED' "
             "AND sl.due_month='2026-10-01'")
         require(Decimal(son_expected) == Decimal('4000000'), f'손설계 10월 예정 합계 확인 실패: {son_expected}')
+        son_new = db.rows("SELECT count(*) AS count,coalesce(sum(c.monthly_equivalent_first_premium),0) AS premium "
+            "FROM fgc.insurance_contract c JOIN fgc.agent a USING(agent_id) WHERE a.agent_code='A-FC-001' "
+            "AND c.contract_date>='2026-10-01' AND c.contract_date<'2026-11-01'")[0]
+        require(son_new['count'] == 8 and Decimal(str(son_new['premium'])) == Decimal('720000'),
+            f'손설계 10월 신규 계약/보험료 확인 실패: {son_new}')
         demo.manifest['sonOctoberExpectedCommission'] = 4_000_000
+        demo.manifest['sonOctoberNewContractCount'] = 8
+        demo.manifest['sonOctoberMonthlyPremium'] = 720_000
     demo.manifest.update(masterChecksums=masters, normalPerMonth=args.normal_per_month,
         initialState='OCTOBER_COMPLETED_NOVEMBER_NOT_RUN', reviewTargetCount=len(monitoring))
     (output / 'prepared.json').write_text(json.dumps(demo.manifest, ensure_ascii=False, indent=2), encoding='utf-8')

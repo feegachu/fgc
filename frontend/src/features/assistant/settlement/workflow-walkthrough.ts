@@ -170,9 +170,11 @@ function sharedSteps(screen: string): WorkflowExplanation[] {
 }
 
 function menuHandoff(id: string, screen: string, label: string, destination: WorkflowDestination): WorkflowExplanation {
+  const finalConsonant = (label.charCodeAt(label.length - 1) - 0xac00) % 28
+  const direction = finalConsonant > 0 && finalConsonant !== 8 ? '으로' : '로' // ㄹ 받침은 '로'
   return {
     id, selector: '[data-guide-feature="navigation.menu.' + screen + '"]', scope: 'shell',
-    title: label + '로 이어가기', concise: true, destination,
+    title: label + direction + ' 이어가기', concise: true, destination,
     instruction: '왼쪽 사이드바의 ' + label + ' 메뉴를 누르세요.',
     interaction: destination === 'validation-list' ? '선택한 지급 건을 모두 확정한 뒤 월 검증을 진행합니다.' : '이동한 화면의 도움말로 안내를 이어갑니다.',
     presentation: { side: 'right', preserveCardPosition: true, ...(destination === 'validation-list' ? { cardAlign: 'top' as const } : {}) },
