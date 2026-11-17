@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.bank.openbanking.OpenBankingProperties;
 import com.susukkang.fgc.bank.service.BankInquiryStarting;
 import com.susukkang.fgc.bank.service.BankLinkService;
 import java.math.BigDecimal;
@@ -57,6 +58,8 @@ class MockBankControllerIntegrationTest {
     private ApplicationEventPublisher events;
     @Autowired
     private BankLinkService linkService;
+    @Autowired
+    private OpenBankingProperties properties;
     private final ObjectMapper json = new ObjectMapper();
 
     @BeforeEach
@@ -147,11 +150,11 @@ class MockBankControllerIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.rsp_code").value("O0001"));
 
         // 틀린 비밀값으로 시도한 코드는 버린다.
-        mvc.perform(token(code).param("client_secret", "fgc-mock-secret"))
+        mvc.perform(token(code).param("client_secret", properties.clientSecret()))
                 .andExpect(jsonPath("$.rsp_code").value("O0001"));
 
         String second = approvedCode();
-        mvc.perform(token(second).param("client_secret", "fgc-mock-secret"))
+        mvc.perform(token(second).param("client_secret", properties.clientSecret()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.access_token").isString())
                 .andExpect(jsonPath("$.token_type").value("Bearer"))
@@ -159,8 +162,18 @@ class MockBankControllerIntegrationTest {
                 .andExpect(jsonPath("$.refresh_token").isString())
                 .andExpect(jsonPath("$.scope").value("login inquiry"))
                 .andExpect(jsonPath("$.user_seq_no").value("1100000001"));
-        mvc.perform(token(second).param("client_secret", "fgc-mock-secret"))
+        mvc.perform(token(second).param("client_secret", properties.clientSecret()))
                 .andExpect(jsonPath("$.rsp_code").value("O0001"));
+    }
+
+    @Test
+    @DisplayName("비밀값을 넣지 않으면 기동할 때 새로 만든 값을 쓰고, 저장소에 적혀 있던 값으로는 토큰을 주지 않는다")
+    void doesNotAcceptAFixedDefaultSecret() throws Exception {
+        // 저장소가 공개돼 있어, 설정 파일에 고정한 기본값은 비밀이 아니다.
+        assertThat(properties.clientSecret()).isNotEqualTo("fgc-mock-secret").hasSizeGreaterThanOrEqualTo(32);
+
+        mvc.perform(token(approvedCode()).param("client_secret", "fgc-mock-secret"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.rsp_code").value("O0001"));
     }
 
     @Test
@@ -321,7 +334,7 @@ class MockBankControllerIntegrationTest {
     }
 
     private String accessToken() throws Exception {
-        MvcResult result = mvc.perform(token(approvedCode()).param("client_secret", "fgc-mock-secret")).andReturn();
+        MvcResult result = mvc.perform(token(approvedCode()).param("client_secret", properties.clientSecret())).andReturn();
         return json.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8)).path("access_token").asText();
     }
 
