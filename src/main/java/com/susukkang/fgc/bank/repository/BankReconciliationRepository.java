@@ -49,7 +49,7 @@ public class BankReconciliationRepository {
 
     /**
      * 설계사별 확정 지급(GA_TO_FC) 합계에서 확정 차감 합계를 뺀 금액. 0보다 큰 것만 준다.
-     * 지급 건마다 먼저 원 단위로 반올림한 뒤 더한다(운영정책서 제17조의2). 합계를 낸 뒤 반올림하면 1원이 어긋날 수 있다.
+     * 지급 건과 차감 건마다 먼저 원 단위로 반올림한 뒤 합친다(운영정책서 제17조의2). 합계를 낸 뒤 반올림하면 1원이 어긋날 수 있다.
      * 원천징수는 FGC가 다루지 않으므로 빼지 않는다(운영정책서 제36조의2, 가상 GA 정책).
      */
     public List<ExpectedTransfer> findExpectedTransfers(LocalDate settlementMonth) {

@@ -196,14 +196,16 @@ class BankReconciliationServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("소수 금액은 지급 건마다 원 단위로 반올림한 뒤 더한다")
-    void roundsEachPaymentBeforeSumming() {
+    @DisplayName("소수 금액은 지급 건과 차감 건마다 원 단위로 반올림한 뒤 합친다")
+    void roundsEachLineBeforeSumming() {
         finalizeMonth(MARCH, DateUtil.nowSeoul());
         link("settle01");
         Map<String, Object> first = expectedTransfers(MARCH).get(0);
         // 운영정책서 제17조의2: 상세행을 먼저 원 단위로 반올림하고 합계는 그 값을 더한다. 100.50 + 100.50 은 201 이 아니라 202 다.
         confirmedLine((Long) first.get("agent_id"), MARCH, "100.50", "PAYMENT");
         confirmedLine((Long) first.get("agent_id"), MARCH, "100.50", "PAYMENT");
+        // 차감도 건마다 반올림한다. 0.40 은 0 이라 202 그대로다. 차감을 반올림하지 않으면 201.60, 합계를 낸 뒤 반올림하면 201 이 된다.
+        confirmedDeduction((Long) first.get("agent_id"), MARCH, "0.40");
         LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
         when(client.withdrawals(TOKEN, FINTECH_USE_NUM, today, today)).thenReturn(List.of());
 
