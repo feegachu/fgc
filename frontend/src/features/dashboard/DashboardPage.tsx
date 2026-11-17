@@ -50,7 +50,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
     ...dashboardSummaryQueryOptions(month),
     meta: { errorToast: false },
   })
-  const openCounts = useQuery(openExceptionCountsQueryOptions())
+  const openCounts = useQuery(openExceptionCountsQueryOptions(month))
   const summaryReady = !error && !isPending
   const href = (path: string, params: Record<string, string> = {}) => {
     const search = new URLSearchParams(params).toString()
@@ -184,7 +184,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
           '한도 위반 및 대사 불일치 등'
         ),
         tone: 'warning',
-        to: href('/exceptions', { status: OPEN_STATUS }),
+        to: href('/exceptions', { status: OPEN_STATUS, validationMonth: `${month}-01` }),
       },
     ] as const)
 
@@ -293,7 +293,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
       {!revised && (
         <p className="dashboard-basis">
           <span>기준 정산월 {monthText(month)}</span>
-          <span>미처리 예외와 원장 불균형은 정산월과 상관없이 전체 건수입니다.</span>
+          <span>원장 불균형은 정산월과 상관없이 전체 건수입니다.</span>
           {!error && <UpdatedAt at={dataUpdatedAt} />}
         </p>
       )}
