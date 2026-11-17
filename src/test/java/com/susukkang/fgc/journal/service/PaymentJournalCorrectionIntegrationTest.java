@@ -107,7 +107,8 @@ class PaymentJournalCorrectionIntegrationTest {
         }
         assertThat(id("SELECT count(*) FROM fgc.journal_correction_group WHERE original_journal_header_id IN (?,?)", f.oldGaJournal(), f.oldInsurerJournal())).isEqualTo(2);
         assertThat(id("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id=? AND action_type='CORRECT'", f.capException())).isEqualTo(1);
-        assertThatThrownBy(() -> exceptionPayments.recheckSchedule(f.capException(), 1L, "admin")).isInstanceOf(FgcBusinessException.class);
+        Long resolvedExceptionId = f.capException();
+        assertThatThrownBy(() -> exceptionPayments.recheckSchedule(resolvedExceptionId, 1L, "admin")).isInstanceOf(FgcBusinessException.class);
         assertThat(id("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id=? AND action_type='CORRECT'", f.capException())).isEqualTo(1);
     }
 

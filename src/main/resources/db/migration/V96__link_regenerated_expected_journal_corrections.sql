@@ -6,6 +6,8 @@ LANGUAGE plpgsql
 SET search_path = fgc, pg_temp
 AS $$
 DECLARE
+  c_reversal_type CONSTANT varchar(35) := 'REVERSAL';
+  c_posted_status CONSTANT varchar(15) := 'POSTED';
   v_original_id bigint;
   v_original_type varchar(35);
   v_original_source_type varchar(60);
@@ -39,7 +41,7 @@ BEGIN
     RAISE EXCEPTION 'Unknown journal correction group %', NEW.correction_group_key;
   END IF;
 
-  IF NEW.journal_type = 'REVERSAL' THEN
+  IF NEW.journal_type = c_reversal_type THEN
     IF NEW.reversal_of_id IS DISTINCT FROM v_original_id
        OR NEW.source_entity_type <> 'JOURNAL_HEADER'
        OR NEW.source_entity_id <> v_original_id::text
@@ -47,7 +49,7 @@ BEGIN
       RAISE EXCEPTION 'Reversal journal does not match correction group %',
         NEW.correction_group_key;
     END IF;
-    IF v_original_status <> 'POSTED' THEN
+    IF v_original_status <> c_posted_status THEN
       RAISE EXCEPTION 'Original journal % is no longer POSTED', v_original_id;
     END IF;
   ELSE
@@ -90,13 +92,13 @@ BEGIN
                )
                AND NEW.journal_date = replacement_line.due_date
                AND (replacement_header.active_yn OR (
-                 TG_OP = 'UPDATE' AND OLD.status = 'POSTED' AND NEW.status = 'REVERSED'
+                 TG_OP = 'UPDATE' AND OLD.status = c_posted_status AND NEW.status = 'REVERSED'
                  AND EXISTS (
                    SELECT 1 FROM fgc.journal_correction_group successor
                    JOIN fgc.journal_header successor_reversal ON successor_reversal.correction_group_key = successor.correction_group_key
                    WHERE successor.original_journal_header_id = NEW.journal_header_id
                      AND successor_reversal.reversal_of_id = NEW.journal_header_id
-                     AND successor_reversal.journal_type = 'REVERSAL' AND successor_reversal.status = 'POSTED'
+                     AND successor_reversal.journal_type = c_reversal_type AND successor_reversal.status = c_posted_status
                  )
                ))
            )
@@ -113,7 +115,7 @@ BEGIN
                AND pc.replacement_payment_id::text = NEW.source_entity_id
                AND o.status = 'CANCELLED'
                AND (n.status = 'CONFIRMED' OR (
-                 TG_OP = 'UPDATE' AND OLD.status = 'POSTED' AND NEW.status = 'REVERSED'
+                 TG_OP = 'UPDATE' AND OLD.status = c_posted_status AND NEW.status = 'REVERSED'
                  AND n.status = 'CANCELLED' AND EXISTS (
                    SELECT 1 FROM fgc.payment_journal_correction successor
                    JOIN fgc.journal_correction_group next_group
@@ -123,7 +125,7 @@ BEGIN
                    WHERE successor.original_payment_id = n.commission_transaction_id
                      AND next_group.original_journal_header_id = NEW.journal_header_id
                      AND next_reversal.reversal_of_id = NEW.journal_header_id
-                     AND next_reversal.journal_type = 'REVERSAL' AND next_reversal.status = 'POSTED'
+                     AND next_reversal.journal_type = c_reversal_type AND next_reversal.status = c_posted_status
                  )
                ))
                AND o.payment_stage = n.payment_stage AND o.cashflow_type = n.cashflow_type
@@ -137,9 +139,9 @@ BEGIN
       SELECT 1
         FROM journal_header r
        WHERE r.correction_group_key = NEW.correction_group_key
-         AND r.journal_type = 'REVERSAL'
+         AND r.journal_type = c_reversal_type
          AND r.reversal_of_id = v_original_id
-         AND r.status = 'POSTED'
+         AND r.status = c_posted_status
     ) THEN
       RAISE EXCEPTION 'Reposted journal requires a POSTED reversal in correction group %',
         NEW.correction_group_key;
