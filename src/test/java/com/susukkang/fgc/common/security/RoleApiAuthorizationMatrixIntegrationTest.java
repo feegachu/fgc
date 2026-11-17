@@ -202,6 +202,10 @@ class RoleApiAuthorizationMatrixIntegrationTest {
                 row("IF-38", POST, "/api/v1/reconciliations", """
                         {"settlementMonth":"2026-01","paymentStage":"GA_TO_FC","insurerId":999999999,"validationRunId":999999999}""", PROCESS),
                 row("IF-42", POST, "/api/v1/reconciliations/{}/exceptions", null, PROCESS),
+                // 지급 이체 대사 FUN-090 — IF-96·97·98. 은행 연결과 대사 실행은 정산 처리 역할만 한다. 조회(IF-95·99)는 읽기 규칙이 맡는다.
+                row("IF-96", POST, "/api/v1/bank/link/authorize-url", null, PROCESS),
+                row("IF-97", POST, "/api/v1/bank/link", "{\"code\":\"role-matrix\",\"state\":\"role-matrix\"}", PROCESS),
+                row("IF-98", POST, "/api/v1/bank-reconciliations", "{\"settlementMonth\":\"2096-12\"}", PROCESS),
                 row("IF-45", POST, "/api/v1/validation-runs", "{\"validationMonth\":\"없는달\",\"runType\":\"없는유형\"}", PROCESS),
                 row("IF-48", POST, "/api/v1/validation-runs/{}/execute", null, PROCESS),
                 // 본문 검증이 @PreAuthorize 보다 먼저 돌아 형식이 맞는 본문이 있어야 역할 판정까지 닿는다.

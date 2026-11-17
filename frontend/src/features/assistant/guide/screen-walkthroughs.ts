@@ -216,6 +216,16 @@ export const screenWalkthroughs: Record<string, readonly ScreenHelpStep[]> = {
     target('reconciliation.history', '실행 이력 펼치기', '화살표(>)는 펼치기, 월 통합검증 이름은 전체 조회입니다.', '지급단계와 보험회사까지 직접 펼쳐서 볼 수 있습니다.'),
     menuStep('reconciliation.openLedger', 'ledg-w01', '검증원장', '/journals')
   ).map(step => ({ ...step, anchor: undefined, presentation: { fixedCard: 'right' as const, allowPageScroll: true } })),
+  // 조회 역할도 같은 안내를 본다. 그래서 누르라는 말 대신 누가 무엇을 하는지로 적는다.
+  'BANK-W01': tour('지급 이체 대사',
+    target('bank.link', '수수료 지급 계좌',
+      '설계사에게 수수료를 보내는 은행 계좌입니다. 연결은 정산담당자가 하며, 은행 동의 화면으로 갔다가 이 화면으로 돌아옵니다.',
+      '은행에서는 거래내역 조회만 합니다. 계좌번호는 은행이 가려서 준 값만 보이고, 서버를 다시 띄우면 다시 연결해야 합니다.',
+      '연결된 은행과 가린 계좌번호를 확인합니다.'),
+    target('bank.result', '확정 지급과 은행 출금 비교',
+      '그 달의 설계사별 확정 지급 순액과 계좌에서 실제로 나간 출금을 맞춘 결과입니다. 정산담당자가 대사를 돌리며, 확정된 정산월만 할 수 있습니다.',
+      '금액 다름은 보낸 금액이 다른 것이고, 이체 없음은 보낸 기록이 없는 것이고, 확인 안 된 출금은 참조코드 없이 나간 돈입니다.',
+      '어긋난 줄부터 확인합니다.')),
   'RECO-W02.detail': tour('대사 원천 비교',
     region('reconciliation.match', '.reco-react-compare-summary', '비교 대상과 매칭 기준',
       '계약, 항목, 회차와 대사 결과 번호를 확인합니다. 매칭키는 두 원천을 어떤 기준으로 연결했는지 설명합니다.',
