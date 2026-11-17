@@ -125,26 +125,14 @@ class BankReconciliationServiceIntegrationTest {
     @Test
     @DisplayName("확정 지급 순액과 은행 출금을 참조코드로 맞춰 일치, 금액 다름, 이체 없음, 확인 안 된 출금으로 나눈다")
     void reconcilesConfirmedPaymentsWithBankWithdrawals() {
-        Long runId = finalizeMonth(MARCH, DateUtil.nowSeoul());
+        finalizeMonth(MARCH, DateUtil.nowSeoul());
         link("settle01");
         List<Map<String, Object>> expected = expectedTransfers(MARCH);
         assertThat(expected).hasSizeGreaterThanOrEqualTo(3);
         LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
-        when(client.withdrawals(TOKEN, FINTECH_USE_NUM, today, today)).thenReturn(List.of(
-                withdrawal(today, reference(MARCH, expected.get(0)), amount(expected.get(0))),
-                withdrawal(today, reference(MARCH, expected.get(1)), amount(expected.get(1)).subtract(new BigDecimal("10000"))),
-                withdrawal(today, "FGC2602-000001", new BigDecimal("300000")),
-                withdrawal(today, "관리비", new BigDecimal("55000"))));
 
-        BankReconciliationResponse result = reconciliationService.run(userId("settle01"), "2026-03");
+        BankReconciliationResponse result = reconcileMarch(expected);
 
-        assertThat(result.settlementMonth()).isEqualTo(MARCH);
-        assertThat(result.inquiryFrom()).isEqualTo(today);
-        assertThat(result.inquiryTo()).isEqualTo(today);
-        assertThat(result.bankName()).isEqualTo("모의은행");
-        assertThat(result.accountNumMasked()).isEqualTo("100-***-***002");
-        assertThat(result.withdrawalCount()).isEqualTo(4);
-        assertThat(result.createdBy()).isEqualTo("settle01");
         assertThat(result.matchedCount()).isEqualTo(1);
         assertThat(result.amountMismatchCount()).isEqualTo(1);
         assertThat(result.notTransferredCount()).isEqualTo(expected.size() - 2);
@@ -168,7 +156,24 @@ class BankReconciliationServiceIntegrationTest {
         assertThat(unknown.printContent()).isEqualTo("관리비");
         assertThat(unknown.bankAmount()).isEqualByComparingTo("55000");
         assertThat(result.items().get(result.items().size() - 1).result()).isEqualTo("MATCHED");
+    }
 
+    @Test
+    @DisplayName("대사 실행에는 조회 기간, 계좌, 실행한 사람을 남기고 그 달의 마지막 결과로 다시 읽힌다")
+    void recordsTheInquiryAndTheAccountOfARun() {
+        Long runId = finalizeMonth(MARCH, DateUtil.nowSeoul());
+        link("settle01");
+        LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
+
+        BankReconciliationResponse result = reconcileMarch(expectedTransfers(MARCH));
+
+        assertThat(result.settlementMonth()).isEqualTo(MARCH);
+        assertThat(result.inquiryFrom()).isEqualTo(today);
+        assertThat(result.inquiryTo()).isEqualTo(today);
+        assertThat(result.bankName()).isEqualTo("모의은행");
+        assertThat(result.accountNumMasked()).isEqualTo("100-***-***002");
+        assertThat(result.withdrawalCount()).isEqualTo(4);
+        assertThat(result.createdBy()).isEqualTo("settle01");
         assertThat(reconciliationService.latest("2026-03")).isEqualTo(result);
         assertThat(jdbc.queryForObject("""
                 SELECT validation_run_id FROM fgc.bank_reconciliation_run WHERE bank_reconciliation_run_id = ?
@@ -177,6 +182,17 @@ class BankReconciliationServiceIntegrationTest {
                 SELECT count(*) FROM fgc.audit_log
                  WHERE action_code = 'BANK_RECONCILIATION_RUN' AND entity_id = ?
                 """, Integer.class, String.valueOf(result.bankReconciliationRunId()))).isEqualTo(1);
+    }
+
+    /** 은행이 첫 설계사는 그대로, 둘째는 1만 원 모자라게, 그리고 지난달 이체 1건과 참조코드 없는 출금 1건을 준 상태로 3월을 대사한다. */
+    private BankReconciliationResponse reconcileMarch(List<Map<String, Object>> expected) {
+        LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
+        when(client.withdrawals(TOKEN, FINTECH_USE_NUM, today, today)).thenReturn(List.of(
+                withdrawal(today, reference(MARCH, expected.get(0)), amount(expected.get(0))),
+                withdrawal(today, reference(MARCH, expected.get(1)), amount(expected.get(1)).subtract(new BigDecimal("10000"))),
+                withdrawal(today, "FGC2602-000001", new BigDecimal("300000")),
+                withdrawal(today, "관리비", new BigDecimal("55000"))));
+        return reconciliationService.run(userId("settle01"), "2026-03");
     }
 
     @Test

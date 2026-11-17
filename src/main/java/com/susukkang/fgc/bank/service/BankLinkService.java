@@ -51,6 +51,8 @@ public class BankLinkService {
     private final Map<String, Pending> pending = new ConcurrentHashMap<>();
     /** 연결한 계좌와 그 계좌의 토큰은 한 묶음으로만 바뀐다. 다른 연결의 토큰으로 이 계좌를 묻는 일이 없게 한다. */
     private final AtomicReference<Connected> connected = new AtomicReference<>();
+    /** 계좌 저장과 토큰 교체를 한 번에 한 연결씩 하게 하는 잠금. */
+    private final Object linking = new Object();
 
     /** 동의 화면으로 보낸 요청. 돌아왔을 때 같은 사용자의 같은 요청인지 본다. */
     private record Pending(Long userId, Instant expiresAt) {
@@ -109,7 +111,7 @@ public class BankLinkService {
         }
         BankAccount account = agreed.orElseThrow(() -> new FgcBusinessException(FgcErrorCode.BANK_005));
         // 계좌 저장과 토큰 교체를 한 번에 한 연결씩 한다. 두 사람이 동시에 연결해도 나중에 끝난 쪽의 계좌와 토큰이 함께 남는다.
-        synchronized (connected) {
+        synchronized (linking) {
             saveLink(userId, account);
             connected.set(new Connected(account.fintechUseNum(), token,
                     Instant.now().plusSeconds(token.expiresInSeconds())));

@@ -2,6 +2,8 @@ package com.susukkang.fgc.bank.repository;
 
 import com.susukkang.fgc.bank.dto.BankReconciliationResponse;
 import com.susukkang.fgc.bank.dto.BankReconciliationResponse.Item;
+import com.susukkang.fgc.bank.repository.BankLinkRepository.Link;
+import com.susukkang.fgc.bank.service.BankTransferMatcher.Matched;
 import com.susukkang.fgc.common.util.DateUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -63,25 +65,25 @@ public class BankReconciliationRepository {
     }
 
     public Long insertRun(LocalDate settlementMonth, Long validationRunId, LocalDate inquiryFrom, LocalDate inquiryTo,
-                          String bankName, String accountNumMasked, int withdrawalCount, Long createdBy) {
+                          Link account, int withdrawalCount, Long createdBy) {
         return jdbc.queryForObject("""
                 INSERT INTO fgc.bank_reconciliation_run
                        (settlement_month, validation_run_id, inquiry_from, inquiry_to, bank_name, account_num_masked,
                         withdrawal_count, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING bank_reconciliation_run_id
-                """, Long.class, settlementMonth, validationRunId, inquiryFrom, inquiryTo, bankName, accountNumMasked,
-                withdrawalCount, createdBy);
+                """, Long.class, settlementMonth, validationRunId, inquiryFrom, inquiryTo, account.bankName(),
+                account.accountNumMasked(), withdrawalCount, createdBy);
     }
 
-    public void insertItem(Long runId, String result, Long agentId, String referenceCode, BigDecimal expectedAmount,
-                           BigDecimal bankAmount, LocalDate bankTranDate, String printContent) {
+    public void insertItem(Long runId, Matched item) {
         jdbc.update("""
                 INSERT INTO fgc.bank_reconciliation_item
                        (bank_reconciliation_run_id, result, agent_id, reference_code, expected_amount, bank_amount,
                         bank_tran_date, print_content)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, runId, result, agentId, referenceCode, expectedAmount, bankAmount, bankTranDate, printContent);
+                """, runId, item.result(), item.agentId(), item.referenceCode(), item.expectedAmount(),
+                item.bankAmount(), item.bankTranDate(), item.printContent());
     }
 
     /** 그 달에 마지막으로 돌린 대사. */

@@ -89,11 +89,10 @@ public class BankReconciliationService {
             List<Expected> expected = repository.findExpectedTransfers(month).stream()
                     .map(transfer -> new Expected(transfer.agentId(), transfer.amount())).toList();
             List<Matched> items = BankTransferMatcher.match(month, expected, withdrawals);
-            Long id = repository.insertRun(month, finalized.validationRunId(), from, to, session.link().bankName(),
-                    session.link().accountNumMasked(), withdrawals.size(), userId);
+            Long id = repository.insertRun(month, finalized.validationRunId(), from, to, session.link(),
+                    withdrawals.size(), userId);
             for (Matched item : items) {
-                repository.insertItem(id, item.result(), item.agentId(), item.referenceCode(), item.expectedAmount(),
-                        item.bankAmount(), item.bankTranDate(), item.printContent());
+                repository.insertItem(id, item);
             }
             auditLogService.record(AuditLogService.AuditEvent.builder()
                     .actionCode("BANK_RECONCILIATION_RUN")

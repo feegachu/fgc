@@ -35,8 +35,9 @@ public final class BankTransferMatcher {
     record Expected(Long agentId, BigDecimal amount) {
     }
 
-    record Matched(String result, Long agentId, String referenceCode, BigDecimal expectedAmount,
-                   BigDecimal bankAmount, LocalDate bankTranDate, String printContent) {
+    /** 맞춰 본 결과 한 줄. 저장하는 모양 그대로다. 결과에 따라 설계사나 은행 쪽 값이 비어 있다. */
+    public record Matched(String result, Long agentId, String referenceCode, BigDecimal expectedAmount,
+                          BigDecimal bankAmount, LocalDate bankTranDate, String printContent) {
     }
 
     private BankTransferMatcher() {

@@ -56,6 +56,13 @@ public class OpenBankingClient {
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final String SUCCESS = "A0000";
     private static final String NO_TRANSACTIONS = "A0018";
+    // 금융결제원 오픈뱅킹 명세가 정한 API 주소와 항목 이름. 은행 주소(base-url)만 설정으로 받는다.
+    private static final String TOKEN_API = "/oauth/2.0/token";
+    private static final String USER_ME_API = "/v2.0/user/me";
+    private static final String TRANSACTION_LIST_API = "/v2.0/account/transaction_list/fin_num";
+    private static final String RSP_CODE = "rsp_code";
+    private static final String USER_SEQ_NO = "user_seq_no";
+    private static final String BAD_RESPONSE = "BAD_RESPONSE";
 
     private final OpenBankingProperties properties;
     private final HttpClient client;
@@ -87,22 +94,22 @@ public class OpenBankingClient {
         form.put("client_secret", properties.clientSecret());
         form.put("redirect_uri", properties.redirectUri());
         form.put("grant_type", "authorization_code");
-        JsonNode json = send("/oauth/2.0/token", HttpRequest.newBuilder(uri("/oauth/2.0/token", Map.of()))
+        JsonNode json = send(TOKEN_API, HttpRequest.newBuilder(uri(TOKEN_API, Map.of()))
                 .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
                 .POST(HttpRequest.BodyPublishers.ofString(encode(form), StandardCharsets.UTF_8)));
-        if (!json.hasNonNull("access_token") || !json.hasNonNull("user_seq_no")) {
-            throw failed("/oauth/2.0/token", json.path("rsp_code").asText("TOKEN_REFUSED"));
+        if (!json.hasNonNull("access_token") || !json.hasNonNull(USER_SEQ_NO)) {
+            throw failed(TOKEN_API, json.path(RSP_CODE).asText("TOKEN_REFUSED"));
         }
-        return new BankToken(json.get("access_token").asText(), json.get("user_seq_no").asText(),
+        return new BankToken(json.get("access_token").asText(), json.get(USER_SEQ_NO).asText(),
                 json.path("expires_in").asLong(0));
     }
 
     /** 사용자가 은행에 등록한 계좌 목록. */
     public List<BankAccount> accounts(BankToken token) {
-        JsonNode json = get("/v2.0/user/me", Map.of("user_seq_no", token.userSeqNo()), token);
-        requireSuccess("/v2.0/user/me", json);
+        JsonNode json = get(USER_ME_API, Map.of(USER_SEQ_NO, token.userSeqNo()), token);
+        requireSuccess(USER_ME_API, json);
         List<BankAccount> accounts = new ArrayList<>();
-        for (JsonNode row : list("/v2.0/user/me", json)) {
+        for (JsonNode row : list(USER_ME_API, json)) {
             accounts.add(new BankAccount(row.path("fintech_use_num").asText(), row.path("bank_name").asText(),
                     row.path("account_num_masked").asText(), row.path("account_holder_name").asText(),
                     "Y".equals(row.path("inquiry_agree_yn").asText())));
@@ -112,7 +119,6 @@ public class OpenBankingClient {
 
     /** 기간 안의 출금 내역을 오래된 순으로 모두 읽는다. */
     public List<BankWithdrawal> withdrawals(BankToken token, String fintechUseNum, LocalDate from, LocalDate to) {
-        String path = "/v2.0/account/transaction_list/fin_num";
         List<BankWithdrawal> withdrawals = new ArrayList<>();
         String trace = null;
         for (int page = 0; page < MAX_PAGES; page++) {
@@ -129,27 +135,27 @@ public class OpenBankingClient {
                 // 철자는 명세 원문 그대로다(befor).
                 query.put("befor_inquiry_trace_info", trace);
             }
-            JsonNode json = get(path, query, token);
-            if (NO_TRANSACTIONS.equals(json.path("rsp_code").asText())) {
+            JsonNode json = get(TRANSACTION_LIST_API, query, token);
+            if (NO_TRANSACTIONS.equals(json.path(RSP_CODE).asText())) {
                 return withdrawals;
             }
-            requireSuccess(path, json);
-            for (JsonNode row : list(path, json)) {
-                withdrawals.add(withdrawal(path, row));
+            requireSuccess(TRANSACTION_LIST_API, json);
+            for (JsonNode row : list(TRANSACTION_LIST_API, json)) {
+                withdrawals.add(withdrawal(TRANSACTION_LIST_API, row));
             }
             if (!"Y".equals(json.path("next_page_yn").asText())) {
                 return withdrawals;
             }
             trace = json.path("befor_inquiry_trace_info").asText();
         }
-        throw failed(path, "TOO_MANY_PAGES");
+        throw failed(TRANSACTION_LIST_API, "TOO_MANY_PAGES");
     }
 
     /** 성공 응답의 목록. 목록이 빠졌으면 빈 목록으로 보지 않는다. 빈 목록으로 받으면 확정 지급 전부가 이체 없음으로 남는다. */
     private static JsonNode list(String path, JsonNode json) {
         JsonNode rows = json.path("res_list");
         if (!rows.isArray()) {
-            throw failed(path, "BAD_RESPONSE");
+            throw failed(path, BAD_RESPONSE);
         }
         return rows;
     }
@@ -162,7 +168,7 @@ public class OpenBankingClient {
             return new BankWithdrawal(LocalDate.parse(row.path("tran_date").asText(), DATE),
                     row.path("tran_time").asText(), printContent.trim(), new BigDecimal(row.path("tran_amt").asText()));
         } catch (RuntimeException e) {
-            throw failed(path, "BAD_RESPONSE");
+            throw failed(path, BAD_RESPONSE);
         }
     }
 
@@ -207,12 +213,12 @@ public class OpenBankingClient {
             JsonNode json = JSON.readTree(response.body());
             return json == null ? JSON.createObjectNode() : json;
         } catch (IOException e) {
-            throw failed(path, "BAD_RESPONSE");
+            throw failed(path, BAD_RESPONSE);
         }
     }
 
     private static void requireSuccess(String path, JsonNode json) {
-        String code = json.path("rsp_code").asText("NO_RSP_CODE");
+        String code = json.path(RSP_CODE).asText("NO_RSP_CODE");
         if (!SUCCESS.equals(code)) {
             throw failed(path, code);
         }

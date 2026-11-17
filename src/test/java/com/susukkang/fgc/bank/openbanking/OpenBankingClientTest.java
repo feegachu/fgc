@@ -18,10 +18,12 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** IF-EXT-06 오픈뱅킹 규격 클라이언트. 실제 은행을 부르지 않고 같은 규격의 가짜 서버로 확인한다. */
 class OpenBankingClientTest {
@@ -43,8 +45,9 @@ class OpenBankingClientTest {
     private final List<Received> received = new ArrayList<>();
     private final Map<String, Deque<String>> responses = new HashMap<>();
     private HttpServer server;
-    private long delayMillis;
-    private long bodyDelayMillis;
+    // 느린 은행을 흉내 내는 문. 닫아 두면 가짜 은행이 그 자리에서 테스트가 끝날 때까지 답하지 않는다.
+    private volatile CountDownLatch beforeHeaders = new CountDownLatch(0);
+    private volatile CountDownLatch beforeBody = new CountDownLatch(0);
     // 다른 통합 테스트와 함께 돌 때도 응답이 제한 안에 들도록 넉넉히 둔다. 시간 초과 테스트만 짧은 제한을 쓴다.
     private Duration timeout = Duration.ofSeconds(10);
 
@@ -62,22 +65,14 @@ class OpenBankingClientTest {
                     parse(exchange.getRequestURI().getRawQuery()),
                     exchange.getRequestHeaders().getFirst("Authorization"),
                     exchange.getRequestHeaders().getFirst("Content-Type"), parse(body)));
-            try {
-                Thread.sleep(delayMillis);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            waitFor(beforeHeaders);
             Deque<String> queue = responses.get(path);
             // 명세: 오류도 HTTP 200 에 rsp_code 로 준다.
             byte[] response = (queue == null || queue.isEmpty() ? "{}" : queue.size() == 1 ? queue.peek() : queue.poll())
                     .getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
             exchange.sendResponseHeaders(200, response.length);
-            try {
-                Thread.sleep(bodyDelayMillis);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            waitFor(beforeBody);
             exchange.getResponseBody().write(response);
             exchange.close();
         });
@@ -86,7 +81,18 @@ class OpenBankingClientTest {
 
     @AfterEach
     void stopServer() {
+        // 멈춰 세운 응답을 먼저 풀어야 서버가 멈춘다.
+        beforeHeaders.countDown();
+        beforeBody.countDown();
         server.stop(0);
+    }
+
+    private static void waitFor(CountDownLatch gate) {
+        try {
+            gate.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Test
@@ -229,10 +235,11 @@ class OpenBankingClientTest {
     }
 
     @Test
+    @Timeout(10)
     @DisplayName("제한 시간 안에 응답이 없으면 시간 초과로 알린다")
     void reportsTimeouts() {
         respond("/v2.0/user/me", USER);
-        delayMillis = 1_500;
+        beforeHeaders = new CountDownLatch(1);
         timeout = Duration.ofMillis(300);
 
         assertThatThrownBy(() -> client().accounts(token()))
@@ -240,16 +247,17 @@ class OpenBankingClientTest {
     }
 
     @Test
+    @Timeout(10)
     @DisplayName("응답 머리만 오고 본문이 오지 않아도 제한 시간이 지나면 시간 초과로 알린다")
     void reportsTimeoutsWhenTheBodyStalls() {
         respond("/v2.0/user/me", USER);
-        bodyDelayMillis = 1_500;
+        beforeBody = new CountDownLatch(1);
         timeout = Duration.ofMillis(300);
 
         long started = System.nanoTime();
         assertThatThrownBy(() -> client().accounts(token()))
                 .isInstanceOfSatisfying(OpenBankingException.class, e -> assertThat(e.code()).isEqualTo("TIMEOUT"));
-        // JDK HttpClient 의 요청 제한 시간은 응답 머리까지만 본다. 본문까지 기다리면 1.5초가 걸린다.
+        // JDK HttpClient 의 요청 제한 시간은 응답 머리까지만 본다. 본문은 이 테스트가 끝날 때까지 오지 않는다.
         assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(1_200));
     }
 

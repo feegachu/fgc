@@ -63,6 +63,13 @@ public class MockBankController {
     private static final String ACCOUNT_NUM_MASKED = "110-***-***001";
     private static final String ACCOUNT_HOLDER = "가상지에이";
     private static final String SCOPE = "login inquiry";
+    // 명세의 항목 이름. 요청과 응답에 같은 이름을 쓴다.
+    private static final String FIELD_CLIENT_ID = "client_id";
+    private static final String FIELD_REDIRECT_URI = "redirect_uri";
+    private static final String FIELD_SCOPE = "scope";
+    private static final String FIELD_STATE = "state";
+    private static final String FIELD_FINTECH_USE_NUM = "fintech_use_num";
+    private static final String FIELD_BANK_TRAN_ID = "bank_tran_id";
     private static final String OPENING_BALANCE = "500000000";
     /** 명세: 한 쪽 최대 25건. */
     private static final int PAGE_SIZE = 25;
@@ -119,7 +126,7 @@ public class MockBankController {
         }
         String code = randomHex(16);
         codes.put(code, Instant.now().plus(CODE_TTL));
-        return redirect("?code=" + code + "&scope=login%20inquiry&state=" + query.get("state"));
+        return redirect("?code=" + code + "&scope=login%20inquiry&state=" + query.get(FIELD_STATE));
     }
 
     @PostMapping("/oauth/2.0/authorize/deny")
@@ -127,7 +134,7 @@ public class MockBankController {
         if (!validAuthorization(query)) {
             return ResponseEntity.ok(rejected());
         }
-        return redirect("?error=access_denied&state=" + query.get("state"));
+        return redirect("?error=access_denied&state=" + query.get(FIELD_STATE));
     }
 
     /** 토큰 발급. 명세대로 오류도 HTTP 200 에 rsp_code 로 준다. 인가 코드는 한 번 쓰이면 버린다. */
@@ -135,9 +142,9 @@ public class MockBankController {
     public Map<String, Object> token(@RequestParam Map<String, String> form) {
         Instant expiresAt = form.get("code") == null ? null : codes.remove(form.get("code"));
         boolean valid = "authorization_code".equals(form.get("grant_type"))
-                && properties.clientId().equals(form.get("client_id"))
+                && properties.clientId().equals(form.get(FIELD_CLIENT_ID))
                 && properties.clientSecret().equals(form.get("client_secret"))
-                && properties.redirectUri().equals(form.get("redirect_uri"))
+                && properties.redirectUri().equals(form.get(FIELD_REDIRECT_URI))
                 && expiresAt != null && expiresAt.isAfter(Instant.now());
         if (!valid) {
             return rejected();
@@ -149,7 +156,7 @@ public class MockBankController {
         body.put("token_type", "Bearer");
         body.put("expires_in", TOKEN_SECONDS);
         body.put("refresh_token", randomHex(24));
-        body.put("scope", SCOPE);
+        body.put(FIELD_SCOPE, SCOPE);
         body.put("user_seq_no", USER_SEQ_NO);
         return body;
     }
@@ -165,7 +172,7 @@ public class MockBankController {
             return error("A0004", "요청전문 포맷 에러");
         }
         Map<String, Object> account = new LinkedHashMap<>();
-        account.put("fintech_use_num", FINTECH_USE_NUM);
+        account.put(FIELD_FINTECH_USE_NUM, FINTECH_USE_NUM);
         account.put("account_alias", "수수료 지급");
         account.put("bank_code_std", "097");
         account.put("bank_code_sub", "0000000");
@@ -201,8 +208,9 @@ public class MockBankController {
         LocalDate from = date(query.get("from_date"));
         LocalDate to = date(query.get("to_date"));
         Integer offset = offset(query.get("befor_inquiry_trace_info"));
-        boolean wellFormed = query.get("bank_tran_id") != null && BANK_TRAN_ID.matcher(query.get("bank_tran_id")).matches()
-                && query.get("fintech_use_num") != null
+        boolean wellFormed = query.get(FIELD_BANK_TRAN_ID) != null
+                && BANK_TRAN_ID.matcher(query.get(FIELD_BANK_TRAN_ID)).matches()
+                && query.get(FIELD_FINTECH_USE_NUM) != null
                 && Set.of("A", "I", "O").contains(String.valueOf(query.get("inquiry_type")))
                 && "D".equals(query.get("inquiry_base"))
                 && from != null && to != null && !from.isAfter(to)
@@ -212,7 +220,7 @@ public class MockBankController {
         if (!wellFormed) {
             return error("A0004", "요청전문 포맷 에러");
         }
-        if (!FINTECH_USE_NUM.equals(query.get("fintech_use_num"))) {
+        if (!FINTECH_USE_NUM.equals(query.get(FIELD_FINTECH_USE_NUM))) {
             return error("A0304", "핀테크이용번호 정보 불일치");
         }
         // 이 계좌에는 출금만 있다. 입금만 물으면 빈 목록이다.
@@ -238,14 +246,14 @@ public class MockBankController {
         }
         boolean more = end < rows.size();
         Map<String, Object> body = success();
-        body.put("bank_tran_id", query.get("bank_tran_id"));
+        body.put(FIELD_BANK_TRAN_ID, query.get(FIELD_BANK_TRAN_ID));
         body.put("bank_tran_date", DATE.format(now().toLocalDate()));
         body.put("bank_code_tran", "097");
         body.put("bank_rsp_code", "000");
         body.put("bank_rsp_message", "");
         body.put("bank_name", BANK_NAME);
         body.put("savings_bank_name", "");
-        body.put("fintech_use_num", FINTECH_USE_NUM);
+        body.put(FIELD_FINTECH_USE_NUM, FINTECH_USE_NUM);
         body.put("balance_amt", balance);
         body.put("page_record_cnt", String.valueOf(page.size()));
         body.put("next_page_yn", more ? "Y" : "N");
@@ -261,14 +269,14 @@ public class MockBankController {
 
     private boolean validAuthorization(Map<String, String> query) {
         return "code".equals(query.get("response_type"))
-                && properties.clientId().equals(query.get("client_id"))
-                && properties.redirectUri().equals(query.get("redirect_uri"))
-                && SCOPE.equals(query.get("scope"))
-                && query.get("state") != null && STATE.matcher(query.get("state")).matches()
+                && properties.clientId().equals(query.get(FIELD_CLIENT_ID))
+                && properties.redirectUri().equals(query.get(FIELD_REDIRECT_URI))
+                && SCOPE.equals(query.get(FIELD_SCOPE))
+                && query.get(FIELD_STATE) != null && STATE.matcher(query.get(FIELD_STATE)).matches()
                 && query.get("auth_type") != null
                 // 모의 은행에는 은행 로그인이 없다. 처리 권한자가 FGC에서 방금 낸 연결 요청인지가 그 자리를 대신한다.
                 // 이 확인이 없으면 로그인하지 않은 사람이 코드와 토큰을 받아 확정 지급액을 읽을 수 있다.
-                && linkRequests.isPending(query.get("state"));
+                && linkRequests.isPending(query.get(FIELD_STATE));
     }
 
     private boolean authorized(String authorization) {
@@ -335,7 +343,7 @@ public class MockBankController {
         StringBuilder hidden = new StringBuilder("<input type=\"hidden\" name=\"")
                 .append(formToken.getParameterName()).append("\" value=\"")
                 .append(HtmlUtils.htmlEscape(formToken.getToken())).append("\">");
-        for (String name : List.of("response_type", "client_id", "redirect_uri", "scope", "state", "auth_type")) {
+        for (String name : List.of("response_type", FIELD_CLIENT_ID, FIELD_REDIRECT_URI, FIELD_SCOPE, FIELD_STATE, "auth_type")) {
             hidden.append("<input type=\"hidden\" name=\"").append(name).append("\" value=\"")
                     .append(HtmlUtils.htmlEscape(query.get(name))).append("\">");
         }
