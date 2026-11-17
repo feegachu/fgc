@@ -13,7 +13,7 @@ import { useWorkspaceStore } from '../../stores/workspace'
 import { useUnsavedWorkStore } from '../../stores/unsavedWork'
 import { validateCorrectionLines } from './correctionLines'
 import type { ExceptionCase, ExceptionOptions, ExceptionSearchResult } from './api'
-import { applyActionToCache } from './api'
+import { applyActionToCache, exceptionDetailQueryOptions } from './api'
 
 // Legacy action-guide regression fixtures do not expose comparison controls in the app.
 let legacyHelpContext = false
@@ -1324,11 +1324,11 @@ it.each([
   expect(requests().filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
 })
 
-it('does not append a cached action twice or overwrite a newer cached status', () => {
+it('does not append a cached action twice or overwrite a newer cached status', async () => {
   const client = new QueryClient()
   const action = { actionSeq: 1, actionType: 'START_REVIEW', toStatus: 'IN_REVIEW' } as const
   client.setQueryData(['exceptions', 'search'], search([{ ...baseCase, status: 'RESOLVED', actions: [action] }]))
-  applyActionToCache(client, 11, action)
+  await applyActionToCache(client, 11, action)
   const item = client.getQueryData<ExceptionSearchResult>(['exceptions', 'search'])!.content![0]
   expect(item.actions).toHaveLength(1)
   expect(item.status).toBe('RESOLVED')
@@ -1435,11 +1435,11 @@ it('gives different exception summary types distinct guide targets and preserves
   expect(document.querySelector('[data-guide-feature="features.exception.exception-page.link-3"]')).toBeNull()
 })
 
-it('preserves a newer cached action when an older guide acknowledgement arrives', () => {
+it('preserves a newer cached action when an older guide acknowledgement arrives', async () => {
   const client = new QueryClient()
   const newer = { actionSeq: 2, toStatus: 'RESOLVED' as const }
   client.setQueryData(['exceptions', 'search'], search([{ ...baseCase, status: 'RESOLVED', actions: [newer] }]))
-  applyActionToCache(client, 11, { actionSeq: 1, toStatus: 'IN_REVIEW' })
+  await applyActionToCache(client, 11, { actionSeq: 1, toStatus: 'IN_REVIEW' })
   const item = client.getQueryData<ExceptionSearchResult>(['exceptions', 'search'])!.content![0]
   expect(item.status).toBe('RESOLVED')
   expect(item.actions).toEqual([newer])
@@ -1467,4 +1467,31 @@ it('미처리 목록에 없는 해결 건의 URL로 처음 진입해도 상세�
     ? [] : [{ ...baseCase, status: 'RESOLVED', statusLabel: '해결', title: '직접 연 해결 건' }])
   renderPage('/app/exceptions?status=OPEN&selected=11')
   expect(await within(await screen.findByRole('dialog')).findByText('직접 연 해결 건')).toBeVisible()
+})
+
+
+it('정정 전에 시작된 상세·목록 응답은 해결 상태와 조치 이력을 덮어쓰지 않는다', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const detailKey = ['exceptions', 'detail', 11]
+  const listKey = ['exceptions', 'search', 'race']
+  const previous = { ...baseCase, status: 'IN_REVIEW' as const, actions: [] }
+  client.setQueryData(detailKey, previous)
+  client.setQueryData(listKey, search([previous]))
+  let finishDetail!: (value: ExceptionSearchResult) => void
+  let finishList!: (value: ExceptionSearchResult) => void
+  vi.mocked(apiClient.request).mockImplementationOnce(() => new Promise(resolve => { finishDetail = data => resolve({ data, error: null, requestId: 'race' }) }))
+  const detailRequest = client.fetchQuery(exceptionDetailQueryOptions('11')).catch(() => undefined)
+  const listRequest = client.fetchQuery({ queryKey: listKey, queryFn: ({ signal }) => {
+    void signal.aborted
+    return new Promise<ExceptionSearchResult>(resolve => { finishList = resolve })
+  } }).catch(() => undefined)
+  await waitFor(() => { expect(finishDetail).toBeDefined(); expect(finishList).toBeDefined() })
+  const action = { actionSeq: 2, actionType: 'CORRECT', fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED' } as const
+  await applyActionToCache(client, 11, action)
+  finishDetail(search([previous]))
+  finishList(search([previous]))
+  await Promise.all([detailRequest, listRequest])
+  expect(client.getQueryData<ExceptionCase>(detailKey)).toMatchObject({ status: 'RESOLVED', actions: [action] })
+  expect(client.getQueryData<ExceptionSearchResult>(listKey)?.content?.[0]).toMatchObject({ status: 'RESOLVED', actions: [action] })
+  client.clear()
 })

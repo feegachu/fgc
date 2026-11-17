@@ -67,7 +67,7 @@ class CompareAskToolsTest {
                 base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
                 base.warnings(), null, List.of(item), List.of(), CompareRankingFilters.NONE);
 
-        assertThat(new CompareAskTools(one).run("get_item", RANK_1)).contains("99.9%").doesNotContain("100.0%");
+        assertThat(new CompareAskTools(one).run("get_item", RANK_1)).contains("\"한도 영향\":\"99.9%\"").doesNotContain("한도 사용률", "100.0%");
         assertThat(CompareAskTools.percent(90.0)).isEqualTo("90.0%");
     }
 
@@ -85,6 +85,9 @@ class CompareAskToolsTest {
     void simplifiedMetricNamesKeepComparisonChecks() {
         CompareAskTools tools = toolsWith("compare", PAIR_2_3);
 
+        assertThat(tools.verify("3위는 2위보다 한도 영향이 적어요.")).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+        assertThat(tools.verify("3위는 2위보다 한도 사용률이 적어요.")).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+        assertThat(tools.verify("3위는 2위보다 한도 사용률이 많아요.")).isEqualTo("DIRECTION_NOT_FROM_TOOL");
         assertThat(tools.verify("3위는 2위보다 순수령액이 적어요.")).isNull();
         assertThat(tools.verify("3위는 2위보다 순수령액이 많아요.")).isEqualTo("DIRECTION_MISMATCH");
         assertThat(tools.verify("3위는 2위보다 한도를 반영한 수령액이 적어요.")).isNull();

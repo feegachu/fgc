@@ -169,7 +169,7 @@ function ActionForm({ item, helpContainer }: { item: ExceptionCase; helpContaine
         void client.invalidateQueries({ queryKey: ['exceptions', 'search'] })
         return
       }
-      applyActionToCache(client, item.exceptionCaseId!, action, action.actionType === 'ASSIGN' ? {
+      await applyActionToCache(client, item.exceptionCaseId!, action, action.actionType === 'ASSIGN' ? {
         assignedTo: input.assignedTo,
         assigneeLoginId: input.assigneeLoginId,
       } : {})

@@ -1,5 +1,8 @@
 package com.susukkang.fgc.journal.service;
 
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
+import java.util.Map;
 import com.susukkang.fgc.journal.domain.ActualInsurerStatementJournalCommand;
 import com.susukkang.fgc.journal.domain.ConfirmedFcPayoutJournalCommand;
 import com.susukkang.fgc.journal.domain.ExpectedFcPayoutJournalCommand;
@@ -131,6 +134,11 @@ public class JournalPostingPortImpl implements JournalPostingPort {
 
     private void postCorrectionDraft(JournalHeaderDraft draft, Long actor, String requestId, String groupKey) {
         var saved = persistenceService.saveDraftInCurrentTransaction(draft, actor, requestId);
+        if (groupKey != null && !"DRAFT".equals(saved.getStatus())) {
+            // A normal batch may already have posted this replacement. Never leave an unlinked reversal.
+            throw new FgcBusinessException(FgcErrorCode.LEDG_002,
+                    Map.of("journalHeaderId", saved.getJournalHeaderId()));
+        }
         if ("DRAFT".equals(saved.getStatus())) {
             if (groupKey != null && journalHeaderRepository.linkReplacementGroup(saved.getJournalHeaderId(), groupKey) != 1) {
                 throw new IllegalStateException("대체 예상 분개의 정정 연결을 저장하지 못했습니다.");

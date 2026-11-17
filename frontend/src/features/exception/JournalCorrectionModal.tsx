@@ -237,7 +237,7 @@ function CorrectionBody({
         void invalidateJournalCorrectionQueries(client)
         return
       }
-      applyActionToCache(client, item.exceptionCaseId!, toAction(item, done))
+      await applyActionToCache(client, item.exceptionCaseId!, toAction(item, done))
       void invalidateJournalCorrectionQueries(client)
       if (!mounted.current) return
       setResult(done)

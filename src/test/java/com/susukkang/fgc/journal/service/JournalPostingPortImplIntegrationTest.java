@@ -283,6 +283,37 @@ class JournalPostingPortImplIntegrationTest {
     }
 
     @Test
+    void alreadyPostedReplacementRejectsCorrectionAndRollsBackItsReversal() {
+        var contract = anyContract();
+        Long contractId = ((Number) contract.get("contract_id")).longValue();
+        Long actor = jdbcTemplate.queryForObject("SELECT user_id FROM fgc.app_user WHERE login_id='settle01'", Long.class);
+        Long run = insertValidationRun(VALIDATION_MONTH);
+        selectContract(run, contractId, ((Number) contract.get("product_offering_id")).longValue());
+        Long policy = anyPolicyVersionId();
+        Long item = anyCommissionItemId();
+        Long agent = ((Number) contract.get("agent_id")).longValue();
+        insertScheduleLine(contractId, "GA_TO_FC", policy, item, agent, VALIDATION_MONTH.plusDays(9));
+        journalPostingPort.post(newContext(run, VALIDATION_MONTH));
+        insertScheduleLine(contractId, "GA_TO_FC", policy, item, agent, VALIDATION_MONTH.plusDays(9));
+        // An ordinary batch posts the regenerated schedule before the operator rechecks the exception.
+        journalPostingPort.post(newContext(run, VALIDATION_MONTH));
+
+        var tx = new TransactionTemplate(transactionManager);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status ->
+                expectedJournals.postExpectedForContract(contractId, run, VALIDATION_MONTH, actor)))
+                .isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class)
+                .hasMessageContaining("FGC-LEDG-002");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.journal_header WHERE validation_run_id=? AND status='POSTED'",
+                Long.class, run)).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.journal_header WHERE validation_run_id=? AND (journal_type='REVERSAL' OR correction_group_key IS NOT NULL)",
+                Long.class, run)).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM fgc.journal_correction_group g JOIN fgc.journal_header h
+                  ON h.journal_header_id=g.original_journal_header_id WHERE h.validation_run_id=?
+                """, Long.class, run)).isZero();
+    }
+
+    @Test
     void scheduleCorrectionLocksTheLatestReconciliationsOfBothPaymentStages() {
         var contract = anyContract();
         Long contractId = ((Number) contract.get("contract_id")).longValue();

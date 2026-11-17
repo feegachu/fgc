@@ -159,12 +159,16 @@ export async function postJournalCorrection(
  * 사라져 패널이 비므로, 사용자가 다시 조회할 때까지 행을 그대로 두고 값만 바꾼다.
  * 요약 카드 건수는 다음 조회 때 갱신되도록 stale 로만 표시한다.
  */
-export function applyActionToCache(
+export async function applyActionToCache(
   client: QueryClient,
   exceptionCaseId: number,
   action: ExceptionAction,
   extra: Partial<ExceptionCase> = {},
 ) {
+  await Promise.all([
+    client.cancelQueries({ queryKey: ['exceptions', 'detail', exceptionCaseId], exact: true }),
+    client.cancelQueries({ queryKey: ['exceptions', 'search'] }),
+  ])
   const update = (item: ExceptionCase): ExceptionCase =>
     item.exceptionCaseId === exceptionCaseId && !item.actions?.some(existing => Number(existing.actionSeq) >= Number(action.actionSeq))
       ? {

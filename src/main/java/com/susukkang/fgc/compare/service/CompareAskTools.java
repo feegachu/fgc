@@ -44,7 +44,7 @@ final class CompareAskTools {
     private static final String EXPECTED_LABEL = "한도 적용 전 수령액";
     private static final String CLAWBACK_LABEL = "예상 환수액";
     private static final String CARRY_LABEL = "이월 예정액";
-    private static final String CAP_IMPACT_LABEL = "한도 사용률";
+    private static final String CAP_IMPACT_LABEL = "한도 영향";
 
     private static final Set<Metric> RECEIPT = EnumSet.of(Metric.CAPPED, Metric.EXPECTED);
     private static final List<MetricPhrase> METRIC_PHRASES = List.of(
@@ -78,7 +78,7 @@ final class CompareAskTools {
             new MetricPhrase("이월 예정", EnumSet.of(Metric.CARRY)),
             new MetricPhrase("이월액", EnumSet.of(Metric.CARRY)),
             new MetricPhrase("이월", EnumSet.of(Metric.CARRY)),
-            new MetricPhrase("한도 영향", EnumSet.of(Metric.CAP_IMPACT)),
+            new MetricPhrase("한도 사용률", EnumSet.of(Metric.CAP_IMPACT)),
             new MetricPhrase(CAP_IMPACT_LABEL, EnumSet.of(Metric.CAP_IMPACT)),
             new MetricPhrase("한도 소진", EnumSet.of(Metric.CAP_IMPACT)));
 
