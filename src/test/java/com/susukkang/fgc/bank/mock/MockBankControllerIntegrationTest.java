@@ -13,6 +13,7 @@ import com.susukkang.fgc.bank.openbanking.OpenBankingProperties;
 import com.susukkang.fgc.bank.service.BankInquiryStarting;
 import com.susukkang.fgc.bank.service.BankLinkService;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -140,6 +141,8 @@ class MockBankControllerIntegrationTest {
         // 다른 사이트가 사용자 대신 폼을 보내는 것을 막는다. 쿠키와 숨은 입력에 같은 값이 있어야 한다.
         mvc.perform(authorize(post(BASE + "/oauth/2.0/authorize/approve"))).andExpect(status().isForbidden());
         mvc.perform(authorize(post(BASE + "/oauth/2.0/authorize/deny"))).andExpect(status().isForbidden());
+        // 주소의 글자를 퍼센트 부호로 바꿔 보내도 같은 요청이다. 이 검사를 비켜 가지 못해야 한다.
+        mvc.perform(authorize(post(URI.create(BASE + "/oauth/2.0/%61uthorize/approve")))).andExpect(status().isForbidden());
     }
 
     @Test
