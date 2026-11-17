@@ -35,6 +35,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     let scrollFrame = 0
     let preparedWidth: number | null = null
     let preparedPresentation = ''
+    let preparedDocumentTop: number | null = null
     let measuredTarget: DOMRect | null = null
     const targetInHeader = Boolean(target?.closest('.app-header'))
     const scrollSmoothly = (offset: number) => {
@@ -160,6 +161,12 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
           const cardTop = cardAlign === 'top' ? topBoundary : fixedCard === 'center' ? Math.max(topBoundary, (height - cardHeight) / 2)
             : anchor ? Math.max(topBoundary, Math.min(anchor.top + 12, height - cardHeight - 16)) : height - cardHeight - 16
           const rect = target?.isConnected ? targetRect() : null
+          if (rect && scrollTargetTop) {
+            const documentTop = rect.top + window.scrollY
+            // Re-anchor after real content above the target changes, not after user scrolling.
+            if (preparedDocumentTop !== null && Math.abs(documentTop - preparedDocumentTop) > 1) preparedPresentation = ''
+            preparedDocumentTop = documentTop
+          }
           setPosition(previous => ({
             box: rect ? {
               left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),

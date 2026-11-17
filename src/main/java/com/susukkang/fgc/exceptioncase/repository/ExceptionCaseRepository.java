@@ -260,13 +260,6 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
               ) recorded
              WHERE cc.validation_run_id = :validationRunId
                AND cc.result_status IN ('VIOLATION', 'WARNING', 'REVIEW_REQUIRED')
-               AND (cc.result_status <> 'VIOLATION' OR NOT EXISTS (
-                   SELECT 1 FROM (
-            """ + CapDisplaySql.MONTHLY_PRE_CONFIRM_VIOLATIONS + """
-                   ) existing_violation
-                   WHERE existing_violation.contract_id = cc.contract_id
-                     AND existing_violation.payment_stage = cc.payment_stage
-               ))
             """, nativeQuery = true)
     long insertFromCapChecks(@Param("validationRunId") Long validationRunId);
 
@@ -277,8 +270,6 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
               FROM (
             """ + CapDisplaySql.MONTHLY_PRE_CONFIRM_VIOLATIONS + """
               ) cc
-              JOIN fgc.cap_check monthly ON monthly.validation_run_id = :validationRunId
-                AND monthly.contract_id = cc.contract_id AND monthly.payment_stage = cc.payment_stage
               JOIN fgc.exception_case ec ON ec.exception_type = 'CAP_VIOLATION'
                 AND ec.status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW')
                 AND (ec.cap_check_id = cc.cap_check_id OR
@@ -287,8 +278,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                   ec.exception_key, ec.exception_type, ec.reason_code, ec.severity,
                   :validationRunId, ec.contract_id, ec.agent_id, ec.policy_version_id,
                   ec.source_entity_type, ec.source_entity_id, ec.title, ec.description,
-                  jsonb_build_object('capCheckId', cc.cap_check_id, 'monthlyCapCheckId', monthly.cap_check_id,
-                      'paymentStage', cc.payment_stage,
+                  jsonb_build_object('capCheckId', cc.cap_check_id, 'paymentStage', cc.payment_stage,
                       'limitAmount', cc.limit_amount, 'includedAmount', cc.included_amount,
                       'remainingAmount', cc.remaining_amount, 'usagePct', cc.usage_pct,
                       'resultStatus', cc.result_status, 'calculationSnapshot', cc.calculation_snapshot)

@@ -39,23 +39,30 @@ final class CompareAskTools {
     private record MetricPhrase(String text, Set<Metric> metrics) {
     }
 
+    private static final String NET_LABEL = "순수령액";
+    private static final String CAPPED_LABEL = "한도 반영 수령액";
+    private static final String EXPECTED_LABEL = "한도 적용 전 수령액";
+    private static final String CLAWBACK_LABEL = "예상 환수액";
+    private static final String CARRY_LABEL = "이월 예정액";
+    private static final String CAP_IMPACT_LABEL = "한도 사용률";
+
     private static final Set<Metric> RECEIPT = EnumSet.of(Metric.CAPPED, Metric.EXPECTED);
     private static final List<MetricPhrase> METRIC_PHRASES = List.of(
             new MetricPhrase("예상 순수령액", EnumSet.of(Metric.NET)),
             new MetricPhrase("보수적 순수령액", EnumSet.of(Metric.NET)),
-            new MetricPhrase("순수령액", EnumSet.of(Metric.NET)),
+            new MetricPhrase(NET_LABEL, EnumSet.of(Metric.NET)),
             new MetricPhrase("순수령", EnumSet.of(Metric.NET)),
             new MetricPhrase("한도 반영 수령 예상액", EnumSet.of(Metric.CAPPED)),
             new MetricPhrase("한도를 반영한 수령 예상액", EnumSet.of(Metric.CAPPED)),
             new MetricPhrase("한도 반영 예상 수령액", EnumSet.of(Metric.CAPPED)),
             new MetricPhrase("한도를 반영한 예상 수령액", EnumSet.of(Metric.CAPPED)),
-            new MetricPhrase("한도 반영 수령액", EnumSet.of(Metric.CAPPED)),
+            new MetricPhrase(CAPPED_LABEL, EnumSet.of(Metric.CAPPED)),
             new MetricPhrase("한도를 반영한 수령액", EnumSet.of(Metric.CAPPED)),
             new MetricPhrase("한도 반영 수령", EnumSet.of(Metric.CAPPED)),
             new MetricPhrase("한도를 반영한 수령", EnumSet.of(Metric.CAPPED)),
             new MetricPhrase("한도 적용 전 수령 예상액", EnumSet.of(Metric.EXPECTED)),
             new MetricPhrase("한도 적용 전 예상 수령액", EnumSet.of(Metric.EXPECTED)),
-            new MetricPhrase("한도 적용 전 수령액", EnumSet.of(Metric.EXPECTED)),
+            new MetricPhrase(EXPECTED_LABEL, EnumSet.of(Metric.EXPECTED)),
             new MetricPhrase("한도 적용 전", EnumSet.of(Metric.EXPECTED)),
             new MetricPhrase("수령 예상액", RECEIPT),
             new MetricPhrase("수령 예상", RECEIPT),
@@ -63,7 +70,7 @@ final class CompareAskTools {
             new MetricPhrase("수령액", RECEIPT),
             new MetricPhrase("환수 노출액", EnumSet.of(Metric.CLAWBACK)),
             new MetricPhrase("환수 노출", EnumSet.of(Metric.CLAWBACK)),
-            new MetricPhrase("예상 환수액", EnumSet.of(Metric.CLAWBACK)),
+            new MetricPhrase(CLAWBACK_LABEL, EnumSet.of(Metric.CLAWBACK)),
             new MetricPhrase("환수액", EnumSet.of(Metric.CLAWBACK)),
             new MetricPhrase("환수 부담", EnumSet.of(Metric.CLAWBACK)),
             new MetricPhrase("환수", EnumSet.of(Metric.CLAWBACK)),
@@ -72,16 +79,10 @@ final class CompareAskTools {
             new MetricPhrase("이월액", EnumSet.of(Metric.CARRY)),
             new MetricPhrase("이월", EnumSet.of(Metric.CARRY)),
             new MetricPhrase("한도 영향", EnumSet.of(Metric.CAP_IMPACT)),
-            new MetricPhrase("한도 사용률", EnumSet.of(Metric.CAP_IMPACT)),
+            new MetricPhrase(CAP_IMPACT_LABEL, EnumSet.of(Metric.CAP_IMPACT)),
             new MetricPhrase("한도 소진", EnumSet.of(Metric.CAP_IMPACT)));
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String NET_LABEL = "순수령액";
-    private static final String CAPPED_LABEL = "한도 반영 수령액";
-    private static final String EXPECTED_LABEL = "한도 적용 전 수령액";
-    private static final String CLAWBACK_LABEL = "예상 환수액";
-    private static final String CARRY_LABEL = "이월 예정액";
-    private static final String CAP_IMPACT_LABEL = "한도 사용률";
     private static final String ERROR = "error";
     private static final String UNIT_PERCENT = "%";
     /** '1위'처럼 순위를 말하는 표기. 소수점·쉼표 뒤의 숫자(금액 일부)는 순위로 보지 않는다. */

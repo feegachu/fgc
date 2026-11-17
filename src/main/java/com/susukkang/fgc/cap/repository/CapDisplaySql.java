@@ -15,10 +15,8 @@ public final class CapDisplaySql {
                             OR EXISTS (SELECT 1 FROM fgc.exception_occurrence resolved_occurrence
                                         WHERE resolved_occurrence.exception_case_id = resolved_exception.exception_case_id
                                           AND resolved_occurrence.validation_run_id = cc.validation_run_id
-                                          AND ((resolved_occurrence.source_entity_type = 'CAP_CHECK'
-                                                AND resolved_occurrence.source_entity_id = cc.cap_check_id::text)
-                                               OR resolved_occurrence.evidence_snapshot ->> 'monthlyCapCheckId'
-                                                  = cc.cap_check_id::text)))))
+                                          AND resolved_occurrence.source_entity_type = 'CAP_CHECK'
+                                          AND resolved_occurrence.source_entity_id = cc.cap_check_id::text))))
             """;
 
     public static final String OPEN_VIOLATION = """

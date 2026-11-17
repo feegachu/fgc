@@ -116,8 +116,8 @@ class ContractServiceImplTest {
     private ContractServiceImpl contractService;
 
     @ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
-    void workflowDemoMarkerRequiresExplicitEnvironmentOptIn(boolean enabled) {
+    @org.junit.jupiter.params.provider.CsvSource({"false,false", "false,true", "true,false", "true,true"})
+    void workflowDemoMarkerRequiresExplicitEnvironmentOptIn(boolean enabled, boolean requested) {
         ReflectionTestUtils.setField(contractService, "workflowDemoEnabled", enabled);
         ContractCreateRequest request = createRequest();
         givenValidReferences(request);
@@ -128,10 +128,10 @@ class ContractServiceImplTest {
         });
         given(scheduleService.generateSchedulesByContractId(21L))
                 .willReturn(new ScheduleGenerationResult(List.of(100L, 101L), 3));
-        contractService.createContract(request, true);
+        contractService.createContract(request, requested);
         ArgumentCaptor<InsuranceContract> saved = ArgumentCaptor.forClass(InsuranceContract.class);
         verify(insuranceContractRepository).saveAndFlush(saved.capture());
-        assertThat(saved.getValue().isWorkflowDemoExcluded()).isEqualTo(enabled);
+        assertThat(saved.getValue().isWorkflowDemoExcluded()).isEqualTo(enabled && requested);
     }
 
     @Test

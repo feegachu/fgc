@@ -217,7 +217,7 @@ function renderPage(path = '/app/exceptions') {
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, actions: userEvent.setup(), unmount: view.unmount }
+  return { router, client, actions: userEvent.setup(), unmount: view.unmount }
 }
 const table = () => screen.findByRole('table', { name: '예외 목록' })
 
@@ -1444,4 +1444,27 @@ it('preserves a newer cached action when an older guide acknowledgement arrives'
   expect(item.status).toBe('RESOLVED')
   expect(item.actions).toEqual([newer])
   client.clear()
+})
+
+
+it('목록에서 사라진 선택 건은 서버 상세를 재조회해 다른 담당자의 해결을 반영한다', async () => {
+  let resolved = false
+  searchResponse = path => {
+    const open = new URL(path, 'http://localhost').searchParams.get('status') === 'OPEN'
+    return search(resolved && open ? [] : [{ ...baseCase, status: resolved ? 'RESOLVED' : 'NEW',
+      statusLabel: resolved ? '해결' : '신규', title: resolved ? '다른 담당자가 해결한 예외' : baseCase.title }])
+  }
+  const { client } = renderPage('/app/exceptions?status=OPEN&selected=11')
+  expect(await screen.findByRole('dialog')).toBeVisible()
+  resolved = true
+  await act(async () => { await client.invalidateQueries({ queryKey: ['exceptions', 'search'] }) })
+  expect(await within(screen.getByRole('dialog')).findByText('다른 담당자가 해결한 예외')).toBeVisible()
+  await waitFor(() => expect(screen.getByRole('button', { name: '예외 건 처리' })).toBeDisabled())
+})
+
+it('미처리 목록에 없는 해결 건의 URL로 처음 진입해도 상세를 조회한다', async () => {
+  searchResponse = path => search(new URL(path, 'http://localhost').searchParams.get('status') === 'OPEN'
+    ? [] : [{ ...baseCase, status: 'RESOLVED', statusLabel: '해결', title: '직접 연 해결 건' }])
+  renderPage('/app/exceptions?status=OPEN&selected=11')
+  expect(await within(await screen.findByRole('dialog')).findByText('직접 연 해결 건')).toBeVisible()
 })

@@ -47,9 +47,11 @@ class JournalPostingPortImplTest {
     private JournalPersistenceService persistenceService;
     @Mock
     private JournalHeaderRepository journalHeaderRepository;
+    @Mock
+    private JournalCorrectionService journalCorrections;
 
     private JournalPostingPortImpl port() {
-        return new JournalPostingPortImpl(sourceRepository, draftService, persistenceService, journalHeaderRepository);
+        return new JournalPostingPortImpl(sourceRepository, draftService, persistenceService, journalHeaderRepository, journalCorrections);
     }
 
     @Test
@@ -121,7 +123,7 @@ class JournalPostingPortImplTest {
         given(draftService.draftActualInsurerStatement(any())).willReturn(mock(JournalHeaderDraft.class));
         given(draftService.draftConfirmedFcPayout(any())).willReturn(mock(JournalHeaderDraft.class));
 
-        given(persistenceService.saveDraftInCurrentTransaction(any(), any(), any()))
+        given(persistenceService.saveDraft(any(), any(), any()))
                 .willReturn(draftHeaderRow(101L), draftHeaderRow(102L), draftHeaderRow(103L), draftHeaderRow(104L));
         given(journalHeaderRepository.markPosted(any(), any())).willReturn(1);
 
@@ -149,7 +151,7 @@ class JournalPostingPortImplTest {
         given(draftService.draftExpectedInsurerIncome(any())).willReturn(mock(JournalHeaderDraft.class));
         JournalHeaderRow existing = postedHeaderRow(101L);
         existing.setStatus(status);
-        given(persistenceService.saveDraftInCurrentTransaction(any(), any(), any())).willReturn(existing);
+        given(persistenceService.saveDraft(any(), any(), any())).willReturn(existing);
 
         JournalPostingResult result = port().post(newContext(42L));
 
@@ -166,7 +168,7 @@ class JournalPostingPortImplTest {
     void skipsWhenAnotherExecutionPostsAfterDraftWasRead() {
         given(sourceRepository.findExpectedInsurerIncomeSources(any(), any())).willReturn(List.of(scheduleRow(1L)));
         given(draftService.draftExpectedInsurerIncome(any())).willReturn(mock(JournalHeaderDraft.class));
-        given(persistenceService.saveDraftInCurrentTransaction(any(), any(), any())).willReturn(draftHeaderRow(101L));
+        given(persistenceService.saveDraft(any(), any(), any())).willReturn(draftHeaderRow(101L));
         given(journalHeaderRepository.markPosted(101L, 3L)).willReturn(0);
 
         JournalPostingResult result = port().post(newContext(42L));
@@ -191,7 +193,7 @@ class JournalPostingPortImplTest {
         given(sourceRepository.findActualInsurerStatementSources(any(), any())).willReturn(List.of());
         given(sourceRepository.findConfirmedFcPayoutSources(any(), any())).willReturn(List.of());
         given(draftService.draftExpectedInsurerIncome(any())).willReturn(mock(JournalHeaderDraft.class));
-        given(persistenceService.saveDraftInCurrentTransaction(any(), any(), any())).willReturn(draftHeaderRow(200L));
+        given(persistenceService.saveDraft(any(), any(), any())).willReturn(draftHeaderRow(200L));
         given(journalHeaderRepository.markPosted(200L, 3L)).willReturn(1);
 
         port().post(newContext(99L));
@@ -214,7 +216,7 @@ class JournalPostingPortImplTest {
     void propagatesPersistenceFailureWithoutSwallowing() {
         given(sourceRepository.findExpectedInsurerIncomeSources(any(), any())).willReturn(List.of(scheduleRow(1L)));
         given(draftService.draftExpectedInsurerIncome(any())).willReturn(mock(JournalHeaderDraft.class));
-        given(persistenceService.saveDraftInCurrentTransaction(any(), any(), any())).willThrow(new IllegalStateException("boom"));
+        given(persistenceService.saveDraft(any(), any(), any())).willThrow(new IllegalStateException("boom"));
 
         assertThatThrownBy(() -> port().post(newContext(42L)))
                 .isInstanceOf(IllegalStateException.class)

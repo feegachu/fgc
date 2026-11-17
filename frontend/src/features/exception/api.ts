@@ -83,21 +83,21 @@ export const exceptionOptionsQueryOptions = () =>
   })
 
 /** Refresh a selected case independently of list filters, including after it is resolved. */
-export const exceptionDetailQueryOptions = (seed: ExceptionCase | null) =>
+export const exceptionDetailQueryOptions = (selectedId: string | null, seed?: ExceptionCase) =>
   queryOptions({
-    queryKey: ['exceptions', 'detail', seed?.exceptionCaseId ?? null],
-    enabled: Boolean(seed?.exceptionCaseId),
-    initialData: seed ?? undefined,
-    staleTime: Infinity,
+    queryKey: ['exceptions', 'detail', Number(selectedId) || null],
+    enabled: Boolean(selectedId && /^[1-9]\d*$/.test(selectedId)) && !seed,
+    initialData: seed,
+    staleTime: 0,
     queryFn: async ({ signal }): Promise<ExceptionCase> => {
-      if (!seed?.exceptionCaseId) throw new Error('조회할 예외를 선택하세요.')
+      if (!selectedId) throw new Error('조회할 예외를 선택하세요.')
       for (let page = 1; ; page++) {
         const result = await get<ExceptionSearchResult>(searchPath({
-          type: seed.type ?? '', reasonCode: '', severity: '', status: ALL_STATUS,
-          assigneeFilter: '', validationMonth: seed.validationMonth ?? '', contractNo: seed.contractNo ?? '',
+          type: '', reasonCode: '', severity: '', status: ALL_STATUS,
+          assigneeFilter: '', validationMonth: '', contractNo: '',
           sort: 'exceptionCaseId,desc', page,
         }), signal)
-        const item = result.content?.find(row => row.exceptionCaseId === seed.exceptionCaseId)
+        const item = result.content?.find(row => String(row.exceptionCaseId) === selectedId)
         if (item) return item
         if (!result.content?.length || page >= (result.totalPages ?? 1)) {
           throw new Error('선택한 예외를 다시 불러오지 못했습니다.')

@@ -141,15 +141,14 @@ class ValidationRunDetailQueriesIntegrationTest {
                 """, Long.class, "PRE-CONFIRM-" + java.util.UUID.randomUUID(), contract, check, runId);
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"NORMAL", "VIOLATION"})
-    void monthlyValidationRedetectsExistingPaymentViolationWithoutDuplicatingAndHidesItWhenResolved(String monthlyResult) {
+    @Test
+    void monthlyValidationRedetectsExistingPaymentViolationWithoutDuplicatingAndHidesItWhenResolved() {
         LocalDate month = LocalDate.of(2033, 10, 1);
         Long run = insertValidationRun(month, 1);
         Long contract = contractId("FGC-FGL01-202607-0001");
         Long existing = insertPreConfirmViolation(run, contract);
         insertTarget(run, contract, "SELECTED", null);
-        insertCapCheck(run, contract, "GA_TO_FC", monthlyResult);
+        insertCapCheck(run, contract, "GA_TO_FC", "NORMAL");
 
         assertThat(validationRunRepository.summarize(run).orElseThrow().getCapViolationCount()).isEqualTo(1);
         assertThat(exceptionCaseRepository.insertFromCapChecks(run)).isZero();
@@ -211,6 +210,23 @@ class ValidationRunDetailQueriesIntegrationTest {
         var summary = validationRunRepository.summarize(run).orElseThrow();
         assertThat(summary.getCapViolationCount()).isZero();
         assertThat(summary.getExceptionDetectedCount()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"RESOLVED", "REJECTED"})
+    void closingCandidateViolationDoesNotHideAnIndependentMonthlyViolationOrAllowFinalization(String closedStatus) {
+        Long run = insertValidationRun(LocalDate.of(2033, 10, 1), 1);
+        Long contract = contractId("FGC-FGL01-202607-0001");
+        Long candidate = insertPreConfirmViolation(run, contract);
+        insertTarget(run, contract, "SELECTED", null);
+        insertCapCheck(run, contract, "GA_TO_FC", "VIOLATION");
+        assertThat(exceptionCaseRepository.insertFromCapChecks(run)).isEqualTo(1);
+        assertThat(exceptionCaseRepository.recordExistingPreConfirmViolations(run)).isZero();
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status=?,resolved_at=now() WHERE exception_case_id=?",
+                closedStatus, candidate);
+        assertThat(validationRunRepository.summarize(run).orElseThrow().getCapViolationCount()).isEqualTo(1);
+        assertThat(validationRunRepository.summarize(run).orElseThrow().getExceptionOpenWorkItemCount()).isEqualTo(1);
+        assertThat(validationRunRepository.findFinalizeChecklistCounts(run).orElseThrow().getUnresolvedExceptionCount()).isEqualTo(1);
     }
 
     private void insertArbitrageCheck(Long runId, Long contractId, String resultStatus) {

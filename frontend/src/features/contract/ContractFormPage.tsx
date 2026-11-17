@@ -291,7 +291,10 @@ function ContractEditor({
           }
         : undefined
       const updated = request ? await updateContract(id!, request, requestKey(request)) : undefined
-      const saved = updated ?? (await createContract(body, useWorkflowGuide.getState().settlementActive))
+      const guide = useWorkflowGuide.getState()
+      const workflowDemo = guide.settlementActive && guide.guideContext?.workflowId === 'settlement'
+        && guide.guideContext.stepId === 'contract.create'
+      const saved = updated ?? (await createContract(body, workflowDemo))
       committed = true
       setSavedSuccessfully(true)
       clearUnsaved()

@@ -8131,7 +8131,9 @@ export interface operations {
     createContract: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-FGC-Workflow-Demo"?: boolean;
+            };
             path?: never;
             cookie?: never;
         };

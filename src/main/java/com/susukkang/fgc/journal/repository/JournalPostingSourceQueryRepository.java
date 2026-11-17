@@ -29,6 +29,54 @@ public class JournalPostingSourceQueryRepository {
 
     private final EntityManager entityManager;
 
+    /** 원본 실행도 먼저 잠가 정정과 과거 실행 확정이 경합하지 않게 한다. */
+    public void lockExpectedJournalValidationRuns(Long contract, Long validation, LocalDate month) {
+        var states = entityManager.createNativeQuery("""
+                SELECT v.status FROM fgc.validation_run v
+                WHERE v.validation_run_id = :validation OR v.validation_run_id IN (
+                    SELECT j.validation_run_id FROM fgc.journal_header j
+                    JOIN fgc.schedule_line l ON l.schedule_line_id::text = j.source_entity_id
+                    JOIN fgc.schedule_header h USING(schedule_header_id)
+                    WHERE j.contract_id = :contract AND j.source_entity_type='SCHEDULE_LINE'
+                      AND j.journal_type IN ('EXPECTED_INSURER_INCOME','EXPECTED_FC_PAYOUT')
+                      AND j.status='POSTED' AND NOT h.active_yn AND l.due_month=:month
+                ) ORDER BY v.validation_run_id FOR UPDATE OF v
+                """, String.class).setParameter("contract", contract).setParameter("validation", validation)
+                .setParameter("month", month).getResultList();
+        if (states.contains("FINALIZED")) throw new com.susukkang.fgc.common.exception.FgcBusinessException(
+                com.susukkang.fgc.common.exception.FgcErrorCode.VRUN_003, java.util.Map.of("validationRunId", validation));
+    }
+
+    /** 재생성으로 비활성화된 운영 스케줄의 기표 원본과 현재 대체 라인. 원본 순으로 잠근다. */
+    public List<Object[]> findSupersededExpectedJournals(Long contract, LocalDate month) {
+        return entityManager.createNativeQuery("""
+                SELECT j.journal_header_id,
+                       (SELECT replacement.schedule_line_id
+                          FROM fgc.schedule_line replacement
+                          JOIN fgc.schedule_header current_header USING(schedule_header_id)
+                         WHERE current_header.contract_id = old_header.contract_id
+                           AND current_header.payment_stage = old_header.payment_stage
+                           AND current_header.schedule_purpose = 'OPERATIONAL' AND current_header.active_yn
+                           AND current_header.status NOT IN ('HOLD','CANCELLED')
+                           AND replacement.installment_no = old_line.installment_no
+                           AND replacement.commission_item_id = old_line.commission_item_id
+                           AND replacement.beneficiary_agent_id IS NOT DISTINCT FROM old_line.beneficiary_agent_id
+                           AND replacement.due_month = :month AND replacement.expected_amount > 0
+                           AND replacement.line_status NOT IN ('HOLD','CANCELLED')
+                         ORDER BY replacement.schedule_line_id DESC LIMIT 1) AS replacement_line_id
+                  FROM fgc.journal_header j
+                  JOIN fgc.schedule_line old_line ON old_line.schedule_line_id::text = j.source_entity_id
+                  JOIN fgc.schedule_header old_header USING(schedule_header_id)
+                 WHERE j.contract_id = :contract
+                   AND j.source_entity_type = 'SCHEDULE_LINE' AND j.status = 'POSTED'
+                   AND j.journal_type IN ('EXPECTED_INSURER_INCOME','EXPECTED_FC_PAYOUT')
+                   AND NOT old_header.active_yn AND old_header.schedule_purpose = 'OPERATIONAL'
+                   AND old_line.due_month = :month
+                 ORDER BY j.journal_header_id FOR UPDATE OF j
+                """, Object[].class).setParameter("contract", contract)
+                .setParameter("month", month).getResultList();
+    }
+
     public List<ScheduleJournalSourceRow> findExpectedInsurerIncomeSources(
             Long validationRunId, LocalDate validationMonth) {
         NativeQuery<?> query = createSourceQuery("""

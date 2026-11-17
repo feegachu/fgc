@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
 
 /**
  * Step 6a(journalPostingStep) 구현체. validation_target(SELECTED)·검증월 범위의
@@ -30,7 +32,7 @@ import java.util.List;
  *
  * 06_배치_Step_협업계약.md:18 "기표 오류는 Step 실패" 원칙에 따라 원천 1건 처리 중 예외가
  * 나면 catch하지 않고 그대로 전파해 Step을 실패시킨다 — capCheckStep·arbitrageCheckStep처럼
- * 건별 skip으로 넘기지 않는다. 공유 트랜잭션의 분개 저장이 멱등이므로
+ * 건별 skip으로 넘기지 않는다. 건별 커밋한 초안은 실패 후 재시작에서도 멱등이므로
  * (journal_type, source_entity_type, source_entity_id, revision_no) 원천은 재실행해도
  * 중복 기표되지 않는다 — 이미 POSTED인 원천은 postedJournalCount(신규 기표 건수)가 아니라
  * skips(ALREADY_POSTED)로 집계한다(코드리뷰 반영: 재실행 시 postedJournalCount가 항상
@@ -46,6 +48,7 @@ public class JournalPostingPortImpl implements JournalPostingPort {
     private final JournalEntryDraftService draftService;
     private final JournalPersistenceService persistenceService;
     private final JournalHeaderRepository journalHeaderRepository;
+    private final JournalCorrectionService journalCorrections;
 
     @Override
     @Transactional
@@ -106,22 +109,32 @@ public class JournalPostingPortImpl implements JournalPostingPort {
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     public void postExpectedForContract(Long contractId, Long validationRunId, LocalDate month, Long actor) {
         if (validationRunId == null) return;
+        sourceRepository.lockExpectedJournalValidationRuns(contractId, validationRunId, month);
         String requestId = "EXCP-SCHEDULE-" + validationRunId + "-" + contractId;
+        var groups = new HashMap<String, String>();
+        for (Object[] source : sourceRepository.findSupersededExpectedJournals(contractId, month)) {
+            var reversal = journalCorrections.reverse(new ReverseJournalCommand(((Number) source[0]).longValue(),
+                    "예상 스케줄 재생성에 따른 정정", requestId, actor));
+            if (source[1] != null) groups.put(source[1].toString(), reversal.correctionGroupKey());
+        }
         for (var row : sourceRepository.findExpectedInsurerIncomeSources(validationRunId, month)) {
             if (contractId.equals(row.getContractId())) {
-                postCorrectionDraft(expectedInsurerDraft(row, validationRunId), actor, requestId);
+                postCorrectionDraft(expectedInsurerDraft(row, validationRunId), actor, requestId, groups.get(row.getScheduleLineId().toString()));
             }
         }
         for (var row : sourceRepository.findExpectedFcPayoutSources(validationRunId, month)) {
             if (contractId.equals(row.getContractId())) {
-                postCorrectionDraft(expectedFcDraft(row, validationRunId), actor, requestId);
+                postCorrectionDraft(expectedFcDraft(row, validationRunId), actor, requestId, groups.get(row.getScheduleLineId().toString()));
             }
         }
     }
 
-    private void postCorrectionDraft(JournalHeaderDraft draft, Long actor, String requestId) {
+    private void postCorrectionDraft(JournalHeaderDraft draft, Long actor, String requestId, String groupKey) {
         var saved = persistenceService.saveDraftInCurrentTransaction(draft, actor, requestId);
         if ("DRAFT".equals(saved.getStatus())) {
+            if (groupKey != null && journalHeaderRepository.linkReplacementGroup(saved.getJournalHeaderId(), groupKey) != 1) {
+                throw new IllegalStateException("대체 예상 분개의 정정 연결을 저장하지 못했습니다.");
+            }
             journalHeaderRepository.markPosted(saved.getJournalHeaderId(), actor);
         }
     }
@@ -161,7 +174,7 @@ public class JournalPostingPortImpl implements JournalPostingPort {
      */
     private long postAndCommit(JournalHeaderDraft draft, Long contractId, Long triggeredBy,
                                 String requestId, List<ContractSkip> skips) {
-        JournalHeaderRow saved = persistenceService.saveDraftInCurrentTransaction(draft, triggeredBy, requestId);
+        JournalHeaderRow saved = persistenceService.saveDraft(draft, triggeredBy, requestId);
         if ("DRAFT".equals(saved.getStatus())
                 && journalHeaderRepository.markPosted(saved.getJournalHeaderId(), triggeredBy) == 1) {
             return 1;

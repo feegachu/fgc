@@ -231,12 +231,16 @@ public class ContractServiceImpl implements ContractService {
     @Override
     @Transactional
     public ContractCreateResponse createContract(ContractCreateRequest request) {
-        return createContract(request, false);
+        return createContractInternal(request, false);
     }
 
     @Override
     @Transactional
     public ContractCreateResponse createContract(ContractCreateRequest request, boolean workflowDemo) {
+        return createContractInternal(request, workflowDemo);
+    }
+
+    private ContractCreateResponse createContractInternal(ContractCreateRequest request, boolean workflowDemo) {
         // 1. 계약일·기준정보·소속 관계와 계약번호 중복 여부 검증
         validateInput(request);
 

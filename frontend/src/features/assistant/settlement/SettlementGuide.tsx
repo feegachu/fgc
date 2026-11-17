@@ -60,6 +60,10 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
     [paymentNo, setPaymentNo] = useState('')
   const [stage, setStage] = useState<Selection['stage']>('GA_TO_FC')
   const [decision, setDecision] = useState<Decision | null>(null)
+  useLayoutEffect(() => {
+    useWorkflowGuide.setState({ guideContext: decision ? { workflowId: 'settlement', stepId: decision.step } : null })
+    return () => { useWorkflowGuide.setState({ guideContext: null }) }
+  }, [decision])
   const [progressNotice, setProgressNotice] = useState('')
   const [collapsed, setCollapsed] = useState(false)
   const [busy, setBusy] = useState(false),

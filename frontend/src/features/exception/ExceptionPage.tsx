@@ -98,11 +98,7 @@ export function ExceptionPage() {
   }
   const rows = data?.content ?? []
   const listedSelection = rows.find((row) => String(row.exceptionCaseId) === selectedId)
-  const [selectionSnapshot, setSelectionSnapshot] = useState<ExceptionCase | null>(null)
-  if (listedSelection && listedSelection !== selectionSnapshot) setSelectionSnapshot(listedSelection)
-  else if (!selectedId && selectionSnapshot) setSelectionSnapshot(null)
-  const selectedDetail = useQuery(exceptionDetailQueryOptions(listedSelection
-    ?? (String(selectionSnapshot?.exceptionCaseId) === selectedId ? selectionSnapshot : null)))
+  const selectedDetail = useQuery(exceptionDetailQueryOptions(selectedId, listedSelection))
   const selected = selectedId ? listedSelection ?? selectedDetail.data : undefined
   const ownReview = selected?.status === 'IN_REVIEW' && selected.assigneeLoginId === user?.loginId
   const sourceCorrection = ['CAP_WARNING', 'CAP_VIOLATION', 'CAP_REVIEW_REQUIRED', 'RECONCILIATION_MISMATCH'].includes(selected?.type ?? '')
