@@ -92,8 +92,10 @@ public class ContractController {
      */
     @PostMapping
     @PreAuthorize(Roles.CAN_PROCESS)
-    public ApiResponse<ContractCreateResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
-        return ApiResponse.success(contractService.createContract(request));
+    public ApiResponse<ContractCreateResponse> createContract(@Valid @RequestBody ContractCreateRequest request,
+            @RequestHeader(name = "X-FGC-Workflow-Demo", defaultValue = "false") boolean workflowDemo) {
+        return ApiResponse.success(workflowDemo ? contractService.createContract(request, true)
+                : contractService.createContract(request));
     }
     /**
      * 설명 : 보험계약을 계약 수정

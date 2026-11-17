@@ -13635,6 +13635,15 @@
       },
       "post" : {
         "operationId" : "createContract",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-FGC-Workflow-Demo",
+          "required" : false,
+          "schema" : {
+            "default" : false,
+            "type" : "boolean"
+          }
+        } ],
         "requestBody" : {
           "content" : {
             "application/json" : {

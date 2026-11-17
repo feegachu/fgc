@@ -82,6 +82,31 @@ export const exceptionOptionsQueryOptions = () =>
     staleTime: 5 * 60_000,
   })
 
+/** Refresh a selected case independently of list filters, including after it is resolved. */
+export const exceptionDetailQueryOptions = (selectedId: string | null, seed?: ExceptionCase) =>
+  queryOptions({
+    queryKey: ['exceptions', 'detail', Number(selectedId) || null],
+    enabled: Boolean(selectedId && /^[1-9]\d*$/.test(selectedId)) && !seed,
+    initialData: seed,
+    staleTime: 0,
+    queryFn: async ({ signal }): Promise<ExceptionCase> => {
+      if (!selectedId) throw new Error('조회할 예외를 선택하세요.')
+      for (let page = 1; ; page++) {
+        const result = await get<ExceptionSearchResult>(searchPath({
+          type: '', reasonCode: '', severity: '', status: ALL_STATUS,
+          assigneeFilter: '', validationMonth: '', contractNo: '',
+          sort: 'exceptionCaseId,desc', page,
+        }), signal)
+        const item = result.content?.find(row => String(row.exceptionCaseId) === selectedId)
+        if (item) return item
+        if (!result.content?.length || page >= (result.totalPages ?? 1)) {
+          throw new Error('선택한 예외를 다시 불러오지 못했습니다.')
+        }
+      }
+    },
+    meta: { errorToast: false },
+  })
+
 export const journalAccountsQueryOptions = () =>
   queryOptions({
     queryKey: ['journals', 'accounts'],
@@ -134,32 +159,37 @@ export async function postJournalCorrection(
  * 사라져 패널이 비므로, 사용자가 다시 조회할 때까지 행을 그대로 두고 값만 바꾼다.
  * 요약 카드 건수는 다음 조회 때 갱신되도록 stale 로만 표시한다.
  */
-export function applyActionToCache(
+export async function applyActionToCache(
   client: QueryClient,
   exceptionCaseId: number,
   action: ExceptionAction,
   extra: Partial<ExceptionCase> = {},
 ) {
+  await Promise.all([
+    client.cancelQueries({ queryKey: ['exceptions', 'detail', exceptionCaseId], exact: true }),
+    client.cancelQueries({ queryKey: ['exceptions', 'search'] }),
+  ])
+  const update = (item: ExceptionCase): ExceptionCase =>
+    item.exceptionCaseId === exceptionCaseId && !item.actions?.some(existing => Number(existing.actionSeq) >= Number(action.actionSeq))
+      ? {
+          ...item,
+          status: action.toStatus,
+          statusLabel: action.toStatusLabel,
+          ...(['ASSIGN', 'START_REVIEW', 'REOPEN'].includes(action.actionType ?? '')
+            ? { assignedTo: action.actionBy, assigneeLoginId: action.actionByLoginId }
+            : {}),
+          ...extra,
+          actions: [...(item.actions ?? []), action],
+        }
+      : item
   client.setQueriesData<ExceptionSearchResult>({ queryKey: ['exceptions', 'search'] }, (current) => {
     if (!current) return current
     return {
       ...current,
-      content: current.content?.map((item) =>
-        item.exceptionCaseId === exceptionCaseId && !item.actions?.some((existing) => Number(existing.actionSeq) >= Number(action.actionSeq))
-          ? {
-              ...item,
-              status: action.toStatus,
-              statusLabel: action.toStatusLabel,
-              ...(['ASSIGN', 'START_REVIEW', 'REOPEN'].includes(action.actionType ?? '')
-                ? { assignedTo: action.actionBy, assigneeLoginId: action.actionByLoginId }
-                : {}),
-              ...extra,
-              actions: [...(item.actions ?? []), action],
-            }
-          : item,
-      ),
+      content: current.content?.map(update),
     }
   })
+  client.setQueryData<ExceptionCase>(['exceptions', 'detail', exceptionCaseId], current => current ? update(current) : undefined)
   void client.invalidateQueries({ queryKey: ['exceptions', 'search'], refetchType: 'none' })
   if (action.fromStatus !== action.toStatus) void client.invalidateQueries({ queryKey: ['exceptions', 'counts'] })
   if (action.actionType === 'ASSIGN') void client.invalidateQueries({ queryKey: ['exceptions', 'options'] })

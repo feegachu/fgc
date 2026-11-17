@@ -132,8 +132,10 @@ public interface ValidationTargetRepository extends JpaRepository<ValidationTarg
                    contract_id,
                    product_offering_id,
                    CASE WHEN matching_count = 1 THEN refund_rate_table_id END,
-                   CASE WHEN matching_count = 1 THEN 'SELECTED' ELSE 'REVIEW_REQUIRED' END,
+                   CASE WHEN fgc.is_workflow_demo_contract(contract_id) THEN 'EXCLUDED'
+                        WHEN matching_count = 1 THEN 'SELECTED' ELSE 'REVIEW_REQUIRED' END,
                    CASE
+                       WHEN fgc.is_workflow_demo_contract(contract_id) THEN '전체 업무 가이드 시연 계약 (월 검증 제외)'
                        WHEN candidate_count = 0 THEN '예상 해약환급률표 없음'
                        WHEN matching_count = 0 THEN '상품코드 불일치'
                        WHEN matching_count > 1 THEN '예상 해약환급률표 중복'
@@ -149,7 +151,8 @@ public interface ValidationTargetRepository extends JpaRepository<ValidationTarg
                        'channelCode', channel_code,
                        'standardProductCode', standard_product_code,
                        'refundRateCandidateCount', candidate_count,
-                       'refundRateMatchingCount', matching_count
+                       'refundRateMatchingCount', matching_count,
+                       'workflowDemoExcluded', fgc.is_workflow_demo_contract(contract_id)
                    )
               FROM resolved
             ON CONFLICT (validation_run_id, contract_id)

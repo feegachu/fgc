@@ -46,6 +46,72 @@ class PaymentJournalCorrectionIntegrationTest {
     @Autowired com.susukkang.fgc.exceptioncase.service.ExceptionCaseService exceptionActions;
     @Autowired com.susukkang.fgc.cap.service.CapCheckService capChecks;
 
+    private record ScheduleCorrectionFixture(Long capException, Long gaRun, Long insurerRun, Long oldGaJournal, Long oldInsurerJournal) {}
+
+    @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    @WithMockUser(roles = "SETTLEMENT")
+    void scheduleRecheckCommitsOrRollsBackJournalsBothReconciliationsAndTheActionTogether() {
+        var f = transactions.execute(tx -> {
+            var payment = fixture(PaymentStage.GA_TO_FC, "80", "100");
+            Long policy = id("SELECT policy_version_id FROM fgc.schedule_header WHERE contract_id=? AND active_yn", contractId);
+            Long oldGa = id("SELECT journal_header_id FROM fgc.journal_header WHERE validation_run_id=? AND journal_type='EXPECTED_FC_PAYOUT'", validationRunId);
+            paymentStage = PaymentStage.INSURER_TO_GA;
+            Long insurerLine = insertSchedule(contractId, policy, payment.item(), null, 1, "50");
+            Long oldInsurer = insertPostedJournal("EXPECTED_INSURER_INCOME", "SCHEDULE_LINE", insurerLine,
+                    contractId, null, payment.item(), "50", "EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
+            Long insurer = id("SELECT insurer_id FROM fgc.insurance_contract WHERE contract_id=?", contractId);
+            Long insurerRun = jdbcTemplate.queryForObject("""
+                    INSERT INTO fgc.reconciliation_run(settlement_month,payment_stage,insurer_id,validation_run_id)
+                    VALUES (?,'INSURER_TO_GA',?,?) RETURNING reconciliation_run_id
+                    """, Long.class, TEST_MONTH, insurer, validationRunId);
+            jdbcTemplate.update("UPDATE fgc.reconciliation_run SET status='RUNNING',started_at=now() WHERE reconciliation_run_id=?", insurerRun);
+            execution.executeInTransaction(new ReconciliationExecutionRequest(insurerRun, validationRunId, TEST_MONTH,
+                    PaymentStage.INSURER_TO_GA, insurer, 1L));
+            jdbcTemplate.update("UPDATE fgc.schedule_header SET active_yn=false WHERE contract_id=? AND active_yn", contractId);
+            insertSchedule(contractId, policy, payment.item(), null, 1, "40", "OPERATIONAL", null, true, 302);
+            paymentStage = PaymentStage.GA_TO_FC;
+            insertSchedule(contractId, policy, payment.item(), payment.agent(), 1, "80", "OPERATIONAL", null, true, 302);
+            // 기존 미처리 스케줄 판정을 실제 계산기로 재점검한다.
+            Long check = jdbcTemplate.queryForObject("""
+                    INSERT INTO fgc.cap_check(contract_id,payment_stage,cap_rule_set_id,check_kind,as_of_date,
+                        base_premium_amount,limit_amount,included_amount,remaining_amount,usage_pct,result_status)
+                    SELECT ?,'GA_TO_FC',min(cap_rule_set_id),'MANUAL',?,100,90,100,-10,111,'VIOLATION'
+                    FROM fgc.cap_rule_set WHERE payment_stage='GA_TO_FC' RETURNING cap_check_id
+                    """, Long.class, contractId, TEST_MONTH);
+            Long exception = jdbcTemplate.queryForObject("""
+                    INSERT INTO fgc.exception_case(exception_key,exception_type,severity,status,contract_id,
+                        validation_month,validation_run_id,first_detected_run_id,last_detected_run_id,
+                        source_entity_type,source_entity_id,cap_check_id,title)
+                    VALUES (?,'CAP_VIOLATION','CRITICAL','NEW',?,?,?,?,?,'CAP_CHECK',?,?,'스케줄 재점검')
+                    RETURNING exception_case_id
+                    """, Long.class, "SCHEDULE-ATOMIC-"+UUID.randomUUID(), contractId, TEST_MONTH,
+                    validationRunId, validationRunId, validationRunId, check.toString(), check);
+            startException(exception);
+            return new ScheduleCorrectionFixture(exception, payment.run(), insurerRun, oldGa, oldInsurer);
+        });
+        assertThatThrownBy(() -> transactions.execute(tx -> {
+            assertThat(exceptionPayments.recheckSchedule(f.capException(), 1L, "admin").resolved()).isTrue();
+            throw new IllegalStateException("schedule recheck rollback");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(status(f.capException())).isEqualTo("IN_REVIEW");
+        for (Long run : List.of(f.gaRun(), f.insurerRun())) {
+            assertThat(jdbcTemplate.queryForObject("SELECT superseded_yn FROM fgc.reconciliation_run WHERE reconciliation_run_id=?", Boolean.class, run)).isFalse();
+        }
+        assertThat(id("SELECT count(*) FROM fgc.journal_header WHERE journal_header_id IN (?,?) AND status='POSTED'", f.oldGaJournal(), f.oldInsurerJournal())).isEqualTo(2);
+        assertThat(id("SELECT count(*) FROM fgc.journal_correction_group WHERE original_journal_header_id IN (?,?)", f.oldGaJournal(), f.oldInsurerJournal())).isZero();
+        assertThat(exceptionPayments.recheckSchedule(f.capException(), 1L, "admin").resolved()).isTrue();
+        assertThat(status(f.capException())).isEqualTo("RESOLVED");
+        for (Long run : List.of(f.gaRun(), f.insurerRun())) {
+            assertThat(jdbcTemplate.queryForObject("SELECT superseded_yn FROM fgc.reconciliation_run WHERE reconciliation_run_id=?", Boolean.class, run)).isTrue();
+        }
+        assertThat(id("SELECT count(*) FROM fgc.journal_correction_group WHERE original_journal_header_id IN (?,?)", f.oldGaJournal(), f.oldInsurerJournal())).isEqualTo(2);
+        assertThat(id("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id=? AND action_type='CORRECT'", f.capException())).isEqualTo(1);
+        Long resolvedExceptionId = f.capException();
+        assertThatThrownBy(() -> exceptionPayments.recheckSchedule(resolvedExceptionId, 1L, "admin")).isInstanceOf(FgcBusinessException.class);
+        assertThat(id("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id=? AND action_type='CORRECT'", f.capException())).isEqualTo(1);
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.EnumSource(PaymentStage.class)
     @WithMockUser(roles = "SETTLEMENT")

@@ -1,6 +1,6 @@
 import { plannedBasisPresentation, UPPER_BOUND_NOTE } from '../arbitrage/planned-basis'
 import { returnLink } from '../transaction/payment-entry'
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef } from 'react'
 import { guideFeatureId } from '../assistant/feature-ids'
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -97,33 +97,7 @@ export function ContractTabs({
   revised?: boolean
 }) {
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([])
-  const previewRoot = useRef<HTMLDivElement>(null)
-  const [preview, setPreview] = useState<ContractTab | null>(null)
-  const activeRef = useRef(active)
-  useLayoutEffect(() => { activeRef.current = active }, [active])
-  useEffect(() => {
-    const root = previewRoot.current
-    if (!revised || !root) return
-    let timer: ReturnType<typeof setInterval> | undefined
-    const stop = () => { clearInterval(timer); setPreview(null) }
-    const start = () => {
-      clearInterval(timer)
-      setPreview(activeRef.current)
-      timer = setInterval(() => {
-        if (document.querySelector('[role="dialog"]')) return
-        setPreview(current => tabs[(tabs.findIndex(([name]) => name === (current ?? activeRef.current)) + 1) % tabs.length][0])
-      }, 2000)
-    }
-    root.addEventListener('fgc-contract-tabs-start', start)
-    root.addEventListener('fgc-contract-tabs-stop', stop)
-    return () => {
-      clearInterval(timer)
-      root.removeEventListener('fgc-contract-tabs-start', start)
-      root.removeEventListener('fgc-contract-tabs-stop', stop)
-    }
-  }, [revised])
-  const selected = revised ? preview ?? active : active
-  const displayed = tabs.some(([name]) => name === selected) ? selected : 'basic'
+  const displayed = tabs.some(([name]) => name === active) ? active : 'basic'
   useEffect(() => {
     if (!revised) return
     const button = tabButtons.current[tabs.findIndex(([name]) => name === displayed)]
@@ -134,12 +108,11 @@ export function ContractTabs({
       : current.left < viewport.left ? current.left - viewport.left : 0
     if (offset) list.scrollBy({ left: offset, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
   }, [displayed, revised])
-  const choose = (tab: ContractTab) => preview !== null ? setPreview(tab) : onSelect(tab)
   const visibleTabs = agentOnly ? tabs.filter(([name]) => name === 'basic') : tabs
   return (
     <RevisedDetail.Provider value={revised}>
     <div className={revised ? 'contract-detail-workspace' : 'contract-detail-legacy-wrapper'}>
-    <div ref={previewRoot} className={revised ? 'contract-detail-primary' : 'contract-detail-legacy-wrapper'}
+    <div className={revised ? 'contract-detail-primary' : 'contract-detail-legacy-wrapper'}
       data-guide-target="contract.tabContent" data-guide-description={contractTabDescriptions[displayed]}>
       <div className="tab-list contract-detail-tabs" role="tablist" aria-label="계약 상세 영역">
         {visibleTabs.map(([name, label], index) => (
@@ -155,7 +128,7 @@ export function ContractTabs({
             aria-selected={displayed === name}
             aria-controls={`contract-panel-${name}`}
             tabIndex={displayed === name ? 0 : -1}
-            onClick={() => choose(name)}
+            onClick={() => onSelect(name)}
             onKeyDown={(event) => {
               const next =
                 event.key === 'ArrowRight'
@@ -169,7 +142,7 @@ export function ContractTabs({
                         : null
               if (next == null) return
               event.preventDefault()
-              choose(visibleTabs[next][0])
+              onSelect(visibleTabs[next][0])
               tabButtons.current[next]?.focus()
             }}
           >
@@ -273,7 +246,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
 
 type ScheduleLine = NonNullable<ContractSchedule['lines']>[number]
 const scheduleColumns: TableColumn<ScheduleLine>[] = [
-  { key: 'installment', label: '회차', render: (row) => int(row.installmentNo) },
+  { key: 'installment', label: '개월', render: (row) => int(row.installmentNo) },
   { key: 'dueDate', label: '예정일', render: (row) => date(row.dueDate) },
   { key: 'item', label: '수수료 항목', render: (row) => <Text value={row.commissionItemName} /> },
   { key: 'recipient', label: '수취인', render: (row) => <Text value={row.recipientName} /> },

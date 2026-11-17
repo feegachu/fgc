@@ -28,7 +28,7 @@ class CompareSummaryServiceTest {
     void describeHasOnlyRankingFacts() {
         String data = CompareSummaryService.describe(ranking());
 
-        assertThat(data).contains("1위 가보험 든든건강", "684,000원", "2위 나보험 튼튼건강")
+        assertThat(data).contains("1위 가보험 든든건강", "684,000원", "2위 나보험 튼튼건강", "해지 가정: 12개월 차에 해지")
                 .doesNotContain("agent", "계약번호", "주민");
     }
 

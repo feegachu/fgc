@@ -13,7 +13,7 @@ import { useWorkspaceStore } from '../../stores/workspace'
 import { useUnsavedWorkStore } from '../../stores/unsavedWork'
 import { validateCorrectionLines } from './correctionLines'
 import type { ExceptionCase, ExceptionOptions, ExceptionSearchResult } from './api'
-import { applyActionToCache } from './api'
+import { applyActionToCache, exceptionDetailQueryOptions } from './api'
 
 // Legacy action-guide regression fixtures do not expose comparison controls in the app.
 let legacyHelpContext = false
@@ -217,7 +217,7 @@ function renderPage(path = '/app/exceptions') {
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, actions: userEvent.setup(), unmount: view.unmount }
+  return { router, client, actions: userEvent.setup(), unmount: view.unmount }
 }
 const table = () => screen.findByRole('table', { name: '예외 목록' })
 
@@ -319,12 +319,12 @@ describe('EXCP-W01 예외함', () => {
     expect(screen.getByLabelText('상태')).toHaveValue('ALL')
   })
 
-  it('미처리 예외가 없어도 기본 7개 요약 카드를 0건으로 유지한다', async () => {
+  it('미처리 예외가 없으면 별도 안내 없이 기본 7개 요약 카드만 0건으로 유지한다', async () => {
     searchResponse = () => ({ ...search([]), summary: [] })
     renderPage()
-    await screen.findByText('미처리 예외가 없습니다.')
-    const summary = screen.getByRole('region', { name: '예외와 모니터링 요약' })
-    expect(within(summary).getAllByRole('link', { name: /0건$/ })).toHaveLength(7)
+    const summary = await screen.findByRole('region', { name: '예외와 모니터링 요약' })
+    expect(await within(summary).findAllByRole('link', { name: /0건$/ })).toHaveLength(7)
+    expect(screen.queryByText('미처리 예외가 없습니다.')).not.toBeInTheDocument()
   })
 
   it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건을 유지한다', async () => {
@@ -719,7 +719,14 @@ describe('EXCP-W01 예외함', () => {
   it('금액 차이 예외는 해당 지급 원장을 모달로 열고 기존 역분개 및 재기표 절차로 연결한다', async () => {
     const mismatch: ExceptionCase = { ...baseCase, type: 'RECONCILIATION_MISMATCH', reconciliationResultType: 'AMOUNT_DIFFERENCE', title: '금액 차이 20,000원 — 예상 845,000 / 실제 825,000',
       status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }
-    searchResponse = () => search([mismatch])
+    let corrected = false
+    searchResponse = path => {
+      if (corrected && new URLSearchParams(path.split('?')[1]).get('status') === 'OPEN') return search([])
+      return search([corrected ? { ...mismatch, status: 'RESOLVED', statusLabel: '해결', actions: [{
+        actionSeq: 1, actionType: 'CORRECT', actionTypeLabel: '정정', fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED',
+        reason: '원장 정정 후 재대사 일치 확인',
+      }] } : mismatch])
+    }
     const original = vi.mocked(apiClient.request).getMockImplementation()!
     vi.mocked(apiClient.request).mockImplementation((async (path: string, init: Parameters<typeof apiClient.request>[1] = {}) => {
       if (path.endsWith('/payment-correction') && !init.method) return envelope({ payments: [
@@ -739,9 +746,10 @@ describe('EXCP-W01 예외함', () => {
         { originalLineNo: 1, debitAmount: 845000, creditAmount: 0 },
         { originalLineNo: 2, debitAmount: 0, creditAmount: 845000 },
       ] })
+      corrected = true
       return { reversalOfId: 70, journalHeaderId: 71, repostedJournalHeaderId: 72 }
     }
-    const { actions } = renderPage('/app/exceptions?selected=11')
+    const { actions, router } = renderPage('/app/exceptions?status=OPEN&selected=11')
     await actions.click(await screen.findByRole('button', { name: '예외 건 처리' }))
     const ledger = await screen.findByRole('dialog', { name: '검증원장 지급 기록 정정' })
     expect(await within(ledger).findByRole('table', { name: '분개별 차변 및 대변 내역' })).toHaveTextContent('825,000')
@@ -758,6 +766,12 @@ describe('EXCP-W01 예외함', () => {
     await actions.type(correction.getByLabelText(/사유/), '기록 오류 정정')
     await actions.click(correction.getByRole('button', { name: '등록' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /^역분개 \+ 재기표$/ })).not.toBeInTheDocument())
+    const detail = await screen.findByRole('dialog', { name: /^예외 상세/ })
+    expect(await within(detail).findByText('해결', { exact: true })).toBeInTheDocument()
+    expect(within(detail).getByText('원장 정정 후 재대사 일치 확인')).toBeInTheDocument()
+    expect(document.querySelector('.exception-table')).toHaveTextContent('조건에 맞는 자료가 없습니다.')
+    expect(new URLSearchParams(router.state.location.search).get('status')).toBe('OPEN')
+    expect(new URLSearchParams(router.state.location.search).get('selected')).toBe('11')
     expect(requests().filter(([path, init]) => init?.method === 'POST' && path.includes('/payment-correction'))).toHaveLength(0)
   })
 
@@ -898,10 +912,12 @@ describe('EXCP-W01 예외함', () => {
     const list = await table()
     expect(within(list).getByRole('link', { name: /^1,200% 판정$/ })).toHaveAttribute('href', '/app/cap-checks?contractNo=C-0001')
   })
-  it.each(['뒤로가기', 'Escape', '창 닫기'])('지급건 참조는 숨기고 계산근거 모달의 %s는 원래 예외 상세로 돌아온다', async (closeAction) => {
+  it.each(['COMMISSION_TRANSACTION', 'CAP_CHECK'].flatMap(sourceType =>
+    ['뒤로가기', 'Escape', '창 닫기'].map(closeAction => ({ sourceType, closeAction })),
+  ))('$sourceType 참조는 숨기고 계산근거 모달의 $closeAction은 원래 예외 상세로 돌아온다', async ({ sourceType, closeAction }) => {
     searchResponse = () => search([{ ...baseCase,
-      sourceEntityType: 'COMMISSION_TRANSACTION', sourceEntityId: '91',
-      sourceLink: '/payments?selected=91', capBasisLink: '/cap-checks?capCheckId=42',
+      sourceEntityType: sourceType, sourceEntityId: '91',
+      sourceLink: sourceType === 'CAP_CHECK' ? '/cap-checks?capCheckId=91' : '/payments?selected=91', capBasisLink: '/cap-checks?capCheckId=42',
     }])
     const original = vi.mocked(apiClient.request).getMockImplementation()!
     vi.mocked(apiClient.request).mockImplementation((async (path: string, init: Parameters<typeof apiClient.request>[1] = {}) => {
@@ -910,6 +926,7 @@ describe('EXCP-W01 예외함', () => {
     }) as typeof apiClient.request)
     const { router, actions } = renderPage('/app/exceptions?selected=11&status=ALL&contractNo=C-0001')
     const dialog = await screen.findByRole('dialog', { name: /^예외 상세/ })
+    expect(within(dialog).queryByText('참조')).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('link', { name: '지급 건 열기' })).not.toBeInTheDocument()
     const before = router.state.location.pathname + router.state.location.search
     await actions.click(within(dialog).getByRole('button', { name: '1,200% 계산근거 열기' }))
@@ -1033,7 +1050,7 @@ describe('EXCP-W01 예외함', () => {
     fireEvent.change(dateInput, { target: { value: '2027-11-07' } })
     const updatedPlanned = within(dialog).getByRole('table', { name: '이연 지급 및 귀속 내역' })
     expect(within(updatedPlanned).getByLabelText('2번 귀속 내역 귀속일')).toHaveValue('2027-11-07')
-    expect(within(updatedPlanned).getByLabelText('2번 귀속 내역 귀속월')).toHaveValue('2027-11-01')
+    expect(within(updatedPlanned).getByLabelText('2번 귀속 내역 귀속월')).toHaveValue('2027-11')
     expect(within(dialog).getByLabelText(/^정산월/)).toHaveValue('2027-11')
     expect(within(dialog).getByLabelText(/이연 금액 \(원\)/)).toHaveValue(60000)
     await actions.click(within(dialog).getByRole('button', { name: '사전검증' }))
@@ -1307,11 +1324,11 @@ it.each([
   expect(requests().filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
 })
 
-it('does not append a cached action twice or overwrite a newer cached status', () => {
+it('does not append a cached action twice or overwrite a newer cached status', async () => {
   const client = new QueryClient()
   const action = { actionSeq: 1, actionType: 'START_REVIEW', toStatus: 'IN_REVIEW' } as const
   client.setQueryData(['exceptions', 'search'], search([{ ...baseCase, status: 'RESOLVED', actions: [action] }]))
-  applyActionToCache(client, 11, action)
+  await applyActionToCache(client, 11, action)
   const item = client.getQueryData<ExceptionSearchResult>(['exceptions', 'search'])!.content![0]
   expect(item.actions).toHaveLength(1)
   expect(item.status).toBe('RESOLVED')
@@ -1418,13 +1435,63 @@ it('gives different exception summary types distinct guide targets and preserves
   expect(document.querySelector('[data-guide-feature="features.exception.exception-page.link-3"]')).toBeNull()
 })
 
-it('preserves a newer cached action when an older guide acknowledgement arrives', () => {
+it('preserves a newer cached action when an older guide acknowledgement arrives', async () => {
   const client = new QueryClient()
   const newer = { actionSeq: 2, toStatus: 'RESOLVED' as const }
   client.setQueryData(['exceptions', 'search'], search([{ ...baseCase, status: 'RESOLVED', actions: [newer] }]))
-  applyActionToCache(client, 11, { actionSeq: 1, toStatus: 'IN_REVIEW' })
+  await applyActionToCache(client, 11, { actionSeq: 1, toStatus: 'IN_REVIEW' })
   const item = client.getQueryData<ExceptionSearchResult>(['exceptions', 'search'])!.content![0]
   expect(item.status).toBe('RESOLVED')
   expect(item.actions).toEqual([newer])
+  client.clear()
+})
+
+
+it('목록에서 사라진 선택 건은 서버 상세를 재조회해 다른 담당자의 해결을 반영한다', async () => {
+  let resolved = false
+  searchResponse = path => {
+    const open = new URL(path, 'http://localhost').searchParams.get('status') === 'OPEN'
+    return search(resolved && open ? [] : [{ ...baseCase, status: resolved ? 'RESOLVED' : 'NEW',
+      statusLabel: resolved ? '해결' : '신규', title: resolved ? '다른 담당자가 해결한 예외' : baseCase.title }])
+  }
+  const { client } = renderPage('/app/exceptions?status=OPEN&selected=11')
+  expect(await screen.findByRole('dialog')).toBeVisible()
+  resolved = true
+  await act(async () => { await client.invalidateQueries({ queryKey: ['exceptions', 'search'] }) })
+  expect(await within(screen.getByRole('dialog')).findByText('다른 담당자가 해결한 예외')).toBeVisible()
+  await waitFor(() => expect(screen.getByRole('button', { name: '예외 건 처리' })).toBeDisabled())
+})
+
+it('미처리 목록에 없는 해결 건의 URL로 처음 진입해도 상세를 조회한다', async () => {
+  searchResponse = path => search(new URL(path, 'http://localhost').searchParams.get('status') === 'OPEN'
+    ? [] : [{ ...baseCase, status: 'RESOLVED', statusLabel: '해결', title: '직접 연 해결 건' }])
+  renderPage('/app/exceptions?status=OPEN&selected=11')
+  expect(await within(await screen.findByRole('dialog')).findByText('직접 연 해결 건')).toBeVisible()
+})
+
+
+it('정정 전에 시작된 상세·목록 응답은 해결 상태와 조치 이력을 덮어쓰지 않는다', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const detailKey = ['exceptions', 'detail', 11]
+  const listKey = ['exceptions', 'search', 'race']
+  const previous = { ...baseCase, status: 'IN_REVIEW' as const, actions: [] }
+  client.setQueryData(detailKey, previous)
+  client.setQueryData(listKey, search([previous]))
+  let finishDetail!: (value: ExceptionSearchResult) => void
+  let finishList!: (value: ExceptionSearchResult) => void
+  vi.mocked(apiClient.request).mockImplementationOnce(() => new Promise(resolve => { finishDetail = data => resolve({ data, error: null, requestId: 'race' }) }))
+  const detailRequest = client.fetchQuery(exceptionDetailQueryOptions('11')).catch(() => undefined)
+  const listRequest = client.fetchQuery({ queryKey: listKey, queryFn: ({ signal }) => {
+    void signal.aborted
+    return new Promise<ExceptionSearchResult>(resolve => { finishList = resolve })
+  } }).catch(() => undefined)
+  await waitFor(() => { expect(finishDetail).toBeDefined(); expect(finishList).toBeDefined() })
+  const action = { actionSeq: 2, actionType: 'CORRECT', fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED' } as const
+  await applyActionToCache(client, 11, action)
+  finishDetail(search([previous]))
+  finishList(search([previous]))
+  await Promise.all([detailRequest, listRequest])
+  expect(client.getQueryData<ExceptionCase>(detailKey)).toMatchObject({ status: 'RESOLVED', actions: [action] })
+  expect(client.getQueryData<ExceptionSearchResult>(listKey)?.content?.[0]).toMatchObject({ status: 'RESOLVED', actions: [action] })
   client.clear()
 })

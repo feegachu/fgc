@@ -94,7 +94,7 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
     onSuccess: async result => {
       Object.keys(useUnsavedWorkStore.getState().owners).filter(owner => owner.startsWith(scope))
         .forEach(owner => useUnsavedWorkStore.getState().mark(owner, false))
-      if (result.action) applyActionToCache(client, item.exceptionCaseId!, result.action)
+      if (result.action) await applyActionToCache(client, item.exceptionCaseId!, result.action)
       void client.invalidateQueries({ queryKey: ['transactions'], refetchType: 'none' })
       void client.invalidateQueries({ queryKey: ['reconciliations'], refetchType: 'none' })
       void client.invalidateQueries({ queryKey: ['cap-checks'], refetchType: 'none' })
@@ -126,8 +126,8 @@ export function PaymentCorrectionModal({ item, onClose }: { item: ExceptionCase;
       return data
     },
     meta: { errorToast: false },
-    onSuccess: result => {
-      if (result.action) applyActionToCache(client, item.exceptionCaseId!, result.action)
+    onSuccess: async result => {
+      if (result.action) await applyActionToCache(client, item.exceptionCaseId!, result.action)
       client.setQueryData<Context>(['exceptions', 'payment-correction', item.exceptionCaseId], old => old ? { ...old, capBasis: result.capBasis } : old)
       void client.invalidateQueries({ queryKey: ['cap-checks'], refetchType: 'none' })
       void client.invalidateQueries({ queryKey: ['reconciliations'], refetchType: 'none' })

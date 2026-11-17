@@ -43,6 +43,7 @@ class ValidationRunExceptionServiceImplTest {
         InOrder calls = inOrder(exceptionCaseRepository);
         calls.verify(exceptionCaseRepository).insertFromValidationTargets(validationRunId);
         calls.verify(exceptionCaseRepository).insertFromCapChecks(validationRunId);
+        calls.verify(exceptionCaseRepository).recordExistingPreConfirmViolations(validationRunId);
         calls.verify(exceptionCaseRepository).insertFromArbitrageChecks(validationRunId);
         calls.verify(exceptionCaseRepository).insertFromReconciliationResults(validationRunId);
         calls.verify(exceptionCaseRepository).insertFromJournalImbalances(validationRunId);

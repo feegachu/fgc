@@ -78,6 +78,7 @@ public class InsurerGaReconciliationRepository {
                 AND (code.effective_to IS NULL OR code.effective_to >= ta.attribution_date)
                 ) aic ON TRUE
                 WHERE ct.insurer_id = :insurerId
+                AND NOT fgc.is_workflow_demo_contract(ta.contract_id)
                 AND (
                 (ct.source_type = 'INSURER_STATEMENT'
                 AND sb.statement_batch_id IS NOT NULL

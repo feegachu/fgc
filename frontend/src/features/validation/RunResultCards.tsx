@@ -9,7 +9,7 @@ function ResultKpis({ cards, completed }: { cards: ResultKpi[]; completed: numbe
     return <div
       key={`${card.label}-${ready}`}
       className={`kpi-card${card.error ? ' kpi-card-error' : ''}${ready ? ' vrun-result-reveal' : ''}`}
-      style={{ animationDelay: `${index * 70}ms` }}
+      style={{ animationDelay: `${index * 10}ms` }}
     >
       <KpiCardContent label={card.label} value={ready ? card.value : '—'} unit="건"
         footer={ready ? card.footer : completed >= card.step ? '결과 불러오는 중' : '검증 대기'} />
@@ -20,7 +20,7 @@ function ResultKpis({ cards, completed }: { cards: ResultKpi[]; completed: numbe
 export function RunSummaryCards({ detail, completed }: { detail: ValidationRunDetail; completed: number }) {
   const { capSummary: cap, arbitrageSummary: arb, ledgerSummary: ledger, reconciliationSummary: reco, exceptionSummary: exceptions } = detail
   return <ResultKpis completed={completed} cards={[
-    { step: 4, label: '1,200% 위반', value: cap?.violationCount, footer: '확정 위반 판정', error: true },
+    { step: 4, label: '1,200% 위반', value: cap?.violationCount, footer: '미해결 위반 · 해결 시 제외', error: true },
     { step: 7, label: '대사 불일치', value: reco?.mismatchCount, footer: '허용오차 0원', error: true },
     { step: 4, label: '1,200% 주의', value: cap?.warningCount, footer: '사용률 경고 기준 이상' },
     { step: 5, label: '차익거래 검토대상', value: arb?.candidateCount, footer: '위반 확정 아님' },

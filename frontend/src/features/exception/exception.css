@@ -25,10 +25,6 @@
   white-space: normal;
 }
 
-.exception-summary-empty {
-  grid-column: 1 / -1;
-}
-
 /* 좁은 화면에서는 표 영역 안에서 가로로 스크롤한다. */
 .exception-table {
   width: 100%;
@@ -529,10 +525,6 @@
 
 .exception-filter-actions {
   flex: 0 0 auto;
-}
-
-.exception-summary-empty {
-  grid-column: 1 / -1;
 }
 
 .exception-count-note {

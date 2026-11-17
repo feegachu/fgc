@@ -1,5 +1,7 @@
 import type { ScreenHelpStep } from '../assistant/guide/ScreenHelp'
 
+const validationHighlight = '[data-guide-target="payment.batch.validation"][data-guide-highlight="true"]'
+
 export const contractPaymentHelp: ScreenHelpStep[] = ([
   {
     targetId: 'payment.batch.contract',
@@ -40,14 +42,14 @@ export const contractPaymentHelp: ScreenHelpStep[] = ([
     advanceOnEvent: 'fgc-payment-precheck-complete',
     instruction: '임시저장 후 사전검증을 누르세요.',
     interaction: '차단된 행은 오른쪽 점검표에서 원인을 확인합니다.',
-    presentation: { side: 'right', preserveCardPosition: true },
+    presentation: { side: 'right', preserveCardPosition: true, highlightTarget: validationHighlight },
   },
   {
     targetId: 'payment.precheck.result',
     title: '확정 전 6단계 점검',
     instruction: '입력, 금액, 저장 및 검증 결과를 차례로 확인하세요.',
-    interaction: '확인 필요 항목을 수정하고 다시 저장 및 검증합니다.',
-    presentation: { side: 'left', preserveCardPosition: true },
+    interaction: '체크리스트와 일괄 사전검증 결과를 함께 확인하고, 확인 필요 항목은 수정 후 다시 저장 및 검증합니다.',
+    presentation: { side: 'left', preserveCardPosition: true, highlightTarget: validationHighlight },
   },
   {
     targetId: 'payment.batch.confirm',

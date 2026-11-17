@@ -14,6 +14,7 @@ import { apiClient, ApiError } from '../../lib/api/client'
 import type { RequestOptions } from '../../lib/api/client'
 import { useToastStore } from '../../stores/toasts'
 import ContractFormPage from './ContractFormPage'
+import { useWorkflowGuide } from '../assistant/workflow-state'
 import { findWorkflowGuide } from '../assistant/workflow-catalog'
 import type { ContractDetail, ContractUpdateRequest } from './api'
 import {
@@ -137,6 +138,7 @@ async function ready() {
   await waitFor(() => expect(save()).toBeEnabled())
 }
 afterEach(() => {
+  useWorkflowGuide.setState({ settlementActive: false, guideContext: null })
   vi.restoreAllMocks()
   useToastStore.setState({ messages: [] })
 })
@@ -400,7 +402,14 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     expect(field('표준해약공제액(원)')).toBeDisabled()
   })
 
-  it('신규 등록은 유효한 FC와 소속을 선택하고 POST하며 수정 토큰을 보내지 않는다', async () => {
+  it.each([
+    [false, null, false],
+    [true, null, false],
+    [true, 'payment.draft', false],
+    [true, 'contract.create', true],
+  ] as const)('신규 등록의 시연 헤더는 계약 등록 안내에만 붙는다: %s %s', async (active, step, demo) => {
+    useWorkflowGuide.setState({ settlementActive: active,
+      guideContext: step ? { workflowId: 'settlement', stepId: step } : null })
     const { user, writes } = renderAt('/contracts/new')
     await waitFor(() => expect(field('보험회사')).toBeEnabled())
     expect(save()).toBeDisabled()
@@ -423,6 +432,7 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
       options: { method: 'POST', body: { organizationId: 5, paymentTermMonths: 240 } },
     })
     expect(writes[0].options?.body).not.toHaveProperty('expectedUpdatedAt')
+    expect(writes[0].options?.headers).toEqual(demo ? { 'X-FGC-Workflow-Demo': 'true' } : undefined)
   })
 
   it('신규 등록에서 계약일을 바꾸면 기존 상품·설계사·소속을 지워 과거 기준정보로 저장하지 않는다', async () => {

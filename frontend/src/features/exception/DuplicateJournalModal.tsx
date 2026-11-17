@@ -54,7 +54,7 @@ export function DuplicateJournalModal({ item, payments, paymentJournalIds, onCha
     },
     meta: { errorToast: false },
     onSuccess: async result => {
-      if (result.action) applyActionToCache(client, item.exceptionCaseId!, result.action)
+      if (result.action) await applyActionToCache(client, item.exceptionCaseId!, result.action)
       void client.invalidateQueries({ queryKey: ['journals'] })
       void client.invalidateQueries({ queryKey: ['transactions'], refetchType: 'none' })
       void client.invalidateQueries({ queryKey: ['reconciliations'], refetchType: 'none' })

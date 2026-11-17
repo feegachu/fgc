@@ -30,7 +30,7 @@ function resolveTarget(trigger: HTMLElement, step: ScreenHelpStep) {
   if (!matches.length || matches.length !== 1 && !step.firstMatch) return null
   const element = matches[0]
   if (step.anchor !== 'start') return element
-  // Lists use their columns and first three rows; useSpotlight bounds this preview.
+  // Lists use their columns and first rows; useSpotlight applies the configured row limit.
   const table = element.matches('table') ? element : [...element.querySelectorAll<HTMLElement>('table')].find(visible)
   if (table) return table
   const label = element.getAttribute('aria-labelledby')?.split(' ')[0]

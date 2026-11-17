@@ -8,7 +8,7 @@ export interface SpotlightPresentation {
   includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean; rowLimit?: number
   fixedCard?: boolean | 'left' | 'right' | 'center'; cardAlign?: 'top'; scrollToTop?: boolean
   cardAnchor?: string; preventScroll?: boolean; allowPageScroll?: boolean; scrollTargetTop?: boolean
-  includeTarget?: string
+  includeTarget?: string; highlightTarget?: string
 }
 
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>, detailed = false,
@@ -24,6 +24,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
   const scrollToTop = presentation?.scrollToTop, scrollTargetTop = presentation?.scrollTargetTop
   const cardAnchor = presentation?.cardAnchor, preventScroll = presentation?.preventScroll
   const includeTarget = presentation?.includeTarget
+  const highlightTarget = presentation?.highlightTarget
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
     card: CSSProperties
@@ -34,6 +35,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     let scrollFrame = 0
     let preparedWidth: number | null = null
     let preparedPresentation = ''
+    let preparedDocumentTop: number | null = null
     let measuredTarget: DOMRect | null = null
     const targetInHeader = Boolean(target?.closest('.app-header'))
     const scrollSmoothly = (offset: number) => {
@@ -47,7 +49,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       }
       const began = performance.now()
       const tick = (now: number) => {
-        const t = Math.min(1, (now - began) / 700)
+        const t = Math.min(1, (now - began) / 500)
         window.scrollTo({ top: start + (end - start) * (t * t * (3 - 2 * t)), behavior: 'instant' })
         measure()
         if (t < 1) scrollFrame = requestAnimationFrame(tick)
@@ -56,6 +58,9 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     }
     const heightLimit = () => Math.min(detailed ? 560 : 460, window.innerHeight * (detailed && window.innerWidth >= 768 ? 0.65 : 0.5))
     const targetRect = () => {
+      const highlighted = highlightTarget
+        ? (target!.closest('[role="dialog"]') ?? document).querySelector<HTMLElement>(highlightTarget) : null
+      if (highlighted?.getClientRects().length) return highlighted.getBoundingClientRect()
       const rect = target!.getBoundingClientRect()
       if (includeTarget) {
         const extra = (target!.closest('[role="dialog"]') ?? document).querySelector<HTMLElement>(includeTarget)
@@ -78,7 +83,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       if (!detailed || !target!.matches('table')) return rect
       const header = target!.querySelector<HTMLElement>(':scope > thead')
       const rows = [...target!.querySelectorAll<HTMLElement>(':scope > tbody > tr')]
-        .filter(row => row.getClientRects().length > 0).slice(0, 3)
+        .filter(row => row.getClientRects().length > 0).slice(0, rowLimit ?? 3)
       const first = header ?? rows[0], last = rows.at(-1) ?? header
       if (!first || !last) return rect
       const viewport = target!.closest('.data-table-viewport')?.getBoundingClientRect()
@@ -156,6 +161,12 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
           const cardTop = cardAlign === 'top' ? topBoundary : fixedCard === 'center' ? Math.max(topBoundary, (height - cardHeight) / 2)
             : anchor ? Math.max(topBoundary, Math.min(anchor.top + 12, height - cardHeight - 16)) : height - cardHeight - 16
           const rect = target?.isConnected ? targetRect() : null
+          if (rect && scrollTargetTop) {
+            const documentTop = rect.top + window.scrollY
+            // Re-anchor after real content above the target changes, not after user scrolling.
+            if (preparedDocumentTop !== null && Math.abs(documentTop - preparedDocumentTop) > 1) preparedPresentation = ''
+            preparedDocumentTop = documentTop
+          }
           setPosition(previous => ({
             box: rect ? {
               left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),
@@ -310,6 +321,18 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     if (card.current) resize?.observe(card.current)
     const workspace = document.getElementById('main-content')
     if (workspace) resize?.observe(workspace)
+    // Keep the action button as the interaction target while results become the highlight.
+    const highlightRoot = target?.closest('[role="dialog"]') ?? workspace ?? document.body
+    const refreshHighlight = () => {
+      const highlighted = highlightTarget ? highlightRoot.querySelector<HTMLElement>(highlightTarget) : null
+      if (highlighted) resize?.observe(highlighted)
+      measure()
+    }
+    const highlightObserver = highlightTarget ? new MutationObserver(refreshHighlight) : null
+    highlightObserver?.observe(highlightRoot, {
+      subtree: true, childList: true, attributes: true, attributeFilter: ['data-guide-highlight', 'hidden'],
+    })
+    if (highlightTarget) refreshHighlight()
     // A split pane can move or resize the target without a viewport event.
     const layoutPoll = !resize && target ? window.setInterval(() => {
       const rect = target.isConnected ? targetRect() : null
@@ -327,11 +350,12 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       cancelAnimationFrame(placementFrame)
       cancelAnimationFrame(scrollFrame)
       resize?.disconnect()
+      highlightObserver?.disconnect()
       window.clearInterval(layoutPoll)
       window.removeEventListener('scroll', measure, true)
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
     }
-  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary, preserveCardPosition, rowLimit, fixedCard, cardAlign, scrollToTop, cardAnchor, preventScroll, scrollTargetTop, includeTarget])
+  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary, preserveCardPosition, rowLimit, fixedCard, cardAlign, scrollToTop, cardAnchor, preventScroll, scrollTargetTop, includeTarget, highlightTarget])
   return position
 }

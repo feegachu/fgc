@@ -94,7 +94,7 @@ class CompareRankingServiceTest {
         // 650,000 × 30% = 195,000. 유지수수료 55,000원은 환수 대상이 아니다
         assertThat(item.clawbackExposure()).isEqualTo(195_000);
         assertThat(item.conservativeNet()).isEqualTo(650_000 + 55_000 - 195_000);
-        assertThat(item.evidence()).filteredOn(e -> e.label().equals("환수 노출액"))
+        assertThat(item.evidence()).filteredOn(e -> e.label().equals("예상 환수액"))
                 .extracting(e -> e.source() + ":" + e.policyVersion()).containsOnly("환수 규칙:CLAW v1");
         assertThat(response.capSummary().usagePct()).isEqualTo(84.123456);
     }

@@ -12,7 +12,7 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    env: { FGC_E2E_PREVIEWS: 'true', VITE_ASSISTANT_AI: 'true' },
+    env: { FGC_E2E_PREVIEWS: 'true', VITE_ASSISTANT_AI: 'true', FGC_API_TARGET: 'http://127.0.0.1:9' },
     command: `npm run dev -- --port ${new URL(origin).port || '5173'}`,
     url: `${origin}/`,
     reuseExistingServer: true,

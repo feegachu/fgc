@@ -47,9 +47,35 @@ class JournalPostingPortImplTest {
     private JournalPersistenceService persistenceService;
     @Mock
     private JournalHeaderRepository journalHeaderRepository;
+    @Mock
+    private JournalCorrectionService journalCorrections;
 
     private JournalPostingPortImpl port() {
-        return new JournalPostingPortImpl(sourceRepository, draftService, persistenceService, journalHeaderRepository);
+        return new JournalPostingPortImpl(sourceRepository, draftService, persistenceService, journalHeaderRepository, journalCorrections);
+    }
+
+    @Test
+    void scheduleCorrectionPostsOnlyTheAffectedContractsExpectedJournalsInTheCurrentTransaction() {
+        LocalDate month = LocalDate.of(2026, 10, 1);
+        var affected = scheduleRow(501L);
+        var other = scheduleRow(502L);
+        other.setContractId(11L);
+        given(sourceRepository.findExpectedInsurerIncomeSources(25L, month)).willReturn(List.of(affected, other));
+        var draft = mock(JournalHeaderDraft.class);
+        given(draftService.draftExpectedInsurerIncome(any())).willReturn(draft);
+        var saved = new JournalHeaderRow();
+        saved.setJournalHeaderId(901L);
+        saved.setStatus("DRAFT");
+        given(persistenceService.saveDraftInCurrentTransaction(draft, 3L, "EXCP-SCHEDULE-25-10")).willReturn(saved);
+
+        port().postExpectedForContract(10L, 25L, month, 3L);
+
+        var command = ArgumentCaptor.forClass(ExpectedInsurerIncomeJournalCommand.class);
+        verify(draftService).draftExpectedInsurerIncome(command.capture());
+        assertThat(command.getValue().getScheduleLineId()).isEqualTo(501L);
+        verify(journalHeaderRepository).markPosted(901L, 3L);
+        verify(persistenceService, never()).saveDraft(any(), any(), any());
+        verify(sourceRepository, never()).findConfirmedFcPayoutSources(any(), any());
     }
 
     private ValidationStepContext newContext(long validationRunId) {

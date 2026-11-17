@@ -1,5 +1,8 @@
 package com.susukkang.fgc.journal.service;
 
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
+import java.util.Map;
 import com.susukkang.fgc.journal.domain.ActualInsurerStatementJournalCommand;
 import com.susukkang.fgc.journal.domain.ConfirmedFcPayoutJournalCommand;
 import com.susukkang.fgc.journal.domain.ExpectedFcPayoutJournalCommand;
@@ -21,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
 
 /**
  * Step 6a(journalPostingStep) 구현체. validation_target(SELECTED)·검증월 범위의
@@ -30,7 +35,7 @@ import java.util.List;
  *
  * 06_배치_Step_협업계약.md:18 "기표 오류는 Step 실패" 원칙에 따라 원천 1건 처리 중 예외가
  * 나면 catch하지 않고 그대로 전파해 Step을 실패시킨다 — capCheckStep·arbitrageCheckStep처럼
- * 건별 skip으로 넘기지 않는다. JournalPersistenceService.saveDraft가 이미 멱등이라
+ * 건별 skip으로 넘기지 않는다. 건별 커밋한 초안은 실패 후 재시작에서도 멱등이므로
  * (journal_type, source_entity_type, source_entity_id, revision_no) 원천은 재실행해도
  * 중복 기표되지 않는다 — 이미 POSTED인 원천은 postedJournalCount(신규 기표 건수)가 아니라
  * skips(ALREADY_POSTED)로 집계한다(코드리뷰 반영: 재실행 시 postedJournalCount가 항상
@@ -40,12 +45,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JournalPostingPortImpl implements JournalPostingPort {
 
+    private static final String DRAFT_STATUS = "DRAFT";
     private static final String ALREADY_POSTED_REASON = "ALREADY_POSTED";
 
     private final JournalPostingSourceQueryRepository sourceRepository;
     private final JournalEntryDraftService draftService;
     private final JournalPersistenceService persistenceService;
     private final JournalHeaderRepository journalHeaderRepository;
+    private final JournalCorrectionService journalCorrections;
 
     @Override
     @Transactional
@@ -59,33 +66,12 @@ public class JournalPostingPortImpl implements JournalPostingPort {
         List<ContractSkip> skips = new ArrayList<>();
 
         for (ScheduleJournalSourceRow row : sourceRepository.findExpectedInsurerIncomeSources(validationRunId, validationMonth)) {
-            JournalHeaderDraft draft = draftService.draftExpectedInsurerIncome(
-                    ExpectedInsurerIncomeJournalCommand.builder()
-                            .scheduleLineId(row.getScheduleLineId())
-                            .contractId(row.getContractId())
-                            .policyVersionId(row.getPolicyVersionId())
-                            .validationRunId(validationRunId)
-                            .commissionItemId(row.getCommissionItemId())
-                            .journalDate(row.getJournalDate())
-                            .expectedAmount(row.getAmount())
-                            .description(row.getDescription())
-                            .build());
+            JournalHeaderDraft draft = expectedInsurerDraft(row, validationRunId);
             newlyPostedCount += postAndCommit(draft, row.getContractId(), triggeredBy, requestId, skips);
         }
 
         for (ScheduleJournalSourceRow row : sourceRepository.findExpectedFcPayoutSources(validationRunId, validationMonth)) {
-            JournalHeaderDraft draft = draftService.draftExpectedFcPayout(
-                    ExpectedFcPayoutJournalCommand.builder()
-                            .scheduleLineId(row.getScheduleLineId())
-                            .contractId(row.getContractId())
-                            .policyVersionId(row.getPolicyVersionId())
-                            .validationRunId(validationRunId)
-                            .beneficiaryAgentId(row.getBeneficiaryAgentId())
-                            .commissionItemId(row.getCommissionItemId())
-                            .journalDate(row.getJournalDate())
-                            .expectedAmount(row.getAmount())
-                            .description(row.getDescription())
-                            .build());
+            JournalHeaderDraft draft = expectedFcDraft(row, validationRunId);
             newlyPostedCount += postAndCommit(draft, row.getContractId(), triggeredBy, requestId, skips);
         }
 
@@ -123,16 +109,82 @@ public class JournalPostingPortImpl implements JournalPostingPort {
         return new JournalPostingResult(newlyPostedCount, skips.size(), 0, skips);
     }
 
+    /** 스케줄 정정 후 같은 계약·검증월의 새 예상 분개만 같은 트랜잭션에서 기표한다. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void postExpectedForContract(Long contractId, Long validationRunId, LocalDate month, Long actor) {
+        if (validationRunId == null) return;
+        sourceRepository.lockExpectedJournalValidationRuns(contractId, validationRunId, month);
+        String requestId = "EXCP-SCHEDULE-" + validationRunId + "-" + contractId;
+        var groups = new HashMap<String, String>();
+        for (Object[] source : sourceRepository.findSupersededExpectedJournals(contractId, month)) {
+            var reversal = journalCorrections.reverse(new ReverseJournalCommand(((Number) source[0]).longValue(),
+                    "예상 스케줄 재생성에 따른 정정", requestId, actor));
+            if (source[1] != null) groups.put(source[1].toString(), reversal.correctionGroupKey());
+        }
+        for (var row : sourceRepository.findExpectedInsurerIncomeSources(validationRunId, month)) {
+            if (contractId.equals(row.getContractId())) {
+                postCorrectionDraft(expectedInsurerDraft(row, validationRunId), actor, requestId, groups.get(row.getScheduleLineId().toString()));
+            }
+        }
+        for (var row : sourceRepository.findExpectedFcPayoutSources(validationRunId, month)) {
+            if (contractId.equals(row.getContractId())) {
+                postCorrectionDraft(expectedFcDraft(row, validationRunId), actor, requestId, groups.get(row.getScheduleLineId().toString()));
+            }
+        }
+    }
+
+    private void postCorrectionDraft(JournalHeaderDraft draft, Long actor, String requestId, String groupKey) {
+        var saved = persistenceService.saveDraftInCurrentTransaction(draft, actor, requestId);
+        if (groupKey != null && !DRAFT_STATUS.equals(saved.getStatus())) {
+            // A normal batch may already have posted this replacement. Never leave an unlinked reversal.
+            throw new FgcBusinessException(FgcErrorCode.LEDG_005,
+                    Map.of("journalHeaderId", saved.getJournalHeaderId()));
+        }
+        if (DRAFT_STATUS.equals(saved.getStatus())) {
+            if (groupKey != null && journalHeaderRepository.linkReplacementGroup(saved.getJournalHeaderId(), groupKey) != 1) {
+                throw new IllegalStateException("대체 예상 분개의 정정 연결을 저장하지 못했습니다.");
+            }
+            journalHeaderRepository.markPosted(saved.getJournalHeaderId(), actor);
+        }
+    }
+
+    private JournalHeaderDraft expectedInsurerDraft(ScheduleJournalSourceRow row, Long validationRunId) {
+        return draftService.draftExpectedInsurerIncome(
+                    ExpectedInsurerIncomeJournalCommand.builder()
+                            .scheduleLineId(row.getScheduleLineId())
+                            .contractId(row.getContractId())
+                            .policyVersionId(row.getPolicyVersionId())
+                            .validationRunId(validationRunId)
+                            .commissionItemId(row.getCommissionItemId())
+                            .journalDate(row.getJournalDate())
+                            .expectedAmount(row.getAmount())
+                            .description(row.getDescription())
+                            .build());
+    }
+
+    private JournalHeaderDraft expectedFcDraft(ScheduleJournalSourceRow row, Long validationRunId) {
+        return draftService.draftExpectedFcPayout(
+                    ExpectedFcPayoutJournalCommand.builder()
+                            .scheduleLineId(row.getScheduleLineId())
+                            .contractId(row.getContractId())
+                            .policyVersionId(row.getPolicyVersionId())
+                            .validationRunId(validationRunId)
+                            .beneficiaryAgentId(row.getBeneficiaryAgentId())
+                            .commissionItemId(row.getCommissionItemId())
+                            .journalDate(row.getJournalDate())
+                            .expectedAmount(row.getAmount())
+                            .description(row.getDescription())
+                            .build());
+    }
+
     /**
-     * 저장(멱등) 후 아직 DRAFT면 POSTED로 전이한다. 이미 POSTED/REVERSED이거나 다른 실행이
-     * 먼저 기표해 상태 변경이 0건이면 ALREADY_POSTED skip으로 기록한다.
-     *
-     * @return 이번 호출로 새로 POSTED가 됐으면 1, 이전 실행에서 이미 처리돼 있었으면 0
+     * 저장(멱등) 후 아직 DRAFT면 POSTED로 전이한다. 이미 처리된 원천은 skip으로 기록한다.
+     * @return 이번 호출로 새로 POSTED가 됐으면 1, 이전에 처리됐으면 0
      */
     private long postAndCommit(JournalHeaderDraft draft, Long contractId, Long triggeredBy,
                                 String requestId, List<ContractSkip> skips) {
         JournalHeaderRow saved = persistenceService.saveDraft(draft, triggeredBy, requestId);
-        if ("DRAFT".equals(saved.getStatus())
+        if (DRAFT_STATUS.equals(saved.getStatus())
                 && journalHeaderRepository.markPosted(saved.getJournalHeaderId(), triggeredBy) == 1) {
             return 1;
         }

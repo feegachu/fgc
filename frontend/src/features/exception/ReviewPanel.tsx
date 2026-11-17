@@ -33,8 +33,8 @@ export function ReviewPanel({ item, onClosed, initialEvidence = '' }: { item: Ex
       return action
     },
     meta: { errorToast: false },
-    onSuccess: action => {
-      applyActionToCache(client, item.exceptionCaseId!, action)
+    onSuccess: async action => {
+      await applyActionToCache(client, item.exceptionCaseId!, action)
       setReason(''); setEvidence(initialEvidence); setError(''); clearDirty()
       toast(action.actionType === 'COMMENT' ? '검토 의견을 기록했습니다. 검토중 상태를 유지합니다.' : '판단 근거를 기록하고 반려로 종결했습니다.', 'success')
       if (action.actionType === 'REJECT') onClosed?.()
@@ -48,8 +48,8 @@ export function ReviewPanel({ item, onClosed, initialEvidence = '' }: { item: Ex
       if (!data) throw new Error('재검증 결과를 확인하지 못했습니다.')
       return data
     }, meta: { errorToast: false },
-    onSuccess: result => {
-      if (result.action) applyActionToCache(client, item.exceptionCaseId!, result.action)
+    onSuccess: async result => {
+      if (result.action) await applyActionToCache(client, item.exceptionCaseId!, result.action)
       void client.invalidateQueries({ queryKey: ['arbitrage-checks'], refetchType: 'none' })
       void client.invalidateQueries({ queryKey: ['cap-checks'], refetchType: 'none' })
       toast(result.message, result.resolved ? 'success' : 'warning')

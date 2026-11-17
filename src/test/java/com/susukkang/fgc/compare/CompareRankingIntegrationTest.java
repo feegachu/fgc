@@ -75,7 +75,7 @@ class CompareRankingIntegrationTest {
             JsonNode item = items.get(i);
             String policy = "";
             for (JsonNode evidence : item.path("evidence")) {
-                if (evidence.path("label").asText().equals("환수 노출액")) {
+                if (evidence.path("label").asText().equals("예상 환수액")) {
                     policy = evidence.path("policyVersion").asText();
                 }
             }
@@ -97,7 +97,7 @@ class CompareRankingIntegrationTest {
             long clawbackLines = 0;
             for (JsonNode evidence : item.path("evidence")) {
                 assertThat(evidence.path("source").asText() + evidence.path("rule").asText()).doesNotContain("해약환급률");
-                if (evidence.path("label").asText().equals("환수 노출액")) {
+                if (evidence.path("label").asText().equals("예상 환수액")) {
                     assertThat(evidence.path("source").asText()).isEqualTo("환수 규칙");
                     clawbackLines += evidence.path("value").asLong(0);
                 }

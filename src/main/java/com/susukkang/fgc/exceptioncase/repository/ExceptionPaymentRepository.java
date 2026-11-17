@@ -16,6 +16,7 @@ import java.util.*;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ExceptionPaymentRepository {
+    private static final String STAGE_PARAM = "stage";
     private static final String CONTRACT_PARAM = "contract";
     private static final String ORIGINAL_PARAM = "original";
     private final EntityManager em;
@@ -40,7 +41,7 @@ public class ExceptionPaymentRepository {
                 WHERE c.contract_id=:contract AND c.payment_stage=:stage
                 ORDER BY c.checked_at DESC, c.cap_check_id DESC LIMIT 1
                 """).setParameter("id", id.toString()).setParameter(CONTRACT_PARAM, scope.contractId())
-                .setParameter("stage", scope.stage().name()).getResultList();
+                .setParameter(STAGE_PARAM, scope.stage().name()).getResultList();
         return rows.isEmpty() ? null : number(rows.getFirst());
     }
 
@@ -85,7 +86,7 @@ public class ExceptionPaymentRepository {
                   AND (p.installment_no IS NULL OR p.installment_no=CAST(:installment AS integer))
                   AND EXISTS(SELECT 1 FROM fgc.transaction_attribution a
                     WHERE a.commission_transaction_id=p.commission_transaction_id AND a.contract_id=:contract)
-                """).setParameter("stage", source.stage().name()).setParameter("month", source.month())
+                """).setParameter(STAGE_PARAM, source.stage().name()).setParameter("month", source.month())
                 .setParameter("item", source.commissionItemId()).setParameter("agent", source.stage() == PaymentStage.GA_TO_FC ? source.expectedAgentId() : null)
                 .setParameter("installment", source.installmentNo()).setParameter(CONTRACT_PARAM, source.contractId()).getSingleResult()).longValue() > 0;
     }
@@ -216,7 +217,18 @@ public class ExceptionPaymentRepository {
                 SELECT v.validation_run_id, v.status FROM fgc.validation_run v
                 WHERE v.validation_run_id IN (
                   SELECT last_detected_run_id FROM fgc.exception_case WHERE exception_case_id = :id
-                  UNION SELECT first_detected_run_id FROM fgc.exception_case WHERE exception_case_id = :id)
+                  UNION SELECT first_detected_run_id FROM fgc.exception_case WHERE exception_case_id = :id
+                  UNION SELECT j.validation_run_id FROM fgc.exception_case e
+                    JOIN fgc.cap_check c ON c.cap_check_id=e.cap_check_id
+                      OR (e.source_entity_type='CAP_CHECK' AND c.cap_check_id::text=e.source_entity_id)
+                    JOIN fgc.journal_header j ON j.contract_id=e.contract_id
+                    JOIN fgc.schedule_line l ON l.schedule_line_id::text=j.source_entity_id
+                    JOIN fgc.schedule_header h USING(schedule_header_id)
+                    WHERE e.exception_case_id=:id AND c.candidate_transaction_id IS NULL
+                      AND j.source_entity_type='SCHEDULE_LINE'
+                      AND j.journal_type IN ('EXPECTED_INSURER_INCOME','EXPECTED_FC_PAYOUT')
+                      AND j.status='POSTED' AND NOT h.active_yn
+                      AND l.due_month=date_trunc('month',c.as_of_date)::date)
                 ORDER BY v.validation_run_id FOR UPDATE
                 """).setParameter("id", id).getResultList();
         for (Object value : rows) if ("FINALIZED".equals(((Object[]) value)[1])) {
@@ -245,6 +257,24 @@ public class ExceptionPaymentRepository {
                 ) SELECT r.reconciliation_run_id FROM fgc.reconciliation_run r JOIN revisions p ON p.id = r.reconciliation_run_id
                   WHERE NOT r.superseded_yn AND r.status = 'COMPLETED' ORDER BY r.reconciliation_run_id FOR UPDATE OF r
                 """, Long.class).setParameter("id", source.sourceId()).getResultList();
+    }
+
+    /** 같은 검증 실행·월의 양 지급단계를 새 스케줄로 교체한다. */
+    public List<Long> scheduleReconciliationRuns(Source source, CapScope scope) {
+        if (source.validationRunId() == null) return List.of();
+        return em.createNativeQuery("""
+                SELECT run.reconciliation_run_id
+                FROM fgc.reconciliation_run run
+                JOIN fgc.insurance_contract contract ON contract.contract_id = :contract
+                WHERE contract.contract_id = :contract
+                  AND run.validation_run_id = :validation
+                  AND run.settlement_month = :month
+                  AND (run.insurer_id = contract.insurer_id OR (run.payment_stage = 'GA_TO_FC' AND run.insurer_id IS NULL))
+                  AND NOT run.superseded_yn AND run.status = 'COMPLETED'
+                ORDER BY run.reconciliation_run_id FOR UPDATE OF run
+                """, Long.class).setParameter(CONTRACT_PARAM, scope.contractId())
+                .setParameter("validation", source.validationRunId())
+                .setParameter("month", scope.asOfDate().withDayOfMonth(1)).getResultList();
     }
 
     public List<com.susukkang.fgc.exceptioncase.dto.ExceptionReconciliationIssue> remainingIssues(Source source) {

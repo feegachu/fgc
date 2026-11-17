@@ -2,17 +2,17 @@ import { expect, test, type Page } from '@playwright/test'
 
 const envelope = (data: unknown) => ({ data, error: null, requestId: 'guide-revision' })
 const paged = (content: unknown[]) => ({ content, page: 1, totalPages: 1, totalElements: content.length })
-async function fixture(page: Page) {
+async function fixture(page: Page, autoComplete = true) {
   let status = 'CREATED', posts = 0
   await page.route('**/api/v1/**', async route => {
     const url = new URL(route.request().url()), path = url.pathname
     let data: unknown = paged([])
     if (path.endsWith('/auth/refresh')) data = { accessToken: 'guide-revision', expiresIn: 1800 }
     else if (path.endsWith('/auth/me')) data = { loginId: 'guide', userName: '담당자', roleCode: 'SYSTEM_ADMIN', canProcess: true, canHandleException: true, canFinalizeValidation: true, demoMonth: '2026-07' }
-    else if (path.endsWith('/validation-runs/7/execute')) { status = 'COMPLETED'; posts++; data = { validationRunId: 7, status: 'RUNNING' } }
-    else if (path.endsWith('/validation-runs/7/progress')) data = { status, currentStep: status === 'CREATED' ? 0 : 8, totalSteps: 10 }
+    else if (path.endsWith('/validation-runs/7/execute')) { status = autoComplete ? 'COMPLETED' : 'RUNNING'; posts++; data = { validationRunId: 7, status: 'RUNNING' } }
+    else if (path.endsWith('/validation-runs/7/progress')) data = { status, currentStep: status === 'CREATED' ? 0 : status === 'RUNNING' ? 6 : 8, totalSteps: 10 }
     else if (path.endsWith('/validation-runs/7')) data = {
-      header: { validationRunId: 7, validationMonth: '2026-07-01', runNo: 2, runType: 'MONTHLY', status, currentStep: status === 'CREATED' ? 0 : 8 },
+      header: { validationRunId: 7, validationMonth: '2026-07-01', runNo: 2, runType: 'MONTHLY', status, currentStep: status === 'CREATED' ? 0 : status === 'RUNNING' ? 6 : 8 },
       targets: [], targetSummary: { selectedCount: 0, excludedCount: 0, reviewRequiredCount: 0 },
       capSummary: { checkedCount: 1, violationCount: 0, warningCount: 1 }, arbitrageSummary: { candidateCount: 1 }, ledgerSummary: { journalCount: 1, imbalanceCount: 0 },
       reconciliationSummary: { resultCount: 2, mismatchCount: 1 }, exceptionSummary: { detectedCount: 1, newCount: 1, recurringCount: 0, reopenedCount: 0, notDetectedCount: 0, openWorkItemCount: 1 },
@@ -41,12 +41,12 @@ async function fixture(page: Page) {
     await route.fulfill({ json: envelope(data) })
   })
   await page.setViewportSize({ width: 1440, height: 900 })
-  return () => posts
+  return Object.assign(() => posts, { complete: () => { status = 'COMPLETED' } })
 }
 
-test('월 검증은 선 도착 후 버퍼링하고 결과 표시 중 안내를 숨긴다', async ({ page }, info) => {
+test('월 검증은 실제 진행 중 안내를 숨기고 완료 후 결과를 보여 준다', async ({ page }, info) => {
   test.setTimeout(65000)
-  const posts = await fixture(page)
+  const posts = await fixture(page, false)
   await page.goto('/validation-runs/7?month=2026-07')
   await page.getByRole('button', { name: '도움말', exact: true }).click()
   const card = page.locator('.screen-step-guide')
@@ -79,6 +79,7 @@ test('월 검증은 선 도착 후 버퍼링하고 결과 표시 중 안내를 �
   await expect.poll(async () => (await summary.boundingBox())?.y ?? 999).toBeLessThan(100)
   await expect(page.getByText(/검증 계산이 끝났습니다/)).toHaveCount(0)
   await page.screenshot({ path: info.outputPath('validation-playing.png') })
+  posts.complete()
   await expect(card.getByRole('heading', { name: '결과 요약', exact: true })).toBeVisible({ timeout: 35000 })
   await expect(page.getByText('검증 계산이 끝났습니다. 결과를 확인해 주세요.', { exact: true })).toBeVisible()
   expect(posts()).toBe(1)

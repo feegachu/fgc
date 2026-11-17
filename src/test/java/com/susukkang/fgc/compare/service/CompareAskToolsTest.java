@@ -67,7 +67,7 @@ class CompareAskToolsTest {
                 base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
                 base.warnings(), null, List.of(item), List.of(), CompareRankingFilters.NONE);
 
-        assertThat(new CompareAskTools(one).run("get_item", RANK_1)).contains("99.9%").doesNotContain("100.0%");
+        assertThat(new CompareAskTools(one).run("get_item", RANK_1)).contains("\"한도 영향\":\"99.9%\"").doesNotContain("한도 사용률", "100.0%");
         assertThat(CompareAskTools.percent(90.0)).isEqualTo("90.0%");
     }
 
@@ -78,6 +78,23 @@ class CompareAskToolsTest {
 
         assertThat(tools.run("explain_term", "{\"name\":\"이월\"}")).contains("다음으로 넘어가는");
         assertThat(tools.run("explain_term", "{\"name\":\"날씨\"}")).contains("error");
+    }
+
+    @Test
+    @DisplayName("화면의 새 용어로 물어도 순수령액·수령액·환수액 비교의 방향을 검증한다")
+    void simplifiedMetricNamesKeepComparisonChecks() {
+        CompareAskTools tools = toolsWith("compare", PAIR_2_3);
+
+        assertThat(tools.verify("3위는 2위보다 한도 영향이 적어요.")).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+        assertThat(tools.verify("3위는 2위보다 한도 사용률이 적어요.")).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+        assertThat(tools.verify("3위는 2위보다 한도 사용률이 많아요.")).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+        assertThat(tools.verify("3위는 2위보다 순수령액이 적어요.")).isNull();
+        assertThat(tools.verify("3위는 2위보다 순수령액이 많아요.")).isEqualTo("DIRECTION_MISMATCH");
+        assertThat(tools.verify("3위는 2위보다 한도를 반영한 수령액이 적어요.")).isNull();
+        assertThat(tools.verify("3위는 2위보다 한도를 반영한 수령액이 많아요.")).isEqualTo("DIRECTION_MISMATCH");
+        assertThat(tools.verify("3위는 2위보다 한도 적용 전 수령액이 적어요.")).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+        assertThat(tools.verify("3위는 2위보다 예상 환수액이 많아요.")).isNull();
+        assertThat(tools.verify("3위는 2위보다 예상 환수액이 적어요.")).isEqualTo("DIRECTION_MISMATCH");
     }
 
     @Test

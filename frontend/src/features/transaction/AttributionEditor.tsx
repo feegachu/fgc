@@ -80,31 +80,16 @@ export function AttributionEditor({
     },
     { key: 'agent', label: '설계사', width: '9rem', render: () => agentLabel },
     {
-      key: 'date',
-      label: '귀속일',
-      width: '8rem',
-      render: (row) => (
-        <input data-guide-feature="features.transaction.attribution-editor.input"
-          {...control(row, 'attributionDate', '귀속일')}
-          data-attr-date
-          type="date"
-          value={row.attributionDate}
-          min={contracts.find((contract) => String(contract.contractId) === row.contractId)?.contractDate}
-          onChange={(event) => patch(row, { attributionDate: event.target.value })}
-        />
-      ),
-    },
-    {
       key: 'month',
       label: '귀속월',
-      width: '8rem',
+      width: '6rem',
       render: (row) => (
         <input data-guide-feature="features.transaction.attribution-editor.input-2"
           aria-label={label(row, '귀속월')}
           data-attr-month
           readOnly
           disabled={disabled}
-          value={row.attributionDate ? `${row.attributionDate.slice(0, 7)}-01` : ''}
+          value={row.attributionDate.slice(0, 7)}
         />
       ),
     },
@@ -122,6 +107,21 @@ export function AttributionEditor({
           step="1"
           value={row.amount}
           onChange={(event) => patch(row, { amount: event.target.value })}
+        />
+      ),
+    },
+    {
+      key: 'date',
+      label: '귀속일',
+      width: '8rem',
+      render: (row) => (
+        <input data-guide-feature="features.transaction.attribution-editor.input"
+          {...control(row, 'attributionDate', '귀속일')}
+          data-attr-date
+          type="date"
+          value={row.attributionDate}
+          min={contracts.find((contract) => String(contract.contractId) === row.contractId)?.contractDate}
+          onChange={(event) => patch(row, { attributionDate: event.target.value })}
         />
       ),
     },
@@ -248,13 +248,13 @@ export function AttributionEditor({
         emptyMessage="귀속 내역을 추가하세요."
         footer={
           <tr>
-            <td colSpan={6}>귀속금액 합계</td>
+            <td colSpan={5}>귀속금액 합계</td>
             <td className="is-number">
               <span className="tabular-nums" id="attr-sum">
                 {won(sum)}
               </span>
             </td>
-            <td colSpan={5}>
+            <td colSpan={6}>
               <span id="attr-diff">
                 <StatusBadge tone={difference === 0 ? 'success' : 'error'}>
                   {difference === 0 ? '일치' : `불일치, 차액 ${won(difference)}`}

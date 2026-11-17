@@ -9,8 +9,10 @@ const readTextLines = (locator: Locator) => locator.evaluate(element => {
 for (const viewport of [{ width: 1365, height: 768 }, { width: 390, height: 844 }]) {
   test(`지급 원장 정정 버튼이 화면 안에 보인다 ${viewport.width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport)
+    let corrected = false
     await page.route('**/api/v1/**', route => {
-      const path = new URL(route.request().url()).pathname
+      const url = new URL(route.request().url())
+      const path = url.pathname
       let data: unknown = {}
       if (path.endsWith('/auth/refresh')) data = { accessToken: 'fixture', tokenType: 'Bearer', expiresIn: 1800 }
       else if (path.endsWith('/auth/me')) data = { loginId: 'settle01', userName: '정산 담당자', roleCode: 'SETTLEMENT',
@@ -18,9 +20,14 @@ for (const viewport of [{ width: 1365, height: 768 }, { width: 390, height: 844 
       else if (path.endsWith('/exceptions/options')) data = { types: [], reasons: [], severities: [], assignableUsers: [], assignees: [], validationMonths: [] }
       else if (path.endsWith('/exceptions')) data = { summary: [], content: [{ exceptionCaseId: 11,
         type: 'RECONCILIATION_MISMATCH', typeLabel: '대사 불일치', reconciliationResultType: 'AMOUNT_DIFFERENCE',
-        status: 'IN_REVIEW', statusLabel: '검토중', severity: 'HIGH', severityLabel: '높음', assignedTo: 7, assigneeLoginId: 'settle01',
+        status: corrected ? 'RESOLVED' : 'IN_REVIEW', statusLabel: corrected ? '해결' : '검토중', severity: 'HIGH', severityLabel: '높음', assignedTo: 7, assigneeLoginId: 'settle01',
         contractId: 3, contractNo: 'FGC-FGL01-202610-0109', title: '금액 차이 20,000원 — 예상 845,000 / 실제 825,000',
-        validationMonth: '2026-10-01', occurrences: [], actions: [] }], page: 1, size: 20, totalElements: 1, totalPages: 1 }
+        validationMonth: '2026-10-01', occurrences: [], actions: corrected ? [{ actionSeq: 1, actionType: 'CORRECT', actionTypeLabel: '정정',
+          fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED', reason: '원장 정정 후 재대사 일치 확인' }] : [] }], page: 1, size: 20, totalElements: 1, totalPages: 1 }
+      else if (path.endsWith('/reverse-and-repost')) {
+        corrected = true
+        data = { reversalOfId: 70, journalHeaderId: 71, repostedJournalHeaderId: 72 }
+      }
       else if (path.endsWith('/payment-correction')) data = { payments: [{ commissionTransactionId: 77, amount: 825000, status: 'CONFIRMED' }],
         paymentJournalIds: { '77': 70 }, reconciliationResultType: 'AMOUNT_DIFFERENCE' }
       else if (path.endsWith('/repost-number-preview')) data = { reversalJournalNo: 'JV-2026-10-0096', repostedJournalNo: 'JV-2026-10-0097' }
@@ -30,9 +37,12 @@ for (const viewport of [{ width: 1365, height: 768 }, { width: 390, height: 844 
         contractNo: 'FGC-FGL01-202610-0109', debitTotal: 825000, creditTotal: 825000, description: '확정 지급 건 GA-202610-L713',
         lines: [{ lineNo: 1, accountCode: '5000', accountName: '확정 설계사 지급비용', debitAmount: 825000, creditAmount: 0 },
           { lineNo: 2, accountCode: '2000', accountName: '확정 지급채무', debitAmount: 0, creditAmount: 825000 }] }
+      if (corrected && path.endsWith('/exceptions') && url.searchParams.get('status') === 'OPEN') {
+        data = { summary: [], content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 }
+      }
       return route.fulfill({ json: envelope(data) })
     })
-    await page.goto('/exceptions?selected=11')
+    await page.goto('/exceptions?status=OPEN&selected=11')
     await page.getByRole('button', { name: '예외 건 처리', exact: true }).click()
     const modal = page.getByRole('dialog', { name: '검증원장 지급 기록 정정' })
     const correction = modal.locator('.modal-footer').getByRole('button', { name: '역분개 + 재기표', exact: true })
@@ -52,6 +62,17 @@ for (const viewport of [{ width: 1365, height: 768 }, { width: 390, height: 844 
     await expect(summary).toBeVisible()
     expect(await readTextLines(summary)).toBeLessThanOrEqual(viewport.width > 400 ? 1 : 2)
     await expect(editor.getByRole('button', { name: '등록', exact: true })).toBeInViewport({ ratio: 1 })
+    await editor.getByLabel('1행 차변').fill('845000')
+    await editor.getByLabel('2행 대변').fill('845000')
+    await editor.getByLabel(/사유/).fill('기록 오류 정정')
+    await editor.getByRole('button', { name: '등록', exact: true }).click()
+    await expect(editor).toBeHidden()
+    const detail = page.getByRole('dialog', { name: /^예외 상세/ })
+    await expect(detail).toBeVisible()
+    await expect(detail.getByText('해결', { exact: true })).toBeVisible()
+    await expect(detail.getByText('원장 정정 후 재대사 일치 확인')).toBeVisible()
+    await expect.poll(() => new URL(page.url()).searchParams.get('status')).toBe('OPEN')
+    await expect.poll(() => new URL(page.url()).searchParams.get('selected')).toBe('11')
   })
 }
 
@@ -154,12 +175,19 @@ test('이연액 입력과 예정일 변경으로 현재 지급액·귀속을 자
   await expect(attribution.getByLabel('1번 귀속 내역 귀속일')).toHaveValue('2026-10-25')
   await expect(attribution.getByLabel('2번 귀속 내역 귀속금액')).toHaveValue('60000')
   await expect(attribution.getByLabel('2번 귀속 내역 귀속일')).toHaveValue('2027-11-15')
-  await expect(attribution.getByLabel('2번 귀속 내역 귀속월')).toHaveValue('2027-11-01')
+  await expect(attribution.getByLabel('2번 귀속 내역 귀속월')).toHaveValue('2027-11')
+  const headers = attribution.getByRole('columnheader')
+  await expect(headers.nth(4)).toContainText('귀속월')
+  await expect(headers.nth(5)).toContainText('귀속금액')
+  await expect(headers.nth(6)).toContainText('귀속일')
+  await expect(attribution.getByLabel('1번 귀속 내역 귀속금액')).toBeInViewport({ ratio: 1 })
+  await expect(attribution.getByLabel('2번 귀속 내역 귀속금액')).toBeInViewport({ ratio: 1 })
   await expect(attribution.getByLabel('2번 귀속 내역 귀속금액')).toBeDisabled()
   await expect(modal.getByLabel(/^정산월/)).toHaveValue('2027-11')
   await preview.click()
   const save = modal.getByRole('button', { name: '이연 저장' })
   await expect(save).toBeEnabled()
+  await expect(modal.locator('.transaction-gate-check')).toHaveCount(6)
   expect(submissions).toEqual([expect.objectContaining({ plannedAction: 'DEFER', deferredAmount: 60000,
     deferredPaymentDate: '2027-11-15', payment: expect.objectContaining({ amount: 150000 }) })])
   await page.screenshot({ path: testInfo.outputPath('entered-deferral.png'), fullPage: true })

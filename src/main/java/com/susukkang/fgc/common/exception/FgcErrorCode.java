@@ -172,6 +172,12 @@ public enum FgcErrorCode {
             "error.ledger.correctionConflict"
     ),
 
+    LEDG_005(
+            "FGC-LEDG-005",
+            HttpStatus.CONFLICT,
+            "error.ledger.scheduleReplacementAlreadyPosted"
+    ),
+
     JOURNAL_001(
             "FGC-JOURNAL-001",
             HttpStatus.UNPROCESSABLE_ENTITY,

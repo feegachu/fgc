@@ -203,7 +203,7 @@
 .cb .cb-table td { padding: 13px 10px; border-bottom: 1px solid var(--cb-line-light); color: var(--cb-t700); white-space: nowrap; vertical-align: middle; font-variant-numeric: tabular-nums; }
 .cb .cb-table tr:last-child td { border-bottom: 0; }
 .cb .cb-table .r { text-align: right; }
-/* 한도 영향 열: 환수 노출(오른쪽 정렬)과 붙어 보이지 않게 좌우 간격을 두고 가운데 정렬한다 */
+/* 한도 여유 열: 예상 환수액(오른쪽 정렬)과 붙어 보이지 않게 좌우 간격을 두고 가운데 정렬한다 */
 .cb .cb-table .c { padding-left: 24px; padding-right: 24px; text-align: center; }
 .cb .cb-table .rank { font-size: 14px; font-weight: 800; color: var(--cb-t900); }
 .cb .cb-table .rank.top { color: var(--cb-brand-dark); }
@@ -317,7 +317,6 @@
 .cb .cb-suggest + .cb-composer { border-top: 0; }
 .cb .cb-suggest-btn { padding: 10px 16px; border: 1.5px solid #cbd5e1; border-radius: var(--radius-full); background: #fff; font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--cb-t700); }
 .cb .cb-suggest-btn:hover:not(:disabled) { border-color: var(--cb-brand-dark); color: var(--cb-brand-dark); }
-.cb .cb-suggest-btn.on { border-color: var(--cb-brand-dark); background: var(--cb-brand-100); color: var(--cb-brand-dark); }
 .cb .cb-suggest-btn:disabled { opacity: 0.5; cursor: default; }
 .cb button.cb-send:disabled { cursor: default; }
 @media (max-width: 760px) {

@@ -1,5 +1,6 @@
 package com.susukkang.fgc.exceptioncase.repository;
 
+import com.susukkang.fgc.cap.repository.CapDisplaySql;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseActionTarget;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionExceptionTarget;
@@ -261,6 +262,29 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                AND cc.result_status IN ('VIOLATION', 'WARNING', 'REVIEW_REQUIRED')
             """, nativeQuery = true)
     long insertFromCapChecks(@Param("validationRunId") Long validationRunId);
+
+    /** 지급 등록에서 검출된 업무건을 그대로 재검출한다. 원천 링크·업무키와 정정 경로는 유지한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    @Query(value = """
+            SELECT COUNT(*) FILTER (WHERE recorded.new_case)
+              FROM (
+            """ + CapDisplaySql.MONTHLY_PRE_CONFIRM_VIOLATIONS + """
+              ) cc
+              JOIN fgc.exception_case ec ON ec.exception_type = 'CAP_VIOLATION'
+                AND ec.status IN ('NEW', 'REVIEW_REQUIRED', 'IN_REVIEW')
+                AND (ec.cap_check_id = cc.cap_check_id OR
+                     (ec.source_entity_type = 'CAP_CHECK' AND ec.source_entity_id = cc.cap_check_id::text))
+              CROSS JOIN LATERAL fgc.record_exception_detection(
+                  ec.exception_key, ec.exception_type, ec.reason_code, ec.severity,
+                  :validationRunId, ec.contract_id, ec.agent_id, ec.policy_version_id,
+                  ec.source_entity_type, ec.source_entity_id, ec.title, ec.description,
+                  jsonb_build_object('capCheckId', cc.cap_check_id, 'paymentStage', cc.payment_stage,
+                      'limitAmount', cc.limit_amount, 'includedAmount', cc.included_amount,
+                      'remainingAmount', cc.remaining_amount, 'usagePct', cc.usage_pct,
+                      'resultStatus', cc.result_status, 'calculationSnapshot', cc.calculation_snapshot)
+              ) recorded
+            """, nativeQuery = true)
+    long recordExistingPreConfirmViolations(@Param("validationRunId") Long validationRunId);
 
     /**
      * 월 검증 8단계(#498): 이미 확정된 달을 다시 검증한 실행이면, 확정 실행과 1,200% 판정을

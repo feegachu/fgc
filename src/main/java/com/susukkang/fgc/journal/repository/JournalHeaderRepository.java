@@ -70,6 +70,14 @@ public interface JournalHeaderRepository
             """)
     int markReversed(@Param("journalHeaderId") Long journalHeaderId);
 
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            UPDATE JournalHeader h SET h.correctionGroupKey = :groupKey
+             WHERE h.journalHeaderId = :id AND h.status = com.susukkang.fgc.common.code.JournalHeaderStatus.DRAFT
+               AND h.correctionGroupKey IS NULL
+            """)
+    int linkReplacementGroup(@Param("id") Long id, @Param("groupKey") String groupKey);
+
     // V82 부분 인덱스의 끝값 한 건으로 MAX를 구한다. 정규식이 인덱스 조건과 글자까지 같아야 인덱스가 쓰인다.
     @Query(value = """
             SELECT COALESCE(MAX(CAST(substring(journal_no FROM 12) AS int)), 0) + 1

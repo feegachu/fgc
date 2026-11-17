@@ -69,9 +69,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState<CompareItem | null>(null)
   const [faq, setFaq] = useState<string | null>(null)
   const [filters, setFilters] = useState<FilterDraft>(EMPTY_FILTERS)
-  // 3단계 하단 질문 버튼을 누르면 입력창에 들어가고, 보내기를 눌러야 답변을 받거나 1단계로 돌아간다.
-  const [draft, setDraft] = useState<{ kind: FollowUpKind | 'restart'; text: string } | null>(null)
-  // 하단 입력창: 연관 질문 버튼을 누르면 문구가 들어가고, 직접 써서 보내면 서버가 자연어 질문에 답한다.
+  // 연관 질문은 클릭 즉시 답하고, 입력창에서 직접 보낸 질문은 서버가 답한다.
   const [input, setInput] = useState('')
   const [asked, setAsked] = useState<{ id: number; kind: FollowUpKind | 'free'; question: string; answer: string | null }[]>([])
   const nextId = useRef(0)
@@ -111,7 +109,6 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
     setCategory(next)
     setProgress(0)
     setSelected(null)
-    setDraft(null)
     setInput('')
     setAsked([])
     rank.reset()
@@ -122,7 +119,20 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
     rank.mutate({ categoryCode: next.code, filters: toFilters(scoped) })
   }
   const pending = asked.some((qa) => qa.answer === null)
-  const canSend = !pending && (draft !== null || input.trim().length > 0)
+  const canSend = !pending && input.trim().length > 0
+  const askFollowUp = (kind: FollowUpKind) => () => {
+    if (pending || !ranking?.items.length || asked.some((qa) => qa.kind === kind)) return
+    const id = nextId.current++
+    setAsked((list) => [
+      ...list,
+      {
+        id,
+        kind,
+        question: followUpQuestion(kind, ranking.items[0]),
+        answer: followUpAnswer(kind, ranking.items, ranking.clawbackMonth),
+      },
+    ])
+  }
   const ask = (question: string) => {
     const id = nextId.current++
     const settle = (answer: string) => setAsked((list) => list.map((qa) => (qa.id === id ? { ...qa, answer } : qa)))
@@ -133,19 +143,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
   }
   const send = () => {
     if (!canSend) return
-    if (draft?.kind === 'restart') {
-      restart()
-      return
-    }
-    if (draft) {
-      const kind = draft.kind as FollowUpKind
-      if (ranking && ranking.items.length > 0) {
-        setAsked((list) => [...list, { id: nextId.current++, kind, question: draft.text, answer: followUpAnswer(kind, ranking.items) }])
-      }
-    } else {
-      ask(input.trim())
-    }
-    setDraft(null)
+    ask(input.trim())
     setInput('')
   }
   const openEvidence = (item: CompareItem) => {
@@ -155,7 +153,6 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
   const restart = () => {
     setCategory(null)
     setSelected(null)
-    setDraft(null)
     setInput('')
     setAsked([])
     setProgress(0)
@@ -349,13 +346,9 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                       <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.follow-up"
                         key={kind}
                         type="button"
-                        className={`cb-suggest-btn${draft?.kind === kind ? ' on' : ''}`}
-                        aria-pressed={draft?.kind === kind}
-                        disabled={asked.some((qa) => qa.kind === kind)}
-                        onClick={() => {
-                          setDraft({ kind, text })
-                          setInput(text)
-                        }}
+                        className="cb-suggest-btn"
+                        disabled={pending || asked.some((qa) => qa.kind === kind)}
+                        onClick={askFollowUp(kind)}
                       >
                         {text}
                       </button>
@@ -363,12 +356,8 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                   })}
                 <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.suggest-restart"
                   type="button"
-                  className={`cb-suggest-btn${draft?.kind === 'restart' ? ' on' : ''}`}
-                  aria-pressed={draft?.kind === 'restart'}
-                  onClick={() => {
-                    setDraft({ kind: 'restart', text: '다른 카테고리도 추천 받기' })
-                    setInput('다른 카테고리도 추천 받기')
-                  }}
+                  className="cb-suggest-btn"
+                  onClick={restart}
                 >
                   다른 카테고리도 추천 받기
                 </button>
@@ -380,10 +369,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                   placeholder="궁금한 점을 입력하거나 위 질문을 골라 보세요(고객 개인정보는 입력하지 마세요)"
                   maxLength={200}
                   value={input}
-                  onChange={(event) => {
-                    setInput(event.target.value)
-                    setDraft((d) => (d && d.text === event.target.value ? d : null))
-                  }}
+                  onChange={(event) => setInput(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
                       event.preventDefault()
@@ -658,22 +644,22 @@ function Result({
               <th scope="col">순위</th>
               <th scope="col">보험사/상품</th>
               <th scope="col" className="r">
-                보수적 순수령액
+                순수령액
               </th>
               <th scope="col" className="r">
-                수령 예상
+                수령액
               </th>
               <th scope="col" className="r">
-                환수 노출
+                예상 환수액
               </th>
               <th scope="col" className="c">
-                한도 영향
+                한도 여유
               </th>
               <th scope="col" className="c">
                 협회 등급
               </th>
               <th scope="col">
-                <span className="visually-hidden">근거</span>
+                <span className="visually-hidden">계산 내역</span>
               </th>
             </tr>
           </thead>
@@ -698,7 +684,7 @@ function Result({
                     <b>{won(item.conservativeNet)}</b>
                   </td>
                   <td className="r">{won(item.cappedReceipt)}</td>
-                  <td className="r neg">−{won(item.clawbackExposure)}</td>
+                  <td className="r">{won(item.clawbackExposure)}</td>
                   <td className="c">
                     <StatusBadge tone={badge.tone} tablePresentation="badge">{badge.text}</StatusBadge>
                   </td>
@@ -712,19 +698,19 @@ function Result({
                       <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.top-evidence"
                         type="button"
                         className="cb-btn small primary"
-                        aria-label={`${item.insurer} ${item.product} 근거 보기`}
+                        aria-label={`${item.insurer} ${item.product} 계산 내역 보기`}
                         onClick={() => onEvidence(item)}
                       >
-                        근거
+                        계산 내역
                       </button>
                     ) : (
                       <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.row-evidence"
                         type="button"
                         className="cb-btn small"
-                        aria-label={`${item.insurer} ${item.product} 근거 보기`}
+                        aria-label={`${item.insurer} ${item.product} 계산 내역 보기`}
                         onClick={() => onEvidence(item)}
                       >
-                        근거
+                        계산 내역
                       </button>
                     )}
                   </td>
@@ -735,12 +721,12 @@ function Result({
         </table>
       </div>
       <p className="cb-note">
-        보수적 순수령액 = 한도 반영 수령 예상액 − 환수 노출액(해지 시나리오 가정). 협회 등급은 표시만 하며 순위에
-        반영하지 않아요. 기준 보험료는 내 계약의 평균 월납환산 초회보험료({won(ranking.basePremium ?? 0)})예요.
+        순수령액 = 수령액(한도 반영) − 예상 환수액. 협회 등급은 참고용이며 순위에 반영하지 않아요.
+        기준 보험료는 내 계약의 평균 월납환산 초회보험료({won(ranking.basePremium ?? 0)})예요.
       </p>
       <p className="cb-note" data-testid="assumption-note">
-        이 순위 기준은 회사가 정한 계산 가정이에요. 환수 노출액은 {ranking.clawbackMonth}개월차에 해지된다고 보고 환수 규칙의
-        환수율로 계산했어요.
+        이 순위 기준은 회사가 정한 계산 가정이에요. {ranking.clawbackMonth}개월 차에 해지한다고 가정하고, 수령액에서
+        예상 환수액을 뺀 금액이에요. 예상 환수액은 환수 규칙의 환수율로 계산했어요.
       </p>
     </>
   )
@@ -766,7 +752,7 @@ function Drawer({
   for (const line of item.evidence) groups.set(line.label, [...(groups.get(line.label) ?? []), line])
   const badge = capBadge(item.capImpactPct, item.carryover)
   return (
-    <aside className="cb-drawer" aria-label="산출 근거">
+    <aside className="cb-drawer" aria-label="계산 내역">
       <div className="cb-drawer-head">
         <div>
           <div className="cb-drawer-title">
@@ -776,17 +762,17 @@ function Drawer({
             {item.rank}위 / {total}개, 자료 기준 {ranking.asOf}
           </div>
         </div>
-        <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.evidence-close" ref={close} type="button" className="cb-close" aria-label="근거 닫기" onClick={onClose}>
+        <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.evidence-close" ref={close} type="button" className="cb-close" aria-label="계산 내역 닫기" onClick={onClose}>
           ×
         </button>
       </div>
       <div className="cb-drawer-body">
         <div className="cb-net">
-          <div className="cb-net-label">실제로 남는 돈</div>
+          <div className="cb-net-label">순수령액</div>
           <div className="cb-net-value">{won(item.conservativeNet)}</div>
           <div className="cb-ledger">
             <div>
-              <span>받을 수 있는 수수료(한도 반영)</span>
+              <span>수령액(한도 반영)</span>
               <b>{won(item.cappedReceipt)}</b>
             </div>
             {item.carryover > 0 && (
@@ -796,7 +782,7 @@ function Drawer({
               </div>
             )}
             <div>
-              <span>해지 시 돌려줄 금액</span>
+              <span>예상 환수액</span>
               <b className="neg">−{won(item.clawbackExposure)}</b>
             </div>
           </div>
@@ -828,7 +814,7 @@ function Drawer({
           </section>
         ))}
         <p className="cb-muted">
-          규칙 계산 결과예요. 환수 노출은 {ranking.clawbackMonth}개월차에 해지된다고 가정한 시나리오 금액이에요.
+          {ranking.clawbackMonth}개월 차에 해지한다고 가정한 계산 내역이에요. 순수령액은 수령액에서 예상 환수액을 뺀 금액이에요.
         </p>
       </div>
     </aside>

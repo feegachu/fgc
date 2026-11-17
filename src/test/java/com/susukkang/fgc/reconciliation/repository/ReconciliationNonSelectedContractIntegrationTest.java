@@ -41,6 +41,35 @@ class ReconciliationNonSelectedContractIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private com.susukkang.fgc.validation.repository.ValidationTargetRepository validationTargets;
+
+    @Test
+    void marked_workflow_demo_is_excluded_from_selection_and_both_reconciliation_sides() {
+        Long demo = insertContract("ACTIVE");
+        Long normal = insertContract("ACTIVE");
+        Long demoLine = insertLine(demo, 1, MONTH.withDayOfMonth(9));
+        Long normalLine = insertLine(normal, 1, MONTH.withDayOfMonth(9));
+        insertConfirmedPayment(demo, 1, MONTH.withDayOfMonth(9));
+        insertConfirmedPayment(normal, 1, MONTH.withDayOfMonth(9));
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET workflow_demo_excluded=true WHERE contract_id=?", demo);
+
+        assertThat(expectedLineIds(normal)).contains(normalLine);
+        assertThat(expectedLineIds(demo)).doesNotContain(demoLine);
+        Long insurer = jdbcTemplate.queryForObject("SELECT insurer_id FROM fgc.insurance_contract WHERE contract_id=?", Long.class, demo);
+        assertThat(gaFcSources.findActualSources(MONTH, insurer))
+                .extracting(row -> row.getContractId()).contains(normal).doesNotContain(demo);
+
+        Long run = insertValidationRun();
+        validationTargets.insertTargets(run, MONTH, MONTH.plusMonths(1).minusDays(1));
+        assertThat(jdbcTemplate.queryForObject("SELECT selection_status FROM fgc.validation_target WHERE validation_run_id=? AND contract_id=?",
+                String.class, run, demo)).isEqualTo("EXCLUDED");
+        assertThat(jdbcTemplate.queryForObject("SELECT selection_reason FROM fgc.validation_target WHERE validation_run_id=? AND contract_id=?",
+                String.class, run, demo)).isEqualTo("전체 업무 가이드 시연 계약 (월 검증 제외)");
+        assertThat(jdbcTemplate.queryForObject("SELECT selection_status FROM fgc.validation_target WHERE validation_run_id=? AND contract_id=?",
+                String.class, run, normal)).isNotEqualTo("EXCLUDED");
+    }
+
     @BeforeEach
     void useUtcSession() {
         jdbcTemplate.execute("SET LOCAL TIME ZONE 'UTC'");

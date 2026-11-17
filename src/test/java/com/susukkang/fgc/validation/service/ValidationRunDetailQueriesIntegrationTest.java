@@ -6,7 +6,10 @@ import com.susukkang.fgc.validation.dto.ValidationRunResultSummaryRow;
 import com.susukkang.fgc.validation.dto.ValidationTargetListRow;
 import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import com.susukkang.fgc.validation.repository.ValidationTargetRepository;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
@@ -30,6 +33,8 @@ class ValidationRunDetailQueriesIntegrationTest {
     private ValidationTargetRepository validationTargetRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private ExceptionCaseRepository exceptionCaseRepository;
 
     private Long contractId(String contractNo) {
         return jdbcTemplate.queryForObject(
@@ -75,6 +80,153 @@ class ValidationRunDetailQueriesIntegrationTest {
                      limit_amount, included_amount, remaining_amount, usage_pct, result_status, checked_at)
                 VALUES (?, ?, ?, ?, 'MONTHLY', '2026-07-01', 100000, 0, 0, 1200000, 0, 1200000, 0, ?, now())
                 """, runId, contractId, paymentStage, capRuleSetId(paymentStage), resultStatus);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"DIRECT", "SOURCE", "OCCURRENCE"})
+    void resolvedViolationDisappearsFromCurrentCountsButKeepsHistoryAndOtherViolations(String link) {
+        Long runId = insertValidationRun(LocalDate.of(2032, 7, 1), 1);
+        Long contract = contractId("FGC-FGL01-202607-0001");
+        insertCapCheck(runId, contract, "INSURER_TO_GA", "VIOLATION");
+        insertCapCheck(runId, contract, "GA_TO_FC", "VIOLATION");
+        Long check = jdbcTemplate.queryForObject("SELECT cap_check_id FROM fgc.cap_check "
+                + "WHERE validation_run_id=? AND payment_stage='INSURER_TO_GA'", Long.class, runId);
+        Long exception = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.exception_case
+                    (exception_key,exception_type,severity,status,validation_run_id,validation_month,
+                     contract_id,source_entity_type,source_entity_id,cap_check_id,title)
+                VALUES (?, 'CAP_VIOLATION','CRITICAL','NEW',?,DATE '2032-07-01',?,'CAP_CHECK',?,?,'summary regression')
+                RETURNING exception_case_id
+                """, Long.class, "SUMMARY-" + java.util.UUID.randomUUID(), runId, contract,
+                "SOURCE".equals(link) ? check.toString() : "superseded", "DIRECT".equals(link) ? check : null);
+        jdbcTemplate.update("""
+                INSERT INTO fgc.exception_occurrence
+                    (exception_case_id,validation_run_id,exception_type,source_entity_type,source_entity_id,is_new_case)
+                VALUES (?,?,'CAP_VIOLATION','CAP_CHECK',?,true)
+                """, exception, runId, "OCCURRENCE".equals(link) ? check.toString() : "other-evidence");
+
+        assertThat(validationRunRepository.summarize(runId).orElseThrow().getCapViolationCount()).isEqualTo(2);
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status='RESOLVED',resolved_at=now() WHERE exception_case_id=?", exception);
+
+        var summary = validationRunRepository.summarize(runId).orElseThrow();
+        assertThat(summary.getCapViolationCount()).isEqualTo(1);
+        assertThat(summary.getExceptionDetectedCount()).isEqualTo(1);
+        assertThat(summary.getExceptionOpenWorkItemCount()).isZero();
+        assertThat(validationRunRepository.summarizeCapByAgent(runId)).allSatisfy(row ->
+                assertThat(row.getViolationCount()).isEqualTo("INSURER_TO_GA".equals(row.getPaymentStage()) ? 0 : 1));
+        assertThat(jdbcTemplate.queryForObject("SELECT result_status FROM fgc.cap_check WHERE cap_check_id=?",
+                String.class, check)).isEqualTo("VIOLATION");
+
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status='NEW',resolved_at=NULL WHERE exception_case_id=?", exception);
+        assertThat(validationRunRepository.summarize(runId).orElseThrow().getCapViolationCount()).isEqualTo(2);
+    }
+
+    private Long insertPreConfirmViolation(Long runId, Long contract) {
+        insertCapCheck(runId, contract, "GA_TO_FC", "VIOLATION");
+        Long check = jdbcTemplate.queryForObject("SELECT cap_check_id FROM fgc.cap_check WHERE validation_run_id=?",
+                Long.class, runId);
+        jdbcTemplate.update("""
+                UPDATE fgc.cap_check SET validation_run_id=NULL,check_kind='PRE_CONFIRM',
+                    as_of_date=(SELECT validation_month FROM fgc.validation_run WHERE validation_run_id=?)
+                WHERE cap_check_id=?
+                """, runId, check);
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.exception_case
+                    (exception_key,exception_type,reason_code,severity,status,validation_month,
+                     contract_id,source_entity_type,source_entity_id,cap_check_id,title)
+                SELECT ?, 'CAP_VIOLATION','CAP_LIMIT_VIOLATION','CRITICAL','NEW',validation_month,
+                     ?,'COMMISSION_TRANSACTION','existing-payment',?,'existing cap violation'
+                  FROM fgc.validation_run WHERE validation_run_id=?
+                RETURNING exception_case_id
+                """, Long.class, "PRE-CONFIRM-" + java.util.UUID.randomUUID(), contract, check, runId);
+    }
+
+    @Test
+    void monthlyValidationRedetectsExistingPaymentViolationWithoutDuplicatingAndHidesItWhenResolved() {
+        LocalDate month = LocalDate.of(2033, 10, 1);
+        Long run = insertValidationRun(month, 1);
+        Long contract = contractId("FGC-FGL01-202607-0001");
+        Long existing = insertPreConfirmViolation(run, contract);
+        insertTarget(run, contract, "SELECTED", null);
+        insertCapCheck(run, contract, "GA_TO_FC", "NORMAL");
+
+        assertThat(validationRunRepository.summarize(run).orElseThrow().getCapViolationCount()).isEqualTo(1);
+        assertThat(exceptionCaseRepository.insertFromCapChecks(run)).isZero();
+        assertThat(exceptionCaseRepository.recordExistingPreConfirmViolations(run)).isZero();
+        assertThat(exceptionCaseRepository.recordExistingPreConfirmViolations(run)).isZero();
+        var summary = validationRunRepository.summarize(run).orElseThrow();
+        assertThat(summary.getExceptionDetectedCount()).isEqualTo(1);
+        assertThat(summary.getExceptionNewCount()).isZero();
+        assertThat(summary.getExceptionRecurringCount()).isEqualTo(1);
+        assertThat(summary.getExceptionOpenWorkItemCount()).isEqualTo(1);
+        assertThat(validationRunRepository.summarizeCapByAgent(run)).singleElement().satisfies(row -> {
+            assertThat(row.getCheckedCount()).isEqualTo(1);
+            assertThat(row.getViolationCount()).isEqualTo(1);
+        });
+        assertThat(jdbcTemplate.queryForObject("SELECT source_entity_type FROM fgc.exception_case WHERE exception_case_id=?",
+                String.class, existing)).isEqualTo("COMMISSION_TRANSACTION");
+
+        jdbcTemplate.update("UPDATE fgc.validation_run SET status='COMPLETED',current_step=8 WHERE validation_run_id=?", run);
+        Long rerun = insertValidationRun(month, 2);
+        insertTarget(rerun, contract, "SELECTED", null);
+        insertCapCheck(rerun, contract, "GA_TO_FC", "NORMAL");
+        assertThat(exceptionCaseRepository.recordExistingPreConfirmViolations(rerun)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_case WHERE validation_month=?",
+                Long.class, month)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_occurrence WHERE exception_case_id=?",
+                Long.class, existing)).isEqualTo(2);
+
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status='RESOLVED',resolved_at=now() WHERE exception_case_id=?", existing);
+        assertThat(validationRunRepository.summarize(run).orElseThrow().getCapViolationCount()).isZero();
+        assertThat(validationRunRepository.summarize(rerun).orElseThrow().getCapViolationCount()).isZero();
+        assertThat(validationRunRepository.summarizeCapByAgent(run)).allSatisfy(row ->
+                assertThat(row.getViolationCount()).isZero());
+        assertThat(exceptionCaseRepository.recordExistingPreConfirmViolations(rerun)).isZero();
+        assertThat(validationRunRepository.summarize(rerun).orElseThrow().getExceptionOpenWorkItemCount()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"EXCLUDED", "OTHER_MONTH", "DELETED", "RESOLVED", "OTHER_STAGE", "NO_MONTHLY"})
+    void unrelatedOrClosedPreConfirmViolationsDoNotEnterMonthlyResults(String condition) {
+        Long run = insertValidationRun(LocalDate.of(2033, 10, 1), 1);
+        Long contract = contractId("FGC-FGL01-202607-0001");
+        Long existing = insertPreConfirmViolation(run, contract);
+        insertTarget(run, contract, "EXCLUDED".equals(condition) ? "EXCLUDED" : "SELECTED", null);
+        if (!"NO_MONTHLY".equals(condition)) {
+            insertCapCheck(run, contract, "OTHER_STAGE".equals(condition) ? "INSURER_TO_GA" : "GA_TO_FC", "NORMAL");
+        }
+        if ("OTHER_MONTH".equals(condition)) {
+            jdbcTemplate.update("UPDATE fgc.cap_check SET as_of_date=DATE '2033-11-01' WHERE cap_check_id="
+                    + "(SELECT cap_check_id FROM fgc.exception_case WHERE exception_case_id=?)", existing);
+        }
+        if ("DELETED".equals(condition)) {
+            jdbcTemplate.update("UPDATE fgc.cap_check SET calculation_snapshot='{\"deletedCandidateTransactionId\":1}'::jsonb "
+                    + "WHERE cap_check_id=(SELECT cap_check_id FROM fgc.exception_case WHERE exception_case_id=?)", existing);
+        }
+        if ("RESOLVED".equals(condition)) {
+            jdbcTemplate.update("UPDATE fgc.exception_case SET status='RESOLVED',resolved_at=now() WHERE exception_case_id=?", existing);
+        }
+        assertThat(exceptionCaseRepository.recordExistingPreConfirmViolations(run)).isZero();
+        var summary = validationRunRepository.summarize(run).orElseThrow();
+        assertThat(summary.getCapViolationCount()).isZero();
+        assertThat(summary.getExceptionDetectedCount()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"RESOLVED", "REJECTED"})
+    void closingCandidateViolationDoesNotHideAnIndependentMonthlyViolationOrAllowFinalization(String closedStatus) {
+        Long run = insertValidationRun(LocalDate.of(2033, 10, 1), 1);
+        Long contract = contractId("FGC-FGL01-202607-0001");
+        Long candidate = insertPreConfirmViolation(run, contract);
+        insertTarget(run, contract, "SELECTED", null);
+        insertCapCheck(run, contract, "GA_TO_FC", "VIOLATION");
+        assertThat(exceptionCaseRepository.insertFromCapChecks(run)).isEqualTo(1);
+        assertThat(exceptionCaseRepository.recordExistingPreConfirmViolations(run)).isZero();
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status=?,resolved_at=now() WHERE exception_case_id=?",
+                closedStatus, candidate);
+        assertThat(validationRunRepository.summarize(run).orElseThrow().getCapViolationCount()).isEqualTo(1);
+        assertThat(validationRunRepository.summarize(run).orElseThrow().getExceptionOpenWorkItemCount()).isEqualTo(1);
+        assertThat(validationRunRepository.findFinalizeChecklistCounts(run).orElseThrow().getUnresolvedExceptionCount()).isEqualTo(1);
     }
 
     private void insertArbitrageCheck(Long runId, Long contractId, String resultStatus) {

@@ -13,6 +13,7 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
     const bar = element?.parentElement
     if (!element || !bar) return
     let overflowing = false
+    let fittedWidth = -1
     const updateEdges = () => {
       const atStart = element.scrollLeft <= 1
       const atEnd = element.scrollLeft >= element.scrollWidth - element.clientWidth - 1
@@ -25,6 +26,8 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
       overflowing = tabs.length > Math.max(1, Math.round(available / 180))
       const width = element.getBoundingClientRect().width
       if (width <= 0) return
+      if (!revealActive && Math.abs(width - fittedWidth) < 0.1) { updateEdges(); return }
+      fittedWidth = width
       const slots = Math.max(1, Math.round(width / 180))
       const previousWidth = element.querySelector<HTMLElement>('.workspace-tab')?.getBoundingClientRect().width || 180
       const tabWidth = width / slots

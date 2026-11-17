@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
 import { StatusBadge } from '../../components/StatusBadge'
@@ -19,21 +19,13 @@ const CONDITIONS = [
 export function AnimatedRunChecklist({ completed, data, error, retry, onPresented }: {
   completed: number; data?: FinalizeChecklist; error?: string; retry: () => void; onPresented?: () => void
 }) {
-  const [revealed, setRevealed] = useState<number[]>([])
   const eligible = CONDITIONS.map((_item, index) => index + 1)
     .filter(no => completed >= CONDITIONS[no - 1].step && data?.conditions?.some(item => item.no === no))
-  const next = eligible.find(no => !revealed.includes(no))
-  useEffect(() => {
-    if (next === undefined) return
-    const timer = window.setTimeout(() => setRevealed(previous => [...previous, next]),
-      window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 0 : 520)
-    return () => window.clearTimeout(timer)
-  }, [next])
-  const allShown = CONDITIONS.every((_item, index) => eligible.includes(index + 1) && revealed.includes(index + 1))
+  const allShown = CONDITIONS.every((_item, index) => eligible.includes(index + 1))
   useEffect(() => {
     if (!allShown || !onPresented) return
     // The last revealed check still needs to finish drawing before completion is announced.
-    const timer = window.setTimeout(onPresented, window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 0 : 520)
+    const timer = window.setTimeout(onPresented, window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 0 : 120)
     return () => window.clearTimeout(timer)
   }, [allShown, onPresented])
   return <section data-guide-feature="features.validation.validation-run-detail-page.section-7" className="surface" aria-labelledby="vrun-checklist-title" data-guide-checklist-ready={allShown}>
@@ -47,7 +39,7 @@ export function AnimatedRunChecklist({ completed, data, error, retry, onPresente
       <div className="vrun-checklist">
         {CONDITIONS.map((item, index) => {
           const no = index + 1
-          const result = eligible.includes(no) && revealed.includes(no) ? data?.conditions?.find(condition => condition.no === no) : undefined
+          const result = eligible.includes(no) ? data?.conditions?.find(condition => condition.no === no) : undefined
           const to = result && !result.passed ? safeInternalLink(result.linkUrl) : null
           return <div className="vrun-checklist-item" data-guide-condition={no} key={no}>
             <span key={result ? String(result.passed) : 'pending'} className={`vrun-condition-icon ${result ? result.passed ? 'is-pass' : 'is-fail' : 'is-pending'}`} aria-hidden="true">

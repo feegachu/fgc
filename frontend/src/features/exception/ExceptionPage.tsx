@@ -33,6 +33,7 @@ import {
   ALL_STATUS,
   EXCEPTION_SORT_KEYS,
   exceptionOptionsQueryOptions,
+  exceptionDetailQueryOptions,
   exceptionSearchQueryOptions,
   OPEN_STATUS,
 } from './api'
@@ -96,7 +97,9 @@ export function ExceptionPage() {
     return monitoringMonth ? withMonth(path, monitoringMonth) : path
   }
   const rows = data?.content ?? []
-  const selected = rows.find((row) => String(row.exceptionCaseId) === selectedId)
+  const listedSelection = rows.find((row) => String(row.exceptionCaseId) === selectedId)
+  const selectedDetail = useQuery(exceptionDetailQueryOptions(selectedId, listedSelection))
+  const selected = selectedId ? listedSelection ?? selectedDetail.data : undefined
   const ownReview = selected?.status === 'IN_REVIEW' && selected.assigneeLoginId === user?.loginId
   const sourceCorrection = ['CAP_WARNING', 'CAP_VIOLATION', 'CAP_REVIEW_REQUIRED', 'RECONCILIATION_MISMATCH'].includes(selected?.type ?? '')
   const scheduleReconciliation = selected?.type === 'RECONCILIATION_MISMATCH' && ['EXPECTED_MISSING', 'INVALID_CONTRACT_PAYMENT'].includes(selected.reconciliationResultType ?? selected.reasonCode ?? '')
@@ -327,9 +330,6 @@ export function ExceptionPage() {
             />
           </Link>
         ))}
-        {data && !data.summary?.length && (
-          <p className="empty-state exception-summary-empty">미처리 예외가 없습니다.</p>
-        )}
       </section>
       {monitoring.isError && <p role="alert">주의와 차익거래 판정을 불러오지 못했습니다.</p>}
 
@@ -396,6 +396,10 @@ export function ExceptionPage() {
               <Button data-guide-feature="features.exception-page.button-1" variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button>
             </>}>
             {processing && <p role="status">처리 중입니다. 완료 후 창을 닫을 수 있습니다.</p>}
+            {selectedDetail.isFetching && <p role="status">예외 상태와 처리 이력을 갱신하고 있습니다.</p>}
+            {selectedDetail.isError && <p role="alert">
+              예외 상태와 처리 이력을 다시 불러오지 못했습니다. 창을 다시 열어 확인해 주세요.
+            </p>}
             <div className="exception-side-panels">
               <div className="exception-main-panels">
                 <section data-guide-feature="features.exception.information" className="surface exception-information">

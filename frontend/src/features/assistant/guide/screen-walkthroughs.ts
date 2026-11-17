@@ -101,14 +101,9 @@ export const screenWalkthroughs: Record<string, readonly ScreenHelpStep[]> = {
       '지급 등록 및 영향 미리보기 및 수정 버튼입니다.',
       '스케줄 재생성과 한도 재검증도 여기서 진행합니다.'), anchor: undefined },
     { ...target('contract.tabContent', '계약 상세 탭',
-      '탭마다 계약에 연결된 정보를 확인합니다.', ''), anchor: undefined,
+      '탭마다 계약에 연결된 정보를 확인합니다.', '확인할 탭을 직접 눌러 살펴보세요.'), anchor: undefined,
       presentation: { side: 'right' },
-      liveDescriptionSelector: '[data-guide-target="contract.tabContent"]',
-      onEnter: () => {
-        const root = document.querySelector('[data-guide-target="contract.tabContent"]')
-        root?.dispatchEvent(new Event('fgc-contract-tabs-start'))
-        return () => { root?.dispatchEvent(new Event('fgc-contract-tabs-stop')) }
-      } },
+      liveDescriptionSelector: '[data-guide-target="contract.tabContent"]' },
     { ...statusHistory, anchor: undefined, presentation: { side: 'left' },
       title: '계약 상태와 변경 이력',
       instruction: '상태 변경이 이력에 쌓이는 모습을 예시로 보여드립니다.',
@@ -129,7 +124,7 @@ export const screenWalkthroughs: Record<string, readonly ScreenHelpStep[]> = {
       'CSV 내보내기를 눌러 저장하세요.'),
     { ...region('schedule.results', '[data-guide-target="schedule.results"] table', '스케줄 목록',
       '계약별 지급단계, 버전 및 회차와 예상 총액입니다.',
-      '사용 중인 스케줄과 상태를 확인하세요.'), anchor: undefined },
+      '사용 중인 스케줄과 상태를 확인하세요.'), anchor: undefined, presentation: { rowLimit: 2 } },
     { ...region('schedule.openDetail', '[data-guide-target="schedule.results"] tbody tr:first-child [data-guide-feature="features.schedule.schedule-list-page.context-link-2"]', '회차 상세 보기',
       '상세 열의 회차 보기를 누르면 상세 화면이 열립니다.',
       '회차별 금액과 적용 정책을 자세히 확인하세요.'), anchor: undefined }),

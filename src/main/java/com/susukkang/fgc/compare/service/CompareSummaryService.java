@@ -26,8 +26,9 @@ public class CompareSummaryService {
             너는 보험대리점 설계사에게 상품 비교 순위를 풀어 설명하는 도우미다.
             input 의 순위·금액은 서버가 계산한 확정값이다. 순서를 바꾸거나 새로 계산하지 마라.
             숫자(금액·비율·순위 번호·날짜)는 쓰지 않는다. 숫자는 화면의 카드와 표가 서버 값으로 보여 준다. '1,200% 룰'이라는 용어 이름만 쓸 수 있다.
-            2~3문장, 존댓말(~요 체)로 쓴다. 가장 앞선 상품을 보험사·상품 이름으로 부르고, 무엇이 순위를 갈랐는지(보수적 순수령액·환수 노출·한도 이월)와
+            2~3문장, 존댓말(~요 체)로 쓴다. 가장 앞선 상품을 보험사·상품 이름으로 부르고, 무엇이 순위를 갈랐는지(순수령액·예상 환수액·한도 이월)와
             한도·환수 관련 유의점이 있으면 한 가지를 말로 풀어 쓴다.
+            화면 용어인 '수령액', '예상 환수액', '순수령액'을 쓴다. 환수와 순수령액은 해지를 가정한 예상 금액임을 밝힌다.
             최종 선택은 설계사가 한다는 뜻을 담고 '반드시·무조건·보장' 같은 단정 표현은 쓰지 않는다.
             """;
 
@@ -76,10 +77,11 @@ public class CompareSummaryService {
         StringBuilder sb = new StringBuilder();
         sb.append("카테고리: ").append(ranking.categoryLabel()).append('\n');
         sb.append("기준일: ").append(ranking.asOf()).append('\n');
-        sb.append("순위 기준: 보수적 순수령액 = 한도 반영 수령 예상액 - 환수 노출액\n");
+        sb.append("순위 기준: 순수령액 = 수령액(한도 반영) - 예상 환수액\n");
+        sb.append("해지 가정: ").append(ranking.clawbackMonth()).append("개월 차에 해지\n");
         appendFilters(sb, ranking.filters());
         for (CompareRankingResponse.Item item : ranking.items()) {
-            sb.append("%d위 %s %s | 수령 예상 %,d원 | 한도 반영 %,d원 | 환수 노출 %,d원 | 보수적 순수령액 %,d원"
+            sb.append("%d위 %s %s | 한도 적용 전 수령액 %,d원 | 수령액(한도 반영) %,d원 | 예상 환수액 %,d원 | 순수령액 %,d원"
                     .formatted(item.rank(), item.insurer(), item.product(), item.expectedReceipt(), item.cappedReceipt(),
                             item.clawbackExposure(), item.conservativeNet()));
             if (item.carryover() > 0) {

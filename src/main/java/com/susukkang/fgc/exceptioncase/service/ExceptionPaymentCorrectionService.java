@@ -43,6 +43,7 @@ public class ExceptionPaymentCorrectionService {
     private final JournalHeaderRepository journalHeaders;
     private final com.susukkang.fgc.cap.service.CapCheckService capChecks;
     private final CapExceptionService capExceptions;
+    private final com.susukkang.fgc.journal.service.JournalPostingPortImpl scheduleJournals;
 
     @Transactional
     public ExceptionPaymentContext context(Long id, Long actor) {
@@ -363,6 +364,14 @@ public class ExceptionPaymentCorrectionService {
                 : status == CapResultStatus.REVIEW_REQUIRED ? "예상 스케줄을 검증할 자료가 부족합니다. 계산근거를 확인하세요."
                 : "예상 지급액 " + com.susukkang.fgc.common.util.DisplayFormat.won(saved.result().includedAmount())
                     + "원이 한도 " + com.susukkang.fgc.common.util.DisplayFormat.won(saved.result().limitAmount()) + "원을 초과합니다. 정책 규칙과 스케줄을 정정하세요.";
+        if (resolved) {
+            // 재생성 전 라인에 남은 대사 연결은 다음 차익거래 검증에서 미연결 지급으로 잡힌다.
+            // 이전 결과는 보존하고 새 스케줄로 재대사해 현재 지급의 연결 근거를 다시 만든다.
+            scheduleJournals.postExpectedForContract(scope.contractId(), source.validationRunId(),
+                    scope.asOfDate().withDayOfMonth(1), actor);
+            reconciliation.refresh(repository.scheduleReconciliationRuns(source, scope),
+                    "EXCP-SCHEDULE-" + id, actor);
+        }
         ExceptionActionResponse action = resolved ? exceptions.action(id,
                 new ExceptionActionRequest(ExceptionActionType.CORRECT, "예상 스케줄 재검증 통과 계산근거 " + saved.capCheckId(), null), actor, login) : null;
         return new ExceptionSourceRecheckResponse(com.susukkang.fgc.cap.dto.CapCheckBasisResponse.from(saved,

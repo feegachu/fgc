@@ -41,7 +41,7 @@
 .payment-guide-card.screen-step-guide > p { font-size: 13px; line-height: 1.7; color: var(--color-fgc-ink); }
 .screen-step-summary > span { display: block; }
 .payment-guide-card.screen-step-guide {
-  transition: left 700ms ease-in-out, top 700ms ease-in-out, width 700ms ease-in-out;
+  transition: left 500ms ease-in-out, top 500ms ease-in-out, width 500ms ease-in-out;
 }
 @media (prefers-reduced-motion: reduce) {
   .payment-guide-card.screen-step-guide { transition: none; }
@@ -58,7 +58,7 @@
   box-shadow: 0 12px 32px #17334b26;
   color: var(--color-fgc-ink);
 }
-.guide-field-picker, .guide-field-picker-motion { animation: guide-picker-open 400ms ease-out; }
+.guide-field-picker, .guide-field-picker-motion { animation: guide-picker-open 280ms ease-out; }
 @keyframes guide-picker-open { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 .guide-field-picker button { min-height: 36px; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
 .guide-field-picker button:hover:not(:disabled) { background: var(--color-fgc-surface); }

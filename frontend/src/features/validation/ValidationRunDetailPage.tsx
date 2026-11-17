@@ -141,7 +141,7 @@ function DetailBody({
   const failureMessage = live?.failureMessage ?? header.failureMessage
   const revised = helpVersion !== 'before'
   const awaitingAttempt = executed && previousAttemptId !== null && !hasNewAttempt(progress.data, previousAttemptId)
-  const presentation = useRunPresentation(status, currentStep, attemptWaitGeneration, revised, awaitingAttempt)
+  const presentation = useRunPresentation(status, currentStep, attemptWaitGeneration, revised, awaitingAttempt, false)
   const displayed = presentation
   const resultDetail = detail
   const resultStep = Math.min(displayed.completed, resultDetail.header?.currentStep ?? 0)

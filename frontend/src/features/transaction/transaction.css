@@ -161,7 +161,7 @@
 .transaction-attr-col-contract { width: 11rem; }
 .transaction-attr-col-agent { width: 9rem; }
 .transaction-attr-col-date { width: 8rem; }
-.transaction-attr-col-month { width: 8rem; }
+.transaction-attr-col-month { width: 6rem; }
 .transaction-attr-col-amount { width: 8rem; }
 .transaction-attr-col-decision { width: 9rem; }
 .transaction-attr-col-method { width: 10rem; }
@@ -193,7 +193,11 @@
   color: var(--color-text-secondary);
   background: var(--color-bg-subtle);
   font-size: 0.875rem;
+  line-height: 1;
 }
+
+.transaction-gate-icon > .material-symbols-rounded { font-size: inherit; }
+.transaction-gate-check { display: block; width: 16px; height: 16px; }
 
 .transaction-gate-label { color: var(--color-text-primary); font-size: 0.8125rem; font-weight: 600; }
 .transaction-gate-detail { margin-top: var(--space-1); color: var(--color-text-tertiary); font-size: 0.75rem; line-height: 1.125rem; overflow-wrap: anywhere; }

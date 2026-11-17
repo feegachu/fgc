@@ -77,8 +77,8 @@ export function RecoveryChecklistModal({ item, payments, onClose }: { item: Exce
       return data
     },
     meta: { errorToast: false },
-    onSuccess: result => {
-      applyActionToCache(client, item.exceptionCaseId!, result.action!)
+    onSuccess: async result => {
+      await applyActionToCache(client, item.exceptionCaseId!, result.action!)
       void client.invalidateQueries({ queryKey: ['reconciliations'], refetchType: 'none' })
       toast(result.message ?? '재대사 결과를 확인했습니다.', result.resolved ? 'success' : 'warning')
       if (result.resolved) onClose()

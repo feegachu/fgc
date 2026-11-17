@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { PrecheckResultPanel } from './PrecheckResultPanel'
+import { GateStatusIcon } from './GateStatusIcon'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
@@ -24,9 +25,7 @@ export function GatePanel({ result, correction = false }: { result: Precheck | n
         {!result && <p className="transaction-gate-detail">사전검증을 하면 결과가 표시됩니다.</p>}
         {gateStates(result).map((gate, index) => (
           <div key={gate.label} className={`transaction-gate-step transaction-gate-${gate.state}`}>
-            <span className="material-symbols-rounded transaction-gate-icon" aria-hidden="true">
-              {gate.state === 'pass' ? 'check' : gate.state === 'fail' ? 'close' : 'more_horiz'}
-            </span>
+            <GateStatusIcon state={gate.state} />
             <div>
               <div className="transaction-gate-label">
                 {index + 1}. {correction && index === 0 ? '수정 입력 준비' : gate.label}, {gate.state === 'pass' ? '통과' : gate.state === 'fail' ? '차단' : '미확인'}
