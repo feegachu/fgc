@@ -1300,7 +1300,7 @@ SELECT bank_reconciliation_run_id, settlement_month, inquiry_from, inquiry_to, w
  LIMIT 5;
 ```
 
-모의 은행은 확정된 달의 이체를 처음 조회될 때 그때의 확정 지급대로 만들어 `mock_bank_transaction`에 둔다. 받는 사람이 세 명 이상인 달에는 세 건을 일부러 어긋나게 만든다(10,000원 덜 보냄, 보내지 않음, 참조코드 없는 출금 55,000원). 시연용 자료를 다시 만들려면 그 달의 행을 지우고 대사를 다시 돌린다. 모의 은행의 표만 지우는 것이고 업무 자료는 건드리지 않는다.
+모의 은행은 확정된 달의 이체를 그 달의 대사를 처음 실행할 때 그때의 확정 지급대로 만들어 `mock_bank_transaction`에 둔다. 받는 사람이 세 명 이상인 달에는 세 건을 일부러 어긋나게 만든다(10,000원 덜 보냄, 보내지 않음, 참조코드 없는 출금 55,000원). 시연용 자료를 다시 만들려면 그 달의 행을 지우고 대사를 다시 돌린다. 모의 은행의 표만 지우는 것이고 업무 자료는 건드리지 않는다.
 
 ```sql
 DELETE FROM fgc.mock_bank_transaction WHERE settlement_month = DATE '2026-07-01';

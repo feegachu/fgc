@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.bank.service.BankInquiryStarting;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -48,6 +50,8 @@ class MockBankControllerIntegrationTest {
     private MockMvc mvc;
     @Autowired
     private JdbcTemplate jdbc;
+    @Autowired
+    private ApplicationEventPublisher events;
     private final ObjectMapper json = new ObjectMapper();
 
     @Test
@@ -59,7 +63,7 @@ class MockBankControllerIntegrationTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("모의 은행")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(STATE)));
 
-        String location = mvc.perform(authorize(post(BASE + "/oauth/2.0/authorize/approve")))
+        String location = mvc.perform(fromConsentPage(authorize(post(BASE + "/oauth/2.0/authorize/approve"))))
                 .andExpect(status().isFound()).andReturn().getResponse().getHeader("Location");
 
         assertThat(location).startsWith("/bank-reconciliations?code=").contains("&state=" + STATE)
@@ -85,7 +89,7 @@ class MockBankControllerIntegrationTest {
     @Test
     @DisplayName("취소하면 오류 값을 붙여 돌려보낸다")
     void redirectsWithAnErrorWhenTheUserDeclines() throws Exception {
-        String location = mvc.perform(authorize(post(BASE + "/oauth/2.0/authorize/deny")))
+        String location = mvc.perform(fromConsentPage(authorize(post(BASE + "/oauth/2.0/authorize/deny"))))
                 .andExpect(status().isFound()).andReturn().getResponse().getHeader("Location");
 
         assertThat(location).isEqualTo("/bank-reconciliations?error=access_denied&state=" + STATE);
@@ -98,8 +102,17 @@ class MockBankControllerIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.rsp_code").value("O0001"));
         mvc.perform(authorize(get(BASE + "/oauth/2.0/authorize"), "fgc-mock-client", "https://evil.example/steal"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.rsp_code").value("O0001"));
-        mvc.perform(authorize(post(BASE + "/oauth/2.0/authorize/approve"), "fgc-mock-client", "https://evil.example/steal"))
+        mvc.perform(fromConsentPage(
+                        authorize(post(BASE + "/oauth/2.0/authorize/approve"), "fgc-mock-client", "https://evil.example/steal")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.rsp_code").value("O0001"));
+    }
+
+    @Test
+    @DisplayName("동의 화면이 준 값 없이 보낸 동의와 취소는 받지 않는다")
+    void rejectsConsentFormsThatDidNotComeFromTheConsentPage() throws Exception {
+        // 다른 사이트가 사용자 대신 폼을 보내는 것을 막는다. 쿠키와 숨은 입력에 같은 값이 있어야 한다.
+        mvc.perform(authorize(post(BASE + "/oauth/2.0/authorize/approve"))).andExpect(status().isForbidden());
+        mvc.perform(authorize(post(BASE + "/oauth/2.0/authorize/deny"))).andExpect(status().isForbidden());
     }
 
     @Test
@@ -159,6 +172,11 @@ class MockBankControllerIntegrationTest {
         assertThat(payees).hasSize(3);
         String token = accessToken();
 
+        // 조회 요청은 원장을 만들지 않는다. 대사가 은행 조회를 시작한다고 알릴 때 그 달의 이체를 만든다.
+        assertThat(transactions(token, today, today, null).path("page_record_cnt").asText()).isEqualTo("0");
+        events.publishEvent(new BankInquiryStarting(MARCH));
+        events.publishEvent(new BankInquiryStarting(MARCH));
+
         JsonNode first = transactions(token, today, today, null);
         JsonNode second = transactions(token, today, today, null);
 
@@ -167,7 +185,7 @@ class MockBankControllerIntegrationTest {
         assertThat(first.path("fintech_use_num").asText()).isEqualTo(FINTECH_USE_NUM);
         assertThat(first.path("next_page_yn").asText()).isEqualTo("N");
         assertThat(first.path("page_record_cnt").asText()).isEqualTo("3");
-        // 두 번 조회해도 같은 이체를 다시 만들지 않는다.
+        // 두 번 알려도, 두 번 조회해도 같은 이체를 다시 만들지 않는다.
         assertThat(second.path("res_list")).isEqualTo(first.path("res_list"));
 
         JsonNode rows = first.path("res_list");
@@ -250,8 +268,17 @@ class MockBankControllerIntegrationTest {
                 .param("state", STATE).param("auth_type", "0");
     }
 
+    /** 브라우저처럼 동의 화면을 먼저 열어, 화면이 준 쿠키와 숨은 입력 값을 폼 요청에 싣는다. */
+    private MockHttpServletRequestBuilder fromConsentPage(MockHttpServletRequestBuilder form) throws Exception {
+        MvcResult page = mvc.perform(authorize(get(BASE + "/oauth/2.0/authorize"))).andReturn();
+        Matcher token = Pattern.compile("name=\"_csrf\" value=\"([^\"]+)\"")
+                .matcher(page.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        assertThat(token.find()).isTrue();
+        return form.cookie(page.getResponse().getCookie("MOCK-BANK-XSRF")).param("_csrf", token.group(1));
+    }
+
     private String approvedCode() throws Exception {
-        String location = mvc.perform(authorize(post(BASE + "/oauth/2.0/authorize/approve")))
+        String location = mvc.perform(fromConsentPage(authorize(post(BASE + "/oauth/2.0/authorize/approve"))))
                 .andReturn().getResponse().getHeader("Location");
         Matcher matcher = Pattern.compile("code=([^&]+)").matcher(location);
         assertThat(matcher.find()).isTrue();

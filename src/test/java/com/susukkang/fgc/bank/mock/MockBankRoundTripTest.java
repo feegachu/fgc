@@ -11,6 +11,7 @@ import com.susukkang.fgc.bank.openbanking.OpenBankingException;
 import com.susukkang.fgc.bank.openbanking.OpenBankingProperties;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -62,10 +63,26 @@ class MockBankRoundTripTest {
         assertThat(consent.statusCode()).isEqualTo(200);
         assertThat(consent.body()).contains("모의 은행 계좌 조회 동의").contains("authorize/approve");
 
+        // 동의 화면은 폼 위조 방지 값을 쿠키와 숨은 입력에 함께 준다. 쿠키는 모의 은행 주소에만 실린다.
+        String setCookie = consent.headers().firstValue("Set-Cookie").orElseThrow();
+        assertThat(setCookie).startsWith("MOCK-BANK-XSRF=").contains("Path=/api/v1/mock-bank").contains("HttpOnly");
+        Matcher csrf = Pattern.compile("name=\"_csrf\" value=\"([^\"]+)\"").matcher(consent.body());
+        assertThat(csrf.find()).isTrue();
+        String form = authorizeUrl.substring(authorizeUrl.indexOf('?') + 1);
+
+        // 그 값 없이 보낸 동의는 다른 사이트가 대신 누른 것으로 보고 받지 않는다.
+        HttpResponse<String> forged = browser.send(HttpRequest.newBuilder(URI.create(base + "/oauth/2.0/authorize/approve"))
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .POST(HttpRequest.BodyPublishers.ofString(form)).build(),
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        assertThat(forged.statusCode()).isEqualTo(403);
+
         // 동의 화면의 폼이 보내는 것과 같은 요청이다.
         HttpResponse<String> approved = browser.send(HttpRequest.newBuilder(URI.create(base + "/oauth/2.0/authorize/approve"))
                         .header("Content-Type", "application/x-www-form-urlencoded")
-                        .POST(HttpRequest.BodyPublishers.ofString(authorizeUrl.substring(authorizeUrl.indexOf('?') + 1)))
+                        .header("Cookie", setCookie.substring(0, setCookie.indexOf(';')))
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                form + "&_csrf=" + URLEncoder.encode(csrf.group(1), StandardCharsets.UTF_8)))
                         .build(),
                 HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         assertThat(approved.statusCode()).isEqualTo(302);

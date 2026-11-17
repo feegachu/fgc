@@ -33,11 +33,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.annotation.Transactional;
 
 /** FUN-090 지급 이체 대사: 은행 계좌 연결과 대사 실행을 실제 PostgreSQL 로 확인한다. 은행은 부르지 않는다. */
 @SpringBootTest
 @Transactional
+@RecordApplicationEvents
 class BankReconciliationServiceIntegrationTest {
 
     /** 시드에 설계사 세 명의 확정 지급이 있는 달. */
@@ -53,6 +56,8 @@ class BankReconciliationServiceIntegrationTest {
     private JdbcTemplate jdbc;
     @MockitoBean
     private OpenBankingClient client;
+    @Autowired
+    private ApplicationEvents applicationEvents;
 
     @Test
     @DisplayName("은행 동의 뒤 조회에 동의한 첫 계좌를 연결하고 가린 번호만 감사로그에 남긴다")
@@ -208,6 +213,22 @@ class BankReconciliationServiceIntegrationTest {
         assertThat(result.inquiryFrom()).isEqualTo(from);
         assertThat(result.inquiryTo()).isEqualTo(from.plusDays(31));
         verify(client).withdrawals(TOKEN, FINTECH_USE_NUM, from, from.plusDays(31));
+    }
+
+    @Test
+    @DisplayName("은행을 부르기 전에 그 달의 조회를 시작한다고 알린다")
+    void announcesTheInquiryBeforeCallingTheBank() {
+        finalizeMonth(MARCH, DateUtil.nowSeoul());
+        link("settle01");
+        when(client.withdrawals(eq(TOKEN), eq(FINTECH_USE_NUM), any(), any())).thenAnswer(call -> {
+            // 모의 은행은 이 알림을 받아 그 달의 이체를 준비한다. 조회보다 먼저여야 한다.
+            assertThat(applicationEvents.stream(BankInquiryStarting.class)).containsExactly(new BankInquiryStarting(MARCH));
+            return List.of();
+        });
+
+        reconciliationService.run(userId("settle01"), "2026-03");
+
+        verify(client).withdrawals(eq(TOKEN), eq(FINTECH_USE_NUM), any(), any());
     }
 
     @Test

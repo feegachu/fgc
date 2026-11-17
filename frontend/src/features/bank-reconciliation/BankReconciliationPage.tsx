@@ -163,7 +163,7 @@ export default function BankReconciliationPage() {
           ) : (
             <p>{link.isPending ? '불러오는 중입니다.' : '연결한 계좌가 없습니다.'}</p>
           )}
-          {account?.mock && <p className="field-helper">실제 은행이 아니라 시연용 모의 은행입니다.</p>}
+          {account?.mock && <p className="field-helper">실제 은행이 아니라 모의 은행입니다.</p>}
           {linkError && (
             <p className="field-error" role="alert">
               {errorText(linkError)}

@@ -139,6 +139,9 @@ describe('BANK-W01 지급 이체 대사', () => {
     renderAt('/bank-reconciliations')
 
     expect(await screen.findByText('모의은행 110-***-***001')).toBeInTheDocument()
+    // 화면 문구 규칙(e2e-demo/screen-language)이 "시연" 같은 팀 안의 말을 금지한다.
+    expect(screen.getByText('실제 은행이 아니라 모의 은행입니다.')).toBeInTheDocument()
+    expect(document.body).not.toHaveTextContent(/시연|데모/)
     const table = await screen.findByRole('table', { name: '지급 이체 대사 결과' })
     await within(table).findByText('금액 다름')
     const [, mismatch, missing, unknown, matched] = within(table).getAllByRole('row')

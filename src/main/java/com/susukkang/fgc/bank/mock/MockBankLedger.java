@@ -2,9 +2,11 @@ package com.susukkang.fgc.bank.mock;
 
 import com.susukkang.fgc.bank.repository.BankReconciliationRepository;
 import com.susukkang.fgc.bank.repository.BankReconciliationRepository.ExpectedTransfer;
+import com.susukkang.fgc.bank.service.BankInquiryStarting;
 import com.susukkang.fgc.bank.service.BankTransferMatcher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,7 +20,7 @@ import java.util.List;
 /**
  * 설명 : 모의 은행의 수수료 지급 계좌 원장. 실제 은행이 아니라, 재무 담당자가 확정일에 확정 지급대로 이체한 것을 흉내 낸다.
  *
- * - 확정된 달의 이체를 처음 조회될 때 한 번 만들어 저장한다. 그 뒤 FGC의 지급이 바뀌어도 은행 기록은 그대로다.
+ * - 확정된 달의 이체를 그 달의 대사를 처음 실행할 때 한 번 만들어 저장한다. 그 뒤 FGC의 지급이 바뀌어도 은행 기록은 그대로다.
  * - 대사가 어긋난 건을 잡아내는 것을 보이려고, 받는 사람이 세 명 이상인 달에는 세 건을 일부러 어긋나게 만든다.
  *   둘째 사람에게 10,000원 덜 보내고, 마지막 사람에게는 보내지 않고, 참조코드 없는 출금 한 건을 섞는다.
  *
@@ -49,10 +51,9 @@ public class MockBankLedger {
     private record FinalizedMonth(LocalDate settlementMonth, LocalDate finalizedOn) {
     }
 
-    /** 기간 안의 출금을 오래된 순으로 준다. 아직 만들지 않은 확정 월의 이체는 먼저 만든다. */
-    @Transactional
+    /** 기간 안의 출금을 오래된 순으로 준다. 읽기만 한다. 조회 요청(GET) 안에서 원장을 만들지 않는다. */
+    @Transactional(readOnly = true)
     public List<Row> withdrawals(LocalDate from, LocalDate to) {
-        createTransfersOfFinalizedMonths(from, to);
         return jdbc.query("""
                 SELECT tran_date, tran_time, print_content, tran_amt, after_balance
                   FROM (SELECT tran_date, tran_time, print_content, tran_amt, mock_bank_transaction_id,
@@ -65,17 +66,23 @@ public class MockBankLedger {
                 rs.getBigDecimal(4), rs.getBigDecimal(5)), OPENING_BALANCE, from, to);
     }
 
-    private void createTransfersOfFinalizedMonths(LocalDate from, LocalDate to) {
+    /**
+     * 대사가 은행 조회를 시작한다고 알리면, 그 달이 확정됐고 아직 이체를 만든 적 없을 때 확정 지급대로 이체를 만든다.
+     * 대사 실행(POST) 안에서 불리고 조회보다 먼저 커밋된다.
+     */
+    @EventListener
+    @Transactional
+    public void recordTransfers(BankInquiryStarting inquiry) {
         List<FinalizedMonth> months = jdbc.query("""
                 SELECT vr.validation_month, (vr.finalized_at AT TIME ZONE 'Asia/Seoul')::date
                   FROM fgc.validation_run vr
-                 WHERE vr.status = 'FINALIZED'
-                   AND (vr.finalized_at AT TIME ZONE 'Asia/Seoul')::date BETWEEN ? AND ?
+                 WHERE vr.status = 'FINALIZED' AND vr.validation_month = ?
                    AND NOT EXISTS (SELECT 1 FROM fgc.mock_bank_transaction made
                                     WHERE made.settlement_month = vr.validation_month)
-                 ORDER BY vr.validation_run_id
+                 ORDER BY vr.validation_run_id DESC
+                 LIMIT 1
                 """, (rs, row) -> new FinalizedMonth(rs.getObject(1, LocalDate.class), rs.getObject(2, LocalDate.class)),
-                from, to);
+                inquiry.settlementMonth());
         for (FinalizedMonth month : months) {
             List<ExpectedTransfer> payees = reconciliations.findExpectedTransfers(month.settlementMonth());
             boolean plantDifferences = payees.size() >= 3;

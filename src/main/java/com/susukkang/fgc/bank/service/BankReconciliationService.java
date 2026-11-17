@@ -13,6 +13,7 @@ import com.susukkang.fgc.bank.service.BankTransferMatcher.Matched;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.DateUtil;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -47,15 +48,17 @@ public class BankReconciliationService {
     private final BankLinkService linkService;
     private final OpenBankingClient client;
     private final AuditLogService auditLogService;
+    private final ApplicationEventPublisher events;
     private final TransactionTemplate transaction;
 
     public BankReconciliationService(BankReconciliationRepository repository, BankLinkService linkService,
                                      OpenBankingClient client, AuditLogService auditLogService,
-                                     PlatformTransactionManager transactionManager) {
+                                     ApplicationEventPublisher events, PlatformTransactionManager transactionManager) {
         this.repository = repository;
         this.linkService = linkService;
         this.client = client;
         this.auditLogService = auditLogService;
+        this.events = events;
         this.transaction = new TransactionTemplate(transactionManager);
     }
 
@@ -69,6 +72,8 @@ public class BankReconciliationService {
         LocalDate from = finalized.finalizedOn();
         LocalDate to = from.plusDays(INQUIRY_DAYS).isAfter(today) ? today : from.plusDays(INQUIRY_DAYS);
 
+        // 모의 은행은 이 알림을 받아 그 달의 이체를 준비한다. 실제 은행에 붙였을 때는 받는 곳이 없다.
+        events.publishEvent(new BankInquiryStarting(month));
         List<BankWithdrawal> withdrawals;
         try {
             withdrawals = client.withdrawals(session.token(), session.link().fintechUseNum(), from, to);

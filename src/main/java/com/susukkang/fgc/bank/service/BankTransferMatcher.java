@@ -58,29 +58,31 @@ public final class BankTransferMatcher {
         List<Matched> items = new ArrayList<>();
         for (BankWithdrawal withdrawal : withdrawals) {
             String content = withdrawal.printContent();
-            boolean reference = REFERENCE.matcher(content).matches();
-            if (reference && !content.startsWith(monthPrefix)) {
-                // 다른 정산월의 이체다. 그 달의 대사에서 본다.
-                continue;
-            }
-            if (reference && expectedByReference.containsKey(content)) {
+            if (expectedByReference.containsKey(content)) {
                 paid.merge(content, withdrawal.amount(), BigDecimal::add);
                 paidOn.merge(content, withdrawal.tranDate(), (left, right) -> left.isAfter(right) ? left : right);
-            } else {
+            } else if (!ofAnotherMonth(content, monthPrefix)) {
                 items.add(new Matched(UNKNOWN_WITHDRAWAL, null, null, BigDecimal.ZERO, withdrawal.amount(),
                         withdrawal.tranDate(), content));
             }
         }
-        expectedByReference.forEach((reference, transfer) -> {
-            BigDecimal bank = paid.getOrDefault(reference, BigDecimal.ZERO);
-            boolean transferred = bank.signum() != 0;
-            String result = !transferred ? NOT_TRANSFERRED
-                    : bank.compareTo(transfer.amount()) == 0 ? MATCHED : AMOUNT_MISMATCH;
-            items.add(new Matched(result, transfer.agentId(), reference, transfer.amount(), bank,
-                    paidOn.get(reference), transferred ? reference : null));
-        });
+        expectedByReference.forEach((reference, transfer) -> items.add(compare(reference, transfer,
+                paid.getOrDefault(reference, BigDecimal.ZERO), paidOn.get(reference))));
         items.sort(Comparator.comparingInt((Matched item) -> ORDER.indexOf(item.result()))
                 .thenComparing(item -> item.referenceCode() != null ? item.referenceCode() : item.printContent()));
         return items;
+    }
+
+    /** 다른 정산월의 참조코드가 붙은 출금이다. 그 달의 대사에서 본다. */
+    private static boolean ofAnotherMonth(String printContent, String monthPrefix) {
+        return REFERENCE.matcher(printContent).matches() && !printContent.startsWith(monthPrefix);
+    }
+
+    private static Matched compare(String reference, Expected transfer, BigDecimal bankAmount, LocalDate paidOn) {
+        if (bankAmount.signum() == 0) {
+            return new Matched(NOT_TRANSFERRED, transfer.agentId(), reference, transfer.amount(), bankAmount, paidOn, null);
+        }
+        String result = bankAmount.compareTo(transfer.amount()) == 0 ? MATCHED : AMOUNT_MISMATCH;
+        return new Matched(result, transfer.agentId(), reference, transfer.amount(), bankAmount, paidOn, reference);
     }
 }

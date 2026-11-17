@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -95,12 +96,12 @@ public class MockBankController {
 
     /** 사용자 인증: 동의 화면. 진입 전 오류는 명세대로 JSON 으로 준다. */
     @GetMapping("/oauth/2.0/authorize")
-    public ResponseEntity<Object> authorize(@RequestParam Map<String, String> query) {
+    public ResponseEntity<Object> authorize(@RequestParam Map<String, String> query, CsrfToken formToken) {
         if (!validAuthorization(query)) {
-            return ResponseEntity.ok(error("O0001", "인증요청 거부-인증 파라미터 오류"));
+            return ResponseEntity.ok(rejected());
         }
         return ResponseEntity.ok().contentType(new MediaType("text", "html", StandardCharsets.UTF_8))
-                .header(HttpHeaders.CACHE_CONTROL, "no-store").body(consentPage(query));
+                .header(HttpHeaders.CACHE_CONTROL, "no-store").body(consentPage(query, formToken));
     }
 
     /** 동의 화면의 스타일. 운영 프록시의 보안 정책(style-src 'self')이 인라인 스타일을 막아 같은 출처의 파일로 준다. */
@@ -112,7 +113,7 @@ public class MockBankController {
     @PostMapping("/oauth/2.0/authorize/approve")
     public ResponseEntity<Object> approve(@RequestParam Map<String, String> query) {
         if (!validAuthorization(query)) {
-            return ResponseEntity.ok(error("O0001", "인증요청 거부-인증 파라미터 오류"));
+            return ResponseEntity.ok(rejected());
         }
         String code = randomHex(16);
         codes.put(code, Instant.now().plus(CODE_TTL));
@@ -122,7 +123,7 @@ public class MockBankController {
     @PostMapping("/oauth/2.0/authorize/deny")
     public ResponseEntity<Object> deny(@RequestParam Map<String, String> query) {
         if (!validAuthorization(query)) {
-            return ResponseEntity.ok(error("O0001", "인증요청 거부-인증 파라미터 오류"));
+            return ResponseEntity.ok(rejected());
         }
         return redirect("?error=access_denied&state=" + query.get("state"));
     }
@@ -137,7 +138,7 @@ public class MockBankController {
                 && properties.redirectUri().equals(form.get("redirect_uri"))
                 && expiresAt != null && expiresAt.isAfter(Instant.now());
         if (!valid) {
-            return error("O0001", "인증요청 거부-인증 파라미터 오류");
+            return rejected();
         }
         String accessToken = randomHex(24);
         accessTokens.add(accessToken);
@@ -252,6 +253,10 @@ public class MockBankController {
         return body;
     }
 
+    private static Map<String, Object> rejected() {
+        return error("O0001", "인증요청 거부-인증 파라미터 오류");
+    }
+
     private boolean validAuthorization(Map<String, String> query) {
         return "code".equals(query.get("response_type"))
                 && properties.clientId().equals(query.get("client_id"))
@@ -320,8 +325,11 @@ public class MockBankController {
     }
 
     /** 값은 모두 검증을 거쳤지만 화면에 넣기 전에 한 번 더 이스케이프한다. */
-    private String consentPage(Map<String, String> query) {
-        StringBuilder hidden = new StringBuilder();
+    private String consentPage(Map<String, String> query, CsrfToken formToken) {
+        // 폼 위조 방지 값. 같은 값이 쿠키에도 실려 있고, 폼이 돌아올 때 보안 체인이 둘을 대조한다.
+        StringBuilder hidden = new StringBuilder("<input type=\"hidden\" name=\"")
+                .append(formToken.getParameterName()).append("\" value=\"")
+                .append(HtmlUtils.htmlEscape(formToken.getToken())).append("\">");
         for (String name : List.of("response_type", "client_id", "redirect_uri", "scope", "state", "auth_type")) {
             hidden.append("<input type=\"hidden\" name=\"").append(name).append("\" value=\"")
                     .append(HtmlUtils.htmlEscape(query.get(name))).append("\">");
@@ -339,7 +347,7 @@ public class MockBankController {
                 <main>
                 <h1>모의 은행 계좌 조회 동의</h1>
                 <p>FGC가 아래 계좌의 거래내역을 조회하려고 합니다. 조회만 하며 이체는 하지 않습니다.</p>
-                <p>이 화면은 실제 은행이 아닙니다. 시연용 자료만 있습니다.</p>
+                <p>이 화면은 실제 은행이 아닙니다. 연습용으로 만든 자료만 있습니다.</p>
                 <dl>
                 <dt>은행</dt><dd>%s</dd>
                 <dt>계좌</dt><dd>%s</dd>
