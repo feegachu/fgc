@@ -67,6 +67,22 @@ class MockBankControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("동의 화면은 인라인 스타일을 쓰지 않고 같은 출처의 스타일 파일을 쓴다")
+    void servesTheConsentStylesFromTheSameOrigin() throws Exception {
+        // 운영 프록시의 보안 정책이 style-src 'self' 라 인라인 스타일은 막힌다(nginx/default.conf.template).
+        mvc.perform(authorize(get(BASE + "/oauth/2.0/authorize")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("<style"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("style=\""))))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "<link rel=\"stylesheet\" href=\"" + BASE + "/consent.css\">")));
+
+        mvc.perform(get(BASE + "/consent.css"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("text/css"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(".approve")));
+    }
+
+    @Test
     @DisplayName("취소하면 오류 값을 붙여 돌려보낸다")
     void redirectsWithAnErrorWhenTheUserDeclines() throws Exception {
         String location = mvc.perform(authorize(post(BASE + "/oauth/2.0/authorize/deny")))

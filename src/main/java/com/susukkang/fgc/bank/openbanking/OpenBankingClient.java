@@ -25,6 +25,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -171,15 +175,19 @@ public class OpenBankingClient {
     }
 
     private JsonNode send(String path, HttpRequest.Builder request) {
+        // JDK HttpClient 의 요청 제한 시간은 응답 머리까지만 본다. 본문이 멈춘 응답도 끊도록 호출 전체에 기한을 둔다.
+        CompletableFuture<HttpResponse<String>> exchange = client.sendAsync(
+                request.timeout(properties.timeout()).build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         HttpResponse<String> response;
         try {
-            response = client.send(request.timeout(properties.timeout()).build(),
-                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        } catch (HttpTimeoutException e) {
+            response = exchange.get(properties.timeout().toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            exchange.cancel(true);
             throw failed(path, "TIMEOUT");
-        } catch (IOException e) {
-            throw failed(path, "IO");
+        } catch (ExecutionException e) {
+            throw failed(path, e.getCause() instanceof HttpTimeoutException ? "TIMEOUT" : "IO");
         } catch (InterruptedException e) {
+            exchange.cancel(true);
             Thread.currentThread().interrupt();
             throw failed(path, "INTERRUPTED");
         }

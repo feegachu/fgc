@@ -72,6 +72,20 @@ public class MockBankController {
     private static final DateTimeFormatter DATE = DateTimeFormatter.BASIC_ISO_DATE;
     private static final DateTimeFormatter DATE_TIME_MILLIS = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final String CONSENT_STYLE = """
+            body{margin:0;font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;background:#f3f5f9;color:#1b2333}
+            main{max-width:26rem;margin:12vh auto;padding:2rem;background:#fff;border:1px solid #d9dee8;border-radius:.75rem}
+            h1{margin:0 0 1rem;font-size:1.25rem}
+            p{margin:.5rem 0;line-height:1.6}
+            dl{margin:1rem 0;padding:1rem;background:#f3f5f9;border-radius:.5rem}
+            dt{font-size:.8125rem;color:#5b6577}
+            dd{margin:0 0 .5rem;font-weight:600}
+            .actions{display:flex;gap:.5rem;margin-top:1.5rem}
+            form{flex:1}
+            button{width:100%;padding:.75rem;border-radius:.5rem;border:1px solid #1d4f91;font-size:1rem;cursor:pointer}
+            .approve{background:#1d4f91;color:#fff}
+            .deny{background:#fff;color:#1d4f91}
+            """;
 
     private final OpenBankingProperties properties;
     private final MockBankLedger ledger;
@@ -87,6 +101,12 @@ public class MockBankController {
         }
         return ResponseEntity.ok().contentType(new MediaType("text", "html", StandardCharsets.UTF_8))
                 .header(HttpHeaders.CACHE_CONTROL, "no-store").body(consentPage(query));
+    }
+
+    /** 동의 화면의 스타일. 운영 프록시의 보안 정책(style-src 'self')이 인라인 스타일을 막아 같은 출처의 파일로 준다. */
+    @GetMapping(value = "/consent.css", produces = "text/css;charset=UTF-8")
+    public String consentStyle() {
+        return CONSENT_STYLE;
     }
 
     @PostMapping("/oauth/2.0/authorize/approve")
@@ -313,20 +333,7 @@ public class MockBankController {
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>모의 은행 계좌 조회 동의</title>
-                <style>
-                body{margin:0;font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;background:#f3f5f9;color:#1b2333}
-                main{max-width:26rem;margin:12vh auto;padding:2rem;background:#fff;border:1px solid #d9dee8;border-radius:.75rem}
-                h1{margin:0 0 1rem;font-size:1.25rem}
-                p{margin:.5rem 0;line-height:1.6}
-                dl{margin:1rem 0;padding:1rem;background:#f3f5f9;border-radius:.5rem}
-                dt{font-size:.8125rem;color:#5b6577}
-                dd{margin:0 0 .5rem;font-weight:600}
-                .actions{display:flex;gap:.5rem;margin-top:1.5rem}
-                form{flex:1}
-                button{width:100%%;padding:.75rem;border-radius:.5rem;border:1px solid #1d4f91;font-size:1rem;cursor:pointer}
-                .approve{background:#1d4f91;color:#fff}
-                .deny{background:#fff;color:#1d4f91}
-                </style>
+                <link rel="stylesheet" href="/api/v1/mock-bank/consent.css">
                 </head>
                 <body>
                 <main>

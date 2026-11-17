@@ -3247,34 +3247,39 @@ export interface components {
             state: string;
         };
         BankLinkResponse: {
-            accountHolderName?: string;
+            accountHolderName?: string | null;
             /** @description 은행이 가려서 준 계좌번호 */
-            accountNumMasked?: string;
-            bankName?: string;
+            accountNumMasked?: string | null;
+            bankName?: string | null;
             /** @description 지금 은행을 부를 수 있는지. 서버를 다시 띄우면 false 가 되어 다시 연결해야 한다 */
             connected?: boolean;
             /** @description 수수료 지급 계좌를 연결한 적이 있는지 */
             linked?: boolean;
             /** Format: date-time */
-            linkedAt?: string;
+            linkedAt?: string | null;
             /** @description 저장소에 들어 있는 모의 은행에 연결되어 있는지 */
             mock?: boolean;
         };
         BankReconciliationItem: {
-            agentCode?: string;
-            agentName?: string;
+            /** @description 확인 안 된 출금이면 null */
+            agentCode?: string | null;
+            /** @description 확인 안 된 출금이면 null */
+            agentName?: string | null;
             /** @description 같은 참조코드로 나간 출금 합계 */
             bankAmount?: number;
-            /** Format: date */
-            bankTranDate?: string;
+            /**
+             * Format: date
+             * @description 이체가 없으면 null
+             */
+            bankTranDate?: string | null;
             /** @description 은행 출금액에서 확정 지급 순액을 뺀 값 */
             differenceAmount?: number;
             /** @description 그 달 확정 지급 합계에서 확정 차감 합계를 뺀 금액(원 단위 반올림) */
             expectedAmount?: number;
-            /** @description 은행 거래내역의 통장인자내용 */
-            printContent?: string;
-            /** @description 이체할 때 내 통장 표시에 적는 값. FGC + 정산월(yyMM) + - + 설계사 번호 6자리 */
-            referenceCode?: string;
+            /** @description 은행 거래내역의 통장인자내용. 이체가 없으면 null */
+            printContent?: string | null;
+            /** @description 이체할 때 내 통장 표시에 적는 값. FGC + 정산월(yyMM) + - + 설계사 번호 6자리. 확인 안 된 출금이면 null */
+            referenceCode?: string | null;
             /** @description MATCHED 일치, AMOUNT_MISMATCH 금액 다름, NOT_TRANSFERRED 이체 없음, UNKNOWN_WITHDRAWAL 확인 안 된 출금 */
             result?: string;
         };

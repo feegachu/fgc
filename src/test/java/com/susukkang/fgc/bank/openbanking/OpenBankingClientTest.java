@@ -44,6 +44,7 @@ class OpenBankingClientTest {
     private final Map<String, Deque<String>> responses = new HashMap<>();
     private HttpServer server;
     private long delayMillis;
+    private long bodyDelayMillis;
     // 다른 통합 테스트와 함께 돌 때도 응답이 제한 안에 들도록 넉넉히 둔다. 시간 초과 테스트만 짧은 제한을 쓴다.
     private Duration timeout = Duration.ofSeconds(10);
 
@@ -72,6 +73,11 @@ class OpenBankingClientTest {
                     .getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
             exchange.sendResponseHeaders(200, response.length);
+            try {
+                Thread.sleep(bodyDelayMillis);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             exchange.getResponseBody().write(response);
             exchange.close();
         });
@@ -215,6 +221,20 @@ class OpenBankingClientTest {
 
         assertThatThrownBy(() -> client().accounts(token()))
                 .isInstanceOfSatisfying(OpenBankingException.class, e -> assertThat(e.code()).isEqualTo("TIMEOUT"));
+    }
+
+    @Test
+    @DisplayName("응답 머리만 오고 본문이 오지 않아도 제한 시간이 지나면 시간 초과로 알린다")
+    void reportsTimeoutsWhenTheBodyStalls() {
+        respond("/v2.0/user/me", USER);
+        bodyDelayMillis = 1_500;
+        timeout = Duration.ofMillis(300);
+
+        long started = System.nanoTime();
+        assertThatThrownBy(() -> client().accounts(token()))
+                .isInstanceOfSatisfying(OpenBankingException.class, e -> assertThat(e.code()).isEqualTo("TIMEOUT"));
+        // JDK HttpClient 의 요청 제한 시간은 응답 머리까지만 본다. 본문까지 기다리면 1.5초가 걸린다.
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(1_200));
     }
 
     private OpenBankingClient client() {

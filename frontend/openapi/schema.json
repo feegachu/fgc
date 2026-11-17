@@ -2771,14 +2771,14 @@
       "BankLinkResponse" : {
         "properties" : {
           "accountHolderName" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "accountNumMasked" : {
             "description" : "은행이 가려서 준 계좌번호",
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "bankName" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "connected" : {
             "description" : "지금 은행을 부를 수 있는지. 서버를 다시 띄우면 false 가 되어 다시 연결해야 한다",
@@ -2790,7 +2790,7 @@
           },
           "linkedAt" : {
             "format" : "date-time",
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "mock" : {
             "description" : "저장소에 들어 있는 모의 은행에 연결되어 있는지",
@@ -2802,18 +2802,21 @@
       "BankReconciliationItem" : {
         "properties" : {
           "agentCode" : {
-            "type" : "string"
+            "description" : "확인 안 된 출금이면 null",
+            "type" : [ "string", "null" ]
           },
           "agentName" : {
-            "type" : "string"
+            "description" : "확인 안 된 출금이면 null",
+            "type" : [ "string", "null" ]
           },
           "bankAmount" : {
             "description" : "같은 참조코드로 나간 출금 합계",
             "type" : "number"
           },
           "bankTranDate" : {
+            "description" : "이체가 없으면 null",
             "format" : "date",
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "differenceAmount" : {
             "description" : "은행 출금액에서 확정 지급 순액을 뺀 값",
@@ -2824,12 +2827,12 @@
             "type" : "number"
           },
           "printContent" : {
-            "description" : "은행 거래내역의 통장인자내용",
-            "type" : "string"
+            "description" : "은행 거래내역의 통장인자내용. 이체가 없으면 null",
+            "type" : [ "string", "null" ]
           },
           "referenceCode" : {
-            "description" : "이체할 때 내 통장 표시에 적는 값. FGC + 정산월(yyMM) + - + 설계사 번호 6자리",
-            "type" : "string"
+            "description" : "이체할 때 내 통장 표시에 적는 값. FGC + 정산월(yyMM) + - + 설계사 번호 6자리. 확인 안 된 출금이면 null",
+            "type" : [ "string", "null" ]
           },
           "result" : {
             "description" : "MATCHED 일치, AMOUNT_MISMATCH 금액 다름, NOT_TRANSFERRED 이체 없음, UNKNOWN_WITHDRAWAL 확인 안 된 출금",

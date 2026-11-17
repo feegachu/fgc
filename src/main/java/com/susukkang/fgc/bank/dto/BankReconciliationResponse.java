@@ -29,13 +29,14 @@ public record BankReconciliationResponse(
     public record Item(
             @Schema(description = "MATCHED 일치, AMOUNT_MISMATCH 금액 다름, NOT_TRANSFERRED 이체 없음, UNKNOWN_WITHDRAWAL 확인 안 된 출금")
             String result,
-            String agentCode,
-            String agentName,
-            @Schema(description = "이체할 때 내 통장 표시에 적는 값. FGC + 정산월(yyMM) + - + 설계사 번호 6자리") String referenceCode,
+            @Schema(nullable = true, description = "확인 안 된 출금이면 null") String agentCode,
+            @Schema(nullable = true, description = "확인 안 된 출금이면 null") String agentName,
+            @Schema(nullable = true, description = "이체할 때 내 통장 표시에 적는 값. FGC + 정산월(yyMM) + - + 설계사 번호 6자리. "
+                    + "확인 안 된 출금이면 null") String referenceCode,
             @Schema(description = "그 달 확정 지급 합계에서 확정 차감 합계를 뺀 금액(원 단위 반올림)") BigDecimal expectedAmount,
             @Schema(description = "같은 참조코드로 나간 출금 합계") BigDecimal bankAmount,
             @Schema(description = "은행 출금액에서 확정 지급 순액을 뺀 값") BigDecimal differenceAmount,
-            LocalDate bankTranDate,
-            @Schema(description = "은행 거래내역의 통장인자내용") String printContent) {
+            @Schema(nullable = true, description = "이체가 없으면 null") LocalDate bankTranDate,
+            @Schema(nullable = true, description = "은행 거래내역의 통장인자내용. 이체가 없으면 null") String printContent) {
     }
 }
