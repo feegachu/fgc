@@ -57,8 +57,44 @@ describe('알림 설정 창', () => {
     await actions.click(screen.getByRole('button', { name: '저장' }))
 
     await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(saved).toEqual([{ mobilePhone: '010-0000-0102', consent: true }])
+    expect(saved).toEqual([{ mobilePhone: '01000000102', consent: true }])
     expect(useToastStore.getState().messages.at(-1)?.message).toBe('알림 설정을 저장했습니다.')
+  })
+
+  it('붙여 넣은 번호에 줄바꿈 없는 공백이 섞여도 검증에 쓴 숫자만 보낸다', async () => {
+    const { onClose, actions } = open({ smsConfigured: true })
+    // 화면 검증은 이 공백을 빼고 보지만 서버는 빼지 못해 거절한다. 검증한 값을 그대로 보내야 한다.
+    await actions.type(await screen.findByLabelText('휴대폰 번호'), '010 0000 0102')
+    await actions.click(screen.getByRole('checkbox', { name: '마감 알림 문자를 받습니다' }))
+    await actions.click(screen.getByRole('button', { name: '저장' }))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(saved).toEqual([{ mobilePhone: '01000000102', consent: true }])
+  })
+
+  it('다시 열면 캐시에 남은 옛 값이 아니라 방금 읽은 값으로 폼을 채운다', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    let setting: NotificationSetting = {
+      mobilePhone: '01000000102',
+      consentedAt: '2026-11-17T10:00:00+09:00',
+      smsConfigured: true,
+    }
+    vi.spyOn(apiClient, 'request').mockImplementation(async () => envelope(setting))
+    const modal = (
+      <QueryClientProvider client={client}>
+        <NotificationSettingsModal agent={false} onClose={vi.fn()} />
+      </QueryClientProvider>
+    )
+    const first = render(modal)
+    expect(await screen.findByLabelText('휴대폰 번호')).toHaveValue('01000000102')
+    first.unmount()
+    // 창을 닫은 사이 다른 기기에서 번호를 바꿨다. 옛 값으로 폼을 채우면 그대로 저장할 때 새 번호를 덮어쓴다.
+    setting = { ...setting, mobilePhone: '01000000199' }
+    await waitFor(() => expect(client.getQueryData(['notification-setting'])).toBeUndefined())
+
+    render(modal)
+    expect(screen.queryByLabelText('휴대폰 번호')).not.toBeInTheDocument()
+    expect(await screen.findByLabelText('휴대폰 번호')).toHaveValue('01000000199')
   })
 
   it('휴대폰 번호가 아니면 서버에 보내지 않고 고칠 곳을 알려 준다', async () => {

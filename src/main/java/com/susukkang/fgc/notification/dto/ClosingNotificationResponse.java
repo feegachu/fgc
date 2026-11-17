@@ -1,5 +1,7 @@
 package com.susukkang.fgc.notification.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
@@ -16,13 +18,13 @@ public record ClosingNotificationResponse(
         String eventType,
         Long validationRunId,
         LocalDate validationMonth,
-        String recipientName,
-        String recipientLoginId,
-        String recipientPhone,
+        @Schema(nullable = true, description = "수신 대상이 없던 사건이면 null") String recipientName,
+        @Schema(nullable = true, description = "수신 대상이 없던 사건이면 null") String recipientLoginId,
+        @Schema(nullable = true, description = "가운데를 가린 번호. 수신 대상이 없거나 수신을 해제했으면 null") String recipientPhone,
         String messageText,
         String status,
         int attemptCount,
-        String errorCode,
+        @Schema(nullable = true, description = "실패하거나 건너뛴 사유. 없으면 null") String errorCode,
         OffsetDateTime createdAt,
-        OffsetDateTime sentAt) {
+        @Schema(nullable = true, description = "보내지 않았으면 null") OffsetDateTime sentAt) {
 }

@@ -1,11 +1,13 @@
 package com.susukkang.fgc.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,6 +16,7 @@ import com.susukkang.fgc.notification.repository.ClosingNotificationRepository;
 import com.susukkang.fgc.notification.repository.ClosingNotificationRepository.Claimed;
 import com.susukkang.fgc.notification.repository.ClosingNotificationRepository.RunMonth;
 import com.susukkang.fgc.notification.sms.SmsGateway;
+import com.susukkang.fgc.notification.sms.SmsSendException;
 import com.susukkang.fgc.validation.dto.FinalizeChecklistResponse;
 import com.susukkang.fgc.validation.service.ValidationRunFinalizationService;
 import java.time.LocalDate;
@@ -49,9 +52,9 @@ class ClosingNotificationServiceTest {
     @Test
     @DisplayName("발송 중 예상하지 못한 오류가 나면 그 알림만 실패로 끝내고 다음 알림을 보낸다")
     void failsOnlyTheNotificationThatThrewUnexpectedly() {
-        when(notifications.claimNext()).thenReturn(
-                Optional.of(new Claimed(10L, "01000000102", "[FGC] 첫 문자", 1)),
-                Optional.of(new Claimed(11L, "01000000103", "[FGC] 둘째 문자", 1)),
+        when(notifications.claimNext(anyInt())).thenReturn(
+                Optional.of(new Claimed(10L, "01000000102", "[FGC] 첫 문자", 1, false)),
+                Optional.of(new Claimed(11L, "01000000103", "[FGC] 둘째 문자", 1, false)),
                 Optional.empty());
         when(smsGateway.send("01000000102", "[FGC] 첫 문자")).thenThrow(new IllegalStateException("서명 실패"));
         when(smsGateway.send("01000000103", "[FGC] 둘째 문자")).thenReturn("M-2");
@@ -63,5 +66,22 @@ class ClosingNotificationServiceTest {
         verify(notifications, never()).markSent(eq(10L), anyString());
         verify(notifications, never()).markStopped(eq(11L), anyString(), anyString());
         verify(notifications, never()).markRetry(anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("문자 사업자가 답하지 않으면 그 주기의 남은 알림은 잡지 않고 다음 주기로 넘긴다")
+    void stopsTheCycleWhenTheProviderDoesNotRespond() {
+        when(notifications.claimNext(anyInt())).thenReturn(
+                Optional.of(new Claimed(10L, "01000000102", "[FGC] 첫 문자", 1, false)),
+                Optional.of(new Claimed(11L, "01000000103", "[FGC] 둘째 문자", 1, false)),
+                Optional.empty());
+        when(smsGateway.send("01000000102", "[FGC] 첫 문자")).thenThrow(new SmsSendException("TIMEOUT", true));
+
+        // 남은 알림마다 제한 시간을 다시 쓰면 같은 스케줄러를 쓰는 다른 예약 작업까지 밀린다.
+        assertThat(service.dispatchPending()).isEqualTo(1);
+
+        verify(notifications).markRetry(10L, "TIMEOUT");
+        verify(notifications, times(1)).claimNext(anyInt());
+        verify(smsGateway, never()).send(eq("01000000103"), anyString());
     }
 }

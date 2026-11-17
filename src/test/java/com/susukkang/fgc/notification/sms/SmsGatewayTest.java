@@ -38,6 +38,7 @@ class SmsGatewayTest {
     private int status = 200;
     private String responseBody = ACCEPTED;
     private long delayMillis;
+    private long bodyDelayMillis;
 
     private record Received(String method, String path, String authorization, String body) {
     }
@@ -57,6 +58,11 @@ class SmsGatewayTest {
             byte[] body = responseBody.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(status, body.length);
+            try {
+                Thread.sleep(bodyDelayMillis);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             exchange.getResponseBody().write(body);
             exchange.close();
         });
@@ -173,6 +179,22 @@ class SmsGatewayTest {
                     assertThat(failure.code()).isEqualTo("TIMEOUT");
                     assertThat(failure.retryable()).isTrue();
                 });
+    }
+
+    @Test
+    @DisplayName("응답 머리만 오고 본문이 오지 않아도 제한 시간이 지나면 다시 보낼 수 있는 실패로 남긴다")
+    void retriesWhenTheBodyStalls() {
+        timeout = Duration.ofMillis(300);
+        bodyDelayMillis = 1_500;
+
+        long started = System.nanoTime();
+        assertThatThrownBy(() -> gateway().send("01000001234", "문자"))
+                .isInstanceOfSatisfying(SmsSendException.class, failure -> {
+                    assertThat(failure.code()).isEqualTo("TIMEOUT");
+                    assertThat(failure.retryable()).isTrue();
+                });
+        // JDK HttpClient 의 요청 제한 시간은 응답 머리까지만 본다. 본문까지 기다리면 1.5초가 걸린다.
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(1_200));
     }
 
     @Test

@@ -3415,8 +3415,6 @@ export interface components {
             evidenceRef?: string;
             itemCode?: string;
             itemName?: string;
-            paymentStatus?: string;
-            paymentStatusSnapshot?: string;
             /** Format: int64 */
             scheduleLineId?: number;
         };
@@ -3791,14 +3789,21 @@ export interface components {
             closingNotificationId?: number;
             /** Format: date-time */
             createdAt?: string;
-            errorCode?: string;
+            /** @description 실패하거나 건너뛴 사유. 없으면 null */
+            errorCode?: string | null;
             eventType?: string;
             messageText?: string;
-            recipientLoginId?: string;
-            recipientName?: string;
-            recipientPhone?: string;
-            /** Format: date-time */
-            sentAt?: string;
+            /** @description 수신 대상이 없던 사건이면 null */
+            recipientLoginId?: string | null;
+            /** @description 수신 대상이 없던 사건이면 null */
+            recipientName?: string | null;
+            /** @description 가운데를 가린 번호. 수신 대상이 없거나 수신을 해제했으면 null */
+            recipientPhone?: string | null;
+            /**
+             * Format: date-time
+             * @description 보내지 않았으면 null
+             */
+            sentAt?: string | null;
             status?: string;
             /** Format: date */
             validationMonth?: string;
@@ -5416,9 +5421,13 @@ export interface components {
             mobilePhone?: string;
         };
         NotificationSettingResponse: {
-            /** Format: date-time */
-            consentedAt?: string;
-            mobilePhone?: string;
+            /**
+             * Format: date-time
+             * @description 수신 동의하지 않았으면 null
+             */
+            consentedAt?: string | null;
+            /** @description 수신 동의하지 않았으면 null */
+            mobilePhone?: string | null;
             smsConfigured?: boolean;
         };
         Option: {

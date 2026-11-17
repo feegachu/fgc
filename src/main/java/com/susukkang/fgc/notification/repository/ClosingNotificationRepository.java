@@ -32,8 +32,11 @@ public class ClosingNotificationRepository {
     public record RunMonth(Long validationRunId, LocalDate validationMonth) {
     }
 
-    /** 잡은 알림 1건. phone 이 null 이면 그사이 수신 동의를 철회한 것이다. */
-    public record Claimed(Long id, String phone, String messageText, int attemptCount) {
+    /**
+     * 잡은 알림 1건. phone 이 null 이면 그사이 수신 동의를 철회한 것이다.
+     * alreadyFinalized 는 확정 대기 알림인데 그사이 그 달이 확정됐다는 뜻이다.
+     */
+    public record Claimed(Long id, String phone, String messageText, int attemptCount, boolean alreadyFinalized) {
     }
 
     /**
@@ -106,13 +109,15 @@ public class ClosingNotificationRepository {
     /**
      * 지금 보낼 알림 하나를 잡으면서 시도 횟수와 다음 시도 시각(1·2분 뒤)을 먼저 기록한다.
      * 호출자가 바로 커밋하므로 발송 중에 멈춰도 그 시각 전에는 같은 알림을 다시 잡지 않는다.
+     * 시도 횟수를 다 쓴 알림은 잡지 않는다.
      */
-    public Optional<Claimed> claimNext() {
+    public Optional<Claimed> claimNext(int maxAttempts) {
         return jdbc.query("""
                 WITH next_notification AS (
                     SELECT n.closing_notification_id
                       FROM fgc.closing_notification n
                      WHERE n.status = 'PENDING' AND n.next_attempt_at <= clock_timestamp()
+                       AND n.attempt_count < ?
                      ORDER BY n.next_attempt_at, n.closing_notification_id
                      LIMIT 1
                      FOR UPDATE SKIP LOCKED)
@@ -124,9 +129,45 @@ public class ClosingNotificationRepository {
                 RETURNING claimed.closing_notification_id,
                           (SELECT s.mobile_phone FROM fgc.user_notification_setting s
                             WHERE s.user_id = claimed.recipient_user_id),
-                          claimed.message_text, claimed.attempt_count
-                """, (rs, row) -> new Claimed(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getInt(4)))
+                          claimed.message_text, claimed.attempt_count,
+                          claimed.event_type = 'FINALIZE_READY' AND EXISTS (
+                              SELECT 1
+                                FROM fgc.validation_run mine
+                                JOIN fgc.validation_run finalized
+                                  ON finalized.validation_month = mine.validation_month
+                               WHERE mine.validation_run_id = claimed.validation_run_id
+                                 AND finalized.status = 'FINALIZED')
+                """, (rs, row) -> new Claimed(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getInt(4),
+                        rs.getBoolean(5)), maxAttempts)
                 .stream().findFirst();
+    }
+
+    /**
+     * 시도 횟수를 다 쓰고도 대기로 남은 알림을 실패로 끝낸다. 마지막 시도를 잡은 뒤 결과를 적기 전에 서버가 멈춘 경우다.
+     * 다음 시도 시각이 지난 것만 본다. 그 전이면 다른 서버가 지금 보내는 중일 수 있다.
+     */
+    public int failExhausted(int maxAttempts) {
+        return jdbc.update("""
+                UPDATE fgc.closing_notification
+                   SET status = 'FAILED', error_code = COALESCE(error_code, 'INTERNAL')
+                 WHERE status = 'PENDING' AND attempt_count >= ? AND next_attempt_at <= clock_timestamp()
+                """, maxAttempts);
+    }
+
+    /**
+     * 확정됐는데 확정 통지를 만든 적 없는 실행. 확정 사건의 기록이 실패했거나 기록 전에 서버가 멈춘 경우다.
+     * 하루 안에 확정된 것만 본다. 이 기능을 처음 배포하거나 알림을 껐다 켰을 때 오래전에 확정된 달까지 알리지 않기 위해서다.
+     */
+    public List<RunMonth> findFinalizedWithoutNotification() {
+        return jdbc.query("""
+                SELECT vr.validation_run_id, vr.validation_month
+                  FROM fgc.validation_run vr
+                 WHERE vr.status = 'FINALIZED' AND vr.finalized_at >= clock_timestamp() - interval '1 day'
+                   AND NOT EXISTS (SELECT 1 FROM fgc.closing_notification n
+                                    WHERE n.validation_run_id = vr.validation_run_id
+                                      AND n.event_type = 'RUN_FINALIZED')
+                 ORDER BY vr.validation_run_id
+                """, (rs, row) -> new RunMonth(rs.getLong(1), rs.getObject(2, LocalDate.class)));
     }
 
     public void markSent(Long id, String providerMessageId) {

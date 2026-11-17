@@ -99,6 +99,15 @@ describe('NOTI-W01 알림 발송 이력', () => {
     expect(listRequests()[0].url).toBe('/api/v1/notifications?page=1&size=20')
   })
 
+  it('그사이 확정돼 보내지 않은 확정 대기 알림은 이미 확정됨으로 보여 준다', async () => {
+    renderAt('/notifications', 'GA_ADMIN', [
+      notification(6, { status: 'SKIPPED', errorCode: 'ALREADY_FINALIZED', sentAt: undefined }),
+    ])
+    const table = await screen.findByRole('table', { name: '마감 알림 문자 발송 이력' })
+    expect(await within(table).findByText('이미 확정됨')).toBeInTheDocument()
+    expect(table).not.toHaveTextContent('ALREADY_FINALIZED')
+  })
+
   it('실패했거나 건너뛴 알림만 다시 보낼 수 있고, 다시 보내면 목록을 새로 읽는다', async () => {
     const { actions } = renderAt('/notifications', 'GA_ADMIN', [
       notification(5, { status: 'FAILED', errorCode: 'TIMEOUT', sentAt: undefined }),

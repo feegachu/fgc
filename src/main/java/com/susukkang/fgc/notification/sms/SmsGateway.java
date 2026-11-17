@@ -21,6 +21,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * 설명 : 외부 문자 발송(솔라피 단건 발송 API) 호출이 지나가는 서버의 유일한 지점(IF-EXT-05).
@@ -73,21 +77,31 @@ public class SmsGateway {
         if (!isConfigured()) {
             throw new SmsSendException("NO_API_KEY", false);
         }
-        HttpResponse<String> response;
+        String body;
         try {
-            String body = JSON.writeValueAsString(Map.of("message",
+            body = JSON.writeValueAsString(Map.of("message",
                     Map.of("to", to, "from", properties.sender(), "text", text, "type", "SMS")));
-            response = client.send(HttpRequest.newBuilder(URI.create(properties.baseUrl() + "/messages/v4/send"))
-                    .timeout(properties.timeout())
-                    .header("Authorization", authorization())
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(),
-                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        } catch (HttpTimeoutException e) {
-            throw failed("TIMEOUT", true);
         } catch (IOException e) {
             throw failed("IO", true);
+        }
+        // JDK HttpClient 의 요청 제한 시간은 응답 머리까지만 본다. 본문이 멈춘 응답도 끊도록 호출 전체에 기한을 둔다.
+        CompletableFuture<HttpResponse<String>> exchange = client.sendAsync(
+                HttpRequest.newBuilder(URI.create(properties.baseUrl() + "/messages/v4/send"))
+                        .timeout(properties.timeout())
+                        .header("Authorization", authorization())
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(),
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<String> response;
+        try {
+            response = exchange.get(properties.timeout().toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            exchange.cancel(true);
+            throw failed("TIMEOUT", true);
+        } catch (ExecutionException e) {
+            throw failed(e.getCause() instanceof HttpTimeoutException ? "TIMEOUT" : "IO", true);
         } catch (InterruptedException e) {
+            exchange.cancel(true);
             Thread.currentThread().interrupt();
             throw failed("INTERRUPTED", true);
         }

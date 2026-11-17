@@ -33,9 +33,11 @@ function SettingForm({ agent, setting, onClose }: { agent: boolean; setting: Not
   const [consent, setConsent] = useState(Boolean(setting.mobilePhone))
   const [submitted, setSubmitted] = useState(false)
   const client = useQueryClient()
-  const invalid = consent && !MOBILE.test(mobilePhone.replace(/[\s-]/g, ''))
+  // 검증한 값을 그대로 보낸다. 서버는 줄바꿈 없는 공백 같은 문자를 빼지 못해, 입력값을 보내면 화면 검증을 통과하고도 거절된다.
+  const digits = mobilePhone.replace(/[\s-]/g, '')
+  const invalid = consent && !MOBILE.test(digits)
   const mutation = useMutation({
-    mutationFn: () => saveNotificationSetting(consent ? { mobilePhone: mobilePhone.trim(), consent } : { consent }),
+    mutationFn: () => saveNotificationSetting(consent ? { mobilePhone: digits, consent } : { consent }),
     meta: { errorToast: false },
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ['notification-setting'] })

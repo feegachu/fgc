@@ -1,5 +1,7 @@
 package com.susukkang.fgc.notification.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.time.OffsetDateTime;
 
 /**
@@ -11,7 +13,7 @@ import java.time.OffsetDateTime;
  * @since 2026-11-17
  */
 public record NotificationSettingResponse(
-        String mobilePhone,
-        OffsetDateTime consentedAt,
+        @Schema(nullable = true, description = "수신 동의하지 않았으면 null") String mobilePhone,
+        @Schema(nullable = true, description = "수신 동의하지 않았으면 null") OffsetDateTime consentedAt,
         boolean smsConfigured) {
 }

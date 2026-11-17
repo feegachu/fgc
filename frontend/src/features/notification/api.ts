@@ -16,6 +16,8 @@ export const notificationSettingQuery = () =>
     queryKey: ['notification-setting'],
     queryFn: async ({ signal }) =>
       (await apiClient.request<NotificationSetting>('/api/v1/notification-settings/me', { signal })).data,
+    // 창을 닫으면 캐시를 버린다. 다시 열 때 옛 값으로 폼을 채우면, 그대로 저장할 때 다른 곳에서 바꾼 번호를 덮어쓴다.
+    gcTime: 0,
     meta: { errorToast: false },
   })
 

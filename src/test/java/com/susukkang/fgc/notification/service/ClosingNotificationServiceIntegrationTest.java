@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,6 +16,7 @@ import com.susukkang.fgc.notification.sms.SmsGateway;
 import com.susukkang.fgc.notification.sms.SmsSendException;
 import java.nio.charset.Charset;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -220,6 +222,80 @@ class ClosingNotificationServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("그사이 그 달이 확정됐으면 확정 대기 알림은 다시 보내도 나가지 않는다")
+    void doesNotSendFinalizeReadyAfterTheMonthWasFinalized() {
+        Long runId = readyRunFor("gaadmin", GA_ADMIN_PHONE);
+        Long id = (Long) notifications(runId).get(0).get("closing_notification_id");
+        when(smsGateway.send(anyString(), anyString())).thenThrow(new SmsSendException("NO_API_KEY", false));
+        service.dispatchPending();
+        finalizeRun(runId, OffsetDateTime.now());
+
+        // 키를 넣은 뒤 발송 이력에서 다시 보내는 경로다. 이때 "확정해 주세요"는 틀린 안내다.
+        service.resend(id);
+        assertThat(service.dispatchPending()).isEqualTo(1);
+
+        assertThat(notifications(runId).get(0)).containsEntry("status", "SKIPPED")
+                .containsEntry("error_code", "ALREADY_FINALIZED");
+        verify(smsGateway, times(1)).send(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("확정 통지는 확정된 달의 알림이므로 그대로 보낸다")
+    void stillSendsRunFinalizedForAFinalizedMonth() {
+        Long runId = createCompletedRun(LocalDate.of(2088, 8, 1));
+        finalizeRun(runId, OffsetDateTime.now());
+        optIn("gaadmin", GA_ADMIN_PHONE);
+        jdbc.update("""
+                INSERT INTO fgc.closing_notification (event_type, validation_run_id, recipient_user_id, message_text)
+                VALUES ('RUN_FINALIZED', ?, ?, '[FGC] 시험 문자')
+                """, runId, userId("gaadmin"));
+        when(smsGateway.send(anyString(), anyString())).thenReturn("M4V-TEST-2");
+
+        assertThat(service.dispatchPending()).isEqualTo(1);
+
+        assertThat(notifications(runId).get(0)).containsEntry("status", "SENT");
+    }
+
+    @Test
+    @DisplayName("세 번째 시도 중에 멈춰 대기로 남은 알림은 네 번째로 보내지 않고 실패로 끝낸다")
+    void doesNotSendAFourthTimeAfterAnInterruptedThirdAttempt() {
+        Long runId = readyRunFor("gaadmin", GA_ADMIN_PHONE);
+        // 세 번째로 잡아 커밋한 뒤 결과를 적기 전에 서버가 멈춘 상태다.
+        jdbc.update("""
+                UPDATE fgc.closing_notification
+                   SET attempt_count = 3, error_code = 'TIMEOUT', next_attempt_at = clock_timestamp() + interval '4 minutes'
+                 WHERE validation_run_id = ?
+                """, runId);
+
+        // 다른 서버가 지금 세 번째로 보내는 중일 수 있다. 다음 시도 시각이 지나기 전에는 건드리지 않는다.
+        assertThat(service.dispatchPending()).isZero();
+        assertThat(notifications(runId).get(0)).containsEntry("status", "PENDING");
+
+        makeDue(runId);
+        assertThat(service.dispatchPending()).isZero();
+
+        assertThat(notifications(runId).get(0)).containsEntry("status", "FAILED").containsEntry("attempt_count", 3)
+                .containsEntry("error_code", "TIMEOUT");
+        verify(smsGateway, never()).send(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("확정 사건을 놓친 실행은 주기에서 다시 찾아 기록하고, 하루가 지난 확정은 알리지 않는다")
+    void recoversFinalizedRunsThatMissedTheirNotification() {
+        Long missed = createCompletedRun(LocalDate.of(2088, 9, 1));
+        finalizeRun(missed, OffsetDateTime.now());
+        Long old = createCompletedRun(LocalDate.of(2088, 10, 1));
+        finalizeRun(old, OffsetDateTime.now().minusDays(2));
+
+        service.recoverMissedFinalized();
+        service.recoverMissedFinalized();
+
+        assertThat(notifications(missed)).singleElement().satisfies(row -> assertThat(row)
+                .containsEntry("event_type", "RUN_FINALIZED").containsEntry("status", "NO_RECIPIENT"));
+        assertThat(notifications(old)).isEmpty();
+    }
+
+    @Test
     @DisplayName("실패하거나 건너뛴 알림만 다시 보내기로 되돌릴 수 있다")
     void resendsOnlyFailedOrSkippedNotifications() {
         Long runId = readyRunFor("gaadmin", GA_ADMIN_PHONE);
@@ -291,6 +367,13 @@ class ClosingNotificationServiceIntegrationTest {
                 VALUES (?, ?, 'PRE_CONFIRM')
                 RETURNING validation_run_id
                 """, Long.class, month, ThreadLocalRandom.current().nextInt(1_000_000, 2_000_000));
+    }
+
+    private void finalizeRun(Long runId, OffsetDateTime finalizedAt) {
+        jdbc.update("""
+                UPDATE fgc.validation_run SET status = 'FINALIZED', current_step = 10, finalized_at = ?, finalized_by = ?
+                 WHERE validation_run_id = ?
+                """, finalizedAt, userId("gaadmin"), runId);
     }
 
     private Long createCompletedRun(LocalDate month) {
