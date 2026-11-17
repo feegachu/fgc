@@ -1437,6 +1437,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notification-settings/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 본인 마감 알림 수신 설정 조회
+         * @description 로그인한 사용자의 휴대폰 번호와 수신 동의 시각을 돌려준다. 동의하지 않았으면 둘 다 null 이다.
+         */
+        get: operations["mySetting"];
+        /**
+         * 본인 마감 알림 수신 설정 저장
+         * @description consent 가 true 면 휴대폰 번호를 저장하고, false 면 번호를 지운다. 사용자 ID는 로그인 정보에서만 얻는다.
+         */
+        put: operations["changeMySetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 마감 알림 발송 이력
+         * @description 최신순. 수신번호는 가운데를 가려 돌려준다.
+         */
+        get: operations["notifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 마감 알림 다시 보내기
+         * @description 실패했거나 건너뛴 알림을 대기로 되돌린다. 다음 발송 주기에 다시 보낸다.
+         */
+        post: operations["resend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/policies": {
         parameters: {
             query?: never;
@@ -2745,6 +2809,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseNotificationSettingResponse: {
+            data?: components["schemas"]["NotificationSettingResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponsePageResponseAcquisitionCostCheckResponse: {
             data?: components["schemas"]["PageResponseAcquisitionCostCheckResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2772,6 +2841,11 @@ export interface components {
         };
         ApiResponsePageResponseClawbackNoticeDocumentResponse: {
             data?: components["schemas"]["PageResponseClawbackNoticeDocumentResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePageResponseClosingNotificationResponse: {
+            data?: components["schemas"]["PageResponseClosingNotificationResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -3341,6 +3415,8 @@ export interface components {
             evidenceRef?: string;
             itemCode?: string;
             itemName?: string;
+            paymentStatus?: string;
+            paymentStatusSnapshot?: string;
             /** Format: int64 */
             scheduleLineId?: number;
         };
@@ -3707,6 +3783,27 @@ export interface components {
             insurerId?: number;
             /** Format: int64 */
             productOfferingId?: number;
+        };
+        ClosingNotificationResponse: {
+            /** Format: int32 */
+            attemptCount?: number;
+            /** Format: int64 */
+            closingNotificationId?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            errorCode?: string;
+            eventType?: string;
+            messageText?: string;
+            recipientLoginId?: string;
+            recipientName?: string;
+            recipientPhone?: string;
+            /** Format: date-time */
+            sentAt?: string;
+            status?: string;
+            /** Format: date */
+            validationMonth?: string;
+            /** Format: int64 */
+            validationRunId?: number;
         };
         /** @description 수수료 항목 기준정보 */
         CommissionItemResponse: {
@@ -5314,6 +5411,16 @@ export interface components {
             publishedAt?: string;
             title?: string;
         };
+        NotificationSettingRequest: {
+            consent: boolean;
+            mobilePhone?: string;
+        };
+        NotificationSettingResponse: {
+            /** Format: date-time */
+            consentedAt?: string;
+            mobilePhone?: string;
+            smsConfigured?: boolean;
+        };
         Option: {
             code?: string;
             label?: string;
@@ -5457,6 +5564,18 @@ export interface components {
         };
         PageResponseClawbackNoticeDocumentResponse: {
             content?: components["schemas"]["ClawbackNoticeDocumentResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageResponseClosingNotificationResponse: {
+            content?: components["schemas"]["ClosingNotificationResponse"][];
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -9269,6 +9388,97 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListNewsHeadline"];
+                };
+            };
+        };
+    };
+    mySetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNotificationSettingResponse"];
+                };
+            };
+        };
+    };
+    changeMySetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationSettingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNotificationSettingResponse"];
+                };
+            };
+        };
+    };
+    notifications: {
+        parameters: {
+            query?: {
+                /** @description 페이지(1-base) */
+                page?: number;
+                /** @description 페이지 크기(최대 100) */
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseClosingNotificationResponse"];
+                };
+            };
+        };
+    };
+    resend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
                 };
             };
         };

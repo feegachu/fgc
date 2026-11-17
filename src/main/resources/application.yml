@@ -66,6 +66,15 @@ fgc:
     max-input-chars: 20000       # 요청당 입력 상한 — 예산 10달러(SRC-060) 보호. 팀 운영 정책
     max-output-tokens: 1024
     cooldown: 10m                # 시간 초과·401·403·404·429 뒤 AI 를 끄는 시간 — 재시도 폭주 방지. 팀 운영 정책
+  # 외부 문자 발송(FUN-089·IF-EXT-05, 솔라피). 키는 커밋하지 않는다 — 셋 중 하나라도 비어 있으면 발송만 건너뛰고 알림 이력은 남는다.
+  sms:
+    api-key: ${SOLAPI_API_KEY:}
+    api-secret: ${SOLAPI_API_SECRET:}
+    sender: ${SOLAPI_SENDER:}    # 문자 사업자에 미리 등록한 발신번호(숫자만)
+    base-url: https://api.solapi.com
+    timeout: 5s
+  notification:
+    enabled: true                # 10초 주기 마감 알림 감지·발송. 끄면 알림을 만들지도 보내지도 않는다
   batch:
     daily-changed-contract:
       cron: "0 0 2 * * *"        # 매일 02:00. 프로젝트 운영 가정일 뿐 법정 기준 아님

@@ -183,6 +183,15 @@ export const screens: ScreenDefinition[] = [
     icon: 'settings',
     permission: 'canViewAuditLog',
   },
+  {
+    id: 'NOTI-W01',
+    path: '/notifications',
+    title: '알림 발송 이력',
+    menu: '/notifications',
+    section: 'admin',
+    icon: 'settings',
+    permission: 'canFinalizeValidation',
+  },
 ]
 export const screenFor = (pathname: string) =>
   screens.find((screen) => matchPath({ path: screen.path, end: true }, pathname))

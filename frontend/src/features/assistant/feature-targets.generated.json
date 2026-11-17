@@ -30,6 +30,11 @@
     "element": "button"
   },
   {
+    "id": "app.shell.sidebar.button-4",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "button"
+  },
+  {
     "id": "app.shell.sidebar.fgc",
     "file": "app/shell/Sidebar.tsx",
     "element": "Link"
@@ -2680,6 +2685,36 @@
     "element": "textarea"
   },
   {
+    "id": "features.notification.notification-history-page.button",
+    "file": "features/notification/NotificationHistoryPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.notification.notification-history-page.section",
+    "file": "features/notification/NotificationHistoryPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.notification.notification-settings-modal.button",
+    "file": "features/notification/NotificationSettingsModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.notification.notification-settings-modal.button-2",
+    "file": "features/notification/NotificationSettingsModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.notification.notification-settings-modal.input",
+    "file": "features/notification/NotificationSettingsModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.notification.notification-settings-modal.input-2",
+    "file": "features/notification/NotificationSettingsModal.tsx",
+    "element": "input"
+  },
+  {
     "id": "features.policies.policies-page.button",
     "file": "features/policies/PoliciesPage.tsx",
     "element": "Button"
@@ -3986,6 +4021,11 @@
   },
   {
     "id": "navigation.menu.ledg-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.noti-w01",
     "file": "app/shell/Sidebar.tsx",
     "element": "Link"
   },
