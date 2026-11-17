@@ -13,15 +13,18 @@ import com.susukkang.fgc.notification.sms.SmsSendException;
 import com.susukkang.fgc.validation.service.ValidationRunFinalizationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 설명 : FUN-089 마감 알림. 월 마감에서 일이 다음 사람에게 넘어가는 두 순간을 문자로 알린다.
@@ -51,6 +54,8 @@ public class ClosingNotificationService {
     private final SmsGateway smsGateway;
     private final AuditLogService auditLogService;
     private final TransactionTemplate transaction;
+    private final TaskScheduler scheduler;
+    private final AtomicBoolean wakeQueued = new AtomicBoolean();
 
     // 예약 실행(감지, 복구, 발송)만 끈다. 테스트가 끄고 detectFinalizeReady()·dispatchPending()을 직접 부르려고 둔 값이다.
     // 꺼도 확정 통지는 리스너가 대기로 쌓고, 켜면 그때 나간다. 운영에서 문자를 끄려면 문자 키를 비운다(Runbook 5-6).
@@ -59,14 +64,37 @@ public class ClosingNotificationService {
 
     public ClosingNotificationService(ClosingNotificationRepository notifications,
                                       ValidationRunFinalizationService finalization, SmsGateway smsGateway,
-                                      AuditLogService auditLogService, PlatformTransactionManager transactionManager) {
+                                      AuditLogService auditLogService, PlatformTransactionManager transactionManager,
+                                      TaskScheduler scheduler) {
         this.notifications = notifications;
         this.finalization = finalization;
         this.smsGateway = smsGateway;
         this.auditLogService = auditLogService;
         this.transaction = new TransactionTemplate(transactionManager);
+        this.scheduler = scheduler;
     }
 
+    /**
+     * 확정 조건이 방금 채워졌을 수 있을 때(예외 종결, 확정 직후) 부른다. 10초 주기를 기다리지 않고 지금 한 번 돈다.
+     * 문자 사업자 호출이 화면 요청을 붙잡지 않게 예약 실행과 같은 스레드에서 돌린다. 깨워 둔 실행이 있으면 더 쌓지 않는다.
+     */
+    public void wake() {
+        if (!enabled || !wakeQueued.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            scheduler.schedule(() -> {
+                // 도는 동안 들어온 요청이 다음 실행을 다시 예약하도록 먼저 푼다.
+                wakeQueued.set(false);
+                runScheduled();
+            }, Instant.now());
+        } catch (RuntimeException failure) {
+            wakeQueued.set(false);
+            throw failure;
+        }
+    }
+
+    // 평소에는 wake()가 바로 돌린다. 이 주기는 사건 없이 조건이 채워진 경우(배치가 끝남)와 재시도, 놓친 것을 다시 본다.
     @Scheduled(fixedDelay = 10, timeUnit = TimeUnit.SECONDS)
     public void runScheduled() {
         if (!enabled) {

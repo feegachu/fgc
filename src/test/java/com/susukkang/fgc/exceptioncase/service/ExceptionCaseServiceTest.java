@@ -10,6 +10,7 @@ import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseActionTarget;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
+import com.susukkang.fgc.exceptioncase.event.ExceptionCaseClosed;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseQueryRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 
@@ -55,11 +57,15 @@ class ExceptionCaseServiceTest {
     @Mock
     private ExceptionActionRepository actionRepository;
 
+    @Mock
+    private ApplicationEventPublisher events;
+
     private ExceptionCaseService service;
 
     @BeforeEach
     void setUp() {
-        service = new ExceptionCaseService(queryRepository, caseRepository, actionRepository, auditLogRepository, new ObjectMapper());
+        service = new ExceptionCaseService(queryRepository, caseRepository, actionRepository, auditLogRepository,
+                new ObjectMapper(), events);
     }
 
     @Test
@@ -147,6 +153,32 @@ class ExceptionCaseServiceTest {
                 .isInstanceOf(FgcBusinessException.class)
                 .satisfies(thrown -> assertThat(((FgcBusinessException) thrown).getErrorCode())
                         .isEqualTo(FgcErrorCode.COMMON_002));
+    }
+
+    // FGC-FUN-089: 마감 알림이 확정 조건을 바로 다시 보도록 예외 종결을 알린다(IF-EVT-08).
+    @Test
+    void announcesAClosedException() {
+        given(caseRepository.findByIdForUpdate(11L)).willReturn(
+                new ExceptionCaseActionTarget(11L, "RECONCILIATION_MISMATCH", ExceptionStatus.IN_REVIEW, 7L));
+        given(actionRepository.findNextActionSeq(11L)).willReturn(2);
+        given(caseRepository.updateCaseAfterAction(eq(11L), eq(ExceptionStatus.RESOLVED), eq(7L), any())).willReturn(1);
+
+        service.action(11L, new ExceptionActionRequest(ExceptionActionType.RESOLVE, "원천 수정 확인", null), 7L, "settle01");
+
+        verify(events).publishEvent(new ExceptionCaseClosed(11L));
+    }
+
+    // FGC-FUN-089: 종결하지 않는 조치는 알리지 않는다.
+    @Test
+    void doesNotAnnounceAnExceptionThatStaysOpen() {
+        given(caseRepository.findByIdForUpdate(11L)).willReturn(
+                new ExceptionCaseActionTarget(11L, "RECONCILIATION_MISMATCH", ExceptionStatus.NEW, null));
+        given(actionRepository.findNextActionSeq(11L)).willReturn(1);
+        given(caseRepository.updateCaseAfterAction(11L, ExceptionStatus.IN_REVIEW, 7L, null)).willReturn(1);
+
+        service.action(11L, new ExceptionActionRequest(ExceptionActionType.START_REVIEW, "검토 시작", null), 7L, "settle01");
+
+        verify(events, never()).publishEvent(any());
     }
 
     @Test

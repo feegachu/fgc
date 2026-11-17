@@ -10,7 +10,9 @@ import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseActionTarget;
+import com.susukkang.fgc.exceptioncase.event.ExceptionCaseClosed;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -31,6 +33,7 @@ import java.util.List;
 public class CapExceptionServiceImpl implements CapExceptionService {
 
     private final CapExceptionRepository capExceptionRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 설명 : 실시간·배치 한도 판정 결과가 주의 또는 위반인 경우 예외 건을 생성한다
@@ -82,6 +85,8 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         if (capExceptionRepository.updateExceptionResolved(exception) != 1) {
             throw new IllegalStateException("한도 예외 상태 변경에 실패했습니다.");
         }
+        // 2026-11-18 yslee - FGC-FUN-089 예외 종결을 사건으로 알린다(IF-EVT-08). 마감 알림이 커밋 뒤에 확정 조건을 바로 다시 본다.
+        eventPublisher.publishEvent(new ExceptionCaseClosed(command.exceptionCaseId()));
     }
 
     /**

@@ -2,7 +2,11 @@ package com.susukkang.fgc.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
+import com.susukkang.fgc.exceptioncase.event.ExceptionCaseClosed;
 import com.susukkang.fgc.validation.event.ValidationRunFinalized;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -11,10 +15,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -33,6 +39,8 @@ class ClosingNotificationListenerIntegrationTest {
     private PlatformTransactionManager transactionManager;
     @Autowired
     private JdbcTemplate jdbc;
+    @MockitoSpyBean
+    private ClosingNotificationService notifications;
 
     private TransactionTemplate transaction;
     private Long runId;
@@ -87,6 +95,38 @@ class ClosingNotificationListenerIntegrationTest {
 
         assertThatCode(() -> transaction.executeWithoutResult(status -> publisher.publishEvent(unknownRun)))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("FGC-FUN-089 예외 종결이 커밋되면 10초 주기를 기다리지 않고 알림 주기를 바로 깨운다")
+    void wakesTheCycleAsSoonAsAnExceptionIsClosed() {
+        transaction.executeWithoutResult(status -> {
+            publisher.publishEvent(new ExceptionCaseClosed(1L));
+            verify(notifications, never()).wake();
+        });
+
+        verify(notifications).wake();
+    }
+
+    @Test
+    @DisplayName("FGC-FUN-089 예외 종결이 되돌려지면 깨우지 않는다")
+    void doesNotWakeWhenTheClosingTransactionRollsBack() {
+        transaction.executeWithoutResult(status -> {
+            publisher.publishEvent(new ExceptionCaseClosed(1L));
+            status.setRollbackOnly();
+        });
+
+        verify(notifications, never()).wake();
+    }
+
+    @Test
+    @DisplayName("FGC-FUN-089 확정 통지를 기록한 뒤에도 바로 깨워 설계사 문자가 10초를 기다리지 않게 한다")
+    void wakesTheCycleAfterRecordingTheFinalizeNotification() {
+        transaction.executeWithoutResult(status -> publisher.publishEvent(finalized()));
+
+        InOrder order = inOrder(notifications);
+        order.verify(notifications).recordRunFinalized(runId, MONTH);
+        order.verify(notifications).wake();
     }
 
     private ValidationRunFinalized finalized() {
