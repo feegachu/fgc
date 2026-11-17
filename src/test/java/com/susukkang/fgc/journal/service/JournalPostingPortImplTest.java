@@ -52,6 +52,30 @@ class JournalPostingPortImplTest {
         return new JournalPostingPortImpl(sourceRepository, draftService, persistenceService, journalHeaderRepository);
     }
 
+    @Test
+    void scheduleCorrectionPostsOnlyTheAffectedContractsExpectedJournalsInTheCurrentTransaction() {
+        LocalDate month = LocalDate.of(2026, 10, 1);
+        var affected = scheduleRow(501L);
+        var other = scheduleRow(502L);
+        other.setContractId(11L);
+        given(sourceRepository.findExpectedInsurerIncomeSources(25L, month)).willReturn(List.of(affected, other));
+        var draft = mock(JournalHeaderDraft.class);
+        given(draftService.draftExpectedInsurerIncome(any())).willReturn(draft);
+        var saved = new JournalHeaderRow();
+        saved.setJournalHeaderId(901L);
+        saved.setStatus("DRAFT");
+        given(persistenceService.saveDraftInCurrentTransaction(draft, 3L, "EXCP-SCHEDULE-25-10")).willReturn(saved);
+
+        port().postExpectedForContract(10L, 25L, month, 3L);
+
+        var command = ArgumentCaptor.forClass(ExpectedInsurerIncomeJournalCommand.class);
+        verify(draftService).draftExpectedInsurerIncome(command.capture());
+        assertThat(command.getValue().getScheduleLineId()).isEqualTo(501L);
+        verify(journalHeaderRepository).markPosted(901L, 3L);
+        verify(persistenceService, never()).saveDraft(any(), any(), any());
+        verify(sourceRepository, never()).findConfirmedFcPayoutSources(any(), any());
+    }
+
     private ValidationStepContext newContext(long validationRunId) {
         ValidationJobContext job = new ValidationJobContext(
                 LocalDate.of(2026, 8, 1), 1L, ValidationRunType.MONTHLY, 3L, "req-142");
@@ -97,7 +121,7 @@ class JournalPostingPortImplTest {
         given(draftService.draftActualInsurerStatement(any())).willReturn(mock(JournalHeaderDraft.class));
         given(draftService.draftConfirmedFcPayout(any())).willReturn(mock(JournalHeaderDraft.class));
 
-        given(persistenceService.saveDraft(any(), any(), any()))
+        given(persistenceService.saveDraftInCurrentTransaction(any(), any(), any()))
                 .willReturn(draftHeaderRow(101L), draftHeaderRow(102L), draftHeaderRow(103L), draftHeaderRow(104L));
         given(journalHeaderRepository.markPosted(any(), any())).willReturn(1);
 
@@ -125,7 +149,7 @@ class JournalPostingPortImplTest {
         given(draftService.draftExpectedInsurerIncome(any())).willReturn(mock(JournalHeaderDraft.class));
         JournalHeaderRow existing = postedHeaderRow(101L);
         existing.setStatus(status);
-        given(persistenceService.saveDraft(any(), any(), any())).willReturn(existing);
+        given(persistenceService.saveDraftInCurrentTransaction(any(), any(), any())).willReturn(existing);
 
         JournalPostingResult result = port().post(newContext(42L));
 
@@ -142,7 +166,7 @@ class JournalPostingPortImplTest {
     void skipsWhenAnotherExecutionPostsAfterDraftWasRead() {
         given(sourceRepository.findExpectedInsurerIncomeSources(any(), any())).willReturn(List.of(scheduleRow(1L)));
         given(draftService.draftExpectedInsurerIncome(any())).willReturn(mock(JournalHeaderDraft.class));
-        given(persistenceService.saveDraft(any(), any(), any())).willReturn(draftHeaderRow(101L));
+        given(persistenceService.saveDraftInCurrentTransaction(any(), any(), any())).willReturn(draftHeaderRow(101L));
         given(journalHeaderRepository.markPosted(101L, 3L)).willReturn(0);
 
         JournalPostingResult result = port().post(newContext(42L));
@@ -167,7 +191,7 @@ class JournalPostingPortImplTest {
         given(sourceRepository.findActualInsurerStatementSources(any(), any())).willReturn(List.of());
         given(sourceRepository.findConfirmedFcPayoutSources(any(), any())).willReturn(List.of());
         given(draftService.draftExpectedInsurerIncome(any())).willReturn(mock(JournalHeaderDraft.class));
-        given(persistenceService.saveDraft(any(), any(), any())).willReturn(draftHeaderRow(200L));
+        given(persistenceService.saveDraftInCurrentTransaction(any(), any(), any())).willReturn(draftHeaderRow(200L));
         given(journalHeaderRepository.markPosted(200L, 3L)).willReturn(1);
 
         port().post(newContext(99L));
@@ -190,7 +214,7 @@ class JournalPostingPortImplTest {
     void propagatesPersistenceFailureWithoutSwallowing() {
         given(sourceRepository.findExpectedInsurerIncomeSources(any(), any())).willReturn(List.of(scheduleRow(1L)));
         given(draftService.draftExpectedInsurerIncome(any())).willReturn(mock(JournalHeaderDraft.class));
-        given(persistenceService.saveDraft(any(), any(), any())).willThrow(new IllegalStateException("boom"));
+        given(persistenceService.saveDraftInCurrentTransaction(any(), any(), any())).willThrow(new IllegalStateException("boom"));
 
         assertThatThrownBy(() -> port().post(newContext(42L)))
                 .isInstanceOf(IllegalStateException.class)

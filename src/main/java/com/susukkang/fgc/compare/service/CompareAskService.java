@@ -35,9 +35,9 @@ public class CompareAskService {
             new Term("이월", List.of("이월"),
                     "한도를 넘어 이번 기간에 받지 못하고 다음으로 넘어가는 수수료 금액이에요."),
             new Term("환수", List.of("환수"),
-                    "계약이 일찍 해약되면 이미 지급한 수수료 일부를 되돌려 받는 것이에요. 환수 노출액은 가정한 해지 시점에 환수 규칙의 환수율을 수수료 항목별 지급액에 곱한 값이에요."),
-            new Term("보수적 순수령액", List.of("순수령", "보수적", "순위 기준"),
-                    "한도를 반영한 수령 예상액에서 환수 노출액을 뺀 금액이에요. 이 금액이 큰 순서로 참고 순위를 매겨요."),
+                    "계약이 일찍 해약되면 이미 받은 수수료 일부를 돌려주는 것이에요. 예상 환수액은 가정한 해지 시점에 환수 규칙의 환수율을 수수료 항목별 지급액에 곱한 값이에요."),
+            new Term("순수령액", List.of("순수령", "보수적", "순위 기준"),
+                    "해지를 가정했을 때, 한도를 반영한 수령액에서 예상 환수액을 뺀 금액이에요. 이 금액이 큰 순서로 참고 순위를 매겨요."),
             new Term("협회 수수료 등급", List.of("등급", "협회"),
                     "협회가 공시한 상품 수수료 등급이에요. 화면에 읽기 전용으로만 보여 주고 순위 계산에는 쓰지 않아요."));
 
@@ -46,6 +46,7 @@ public class CompareAskService {
             data 의 '용어 설명', '순위 결과', '순위별 비교 근거'만 근거로 답한다. 거기에 없는 내용과 계산을 만들지 마라.
             답에는 숫자(금액·비율·순위 번호·날짜)를 쓰지 않는다. '1,200% 룰'이라는 용어 이름만 쓸 수 있다. 순위·금액은 서버가 답 앞에 따로 붙인다.
             상품은 보험사·상품 이름으로 부르고, 어느 쪽이 더 크거나 작은지와 그 이유(한도·이월·환수)를 말로 풀어 쓴다.
+            금액 이름은 '수령액', '예상 환수액', '순수령액'으로 쓴다. 환수와 순수령액은 해지를 가정한 예상 금액이다.
             다음 질문은 모두 범위 안이다(inScope=true): 몇 위인 이유, 1위와 다른 순위의 차이, 한도·이월·환수가 순위에 준 영향,
             상품 간 비교, 순위 계산 기준, 위 용어의 뜻. 순위 결과가 있으면 '순위별 비교 근거'의 차이를 풀어서 이유를 설명한다.
             용어 뜻을 묻는 질문('협회등급이 뭐야?', '순수령액이 어떻게 되는거지')과 이 챗봇이 무엇을 알려 주는지 묻는 질문('너는 뭘 알려주는거야', '역할이 뭐야')은
@@ -66,6 +67,7 @@ public class CompareAskService {
             도구가 주지 않은 내용과 계산은 만들지 마라. 질문에 필요한 값만 불러라.
             답에는 금액·비율·날짜 같은 숫자를 절대 쓰지 않는다(숫자가 든 문장은 서버가 지운다). '1,200% 룰'이라는 용어 이름과 '1위' 같은 순위 표기만 쓸 수 있다. 금액은 서버가 답 앞에 따로 붙인다.
             상품은 보험사·상품 이름으로 부르고, 도구 값을 보고 어느 쪽이 더 크거나 작은지와 그 이유(한도·이월·환수)를 말로 풀어 쓴다.
+            금액 이름은 '수령액', '예상 환수액', '순수령액'으로 쓴다. 환수와 순수령액은 해지를 가정한 예상 금액이다.
             두 상품의 많고 적음을 말하려면 먼저 compare 로 두 상품을 견주고, compare 의 '값이 더 큰 쪽'에 맞게 말한다.
             질문이 두 상품이나 특정 순위를 가리키면 그 상품들만 다룬다. 다른 상품과의 비교로 바꿔 답하지 않는다.
             다음 질문은 모두 범위 안이다(inScope=true): 몇 위인 이유, 순위 사이의 차이, 한도·이월·환수가 순위에 준 영향, 상품 간 비교,
@@ -80,7 +82,7 @@ public class CompareAskService {
 
     static final String OUT_OF_SCOPE = "이 챗봇은 비교 결과와 수수료 기본 용어(1,200% 룰, 이월, 환수, 순수령액, 협회 등급)만 안내해 드려요. 다른 질문은 담당자에게 문의해 주세요.";
     static final String INTRO = "저는 상품 비교 결과(참고 순위)와 수수료 기본 용어(1,200% 룰, 이월, 환수, 순수령액, 협회 등급)를 설명해 드리는 피코 AI예요. 순위가 왜 그렇게 나왔는지, 두 상품의 차이가 무엇인지 물어보세요.";
-    static final String FALLBACK = "지금은 질문에 맞는 답변을 만들지 못했어요. 아래 연관 질문 버튼이나 근거 보기를 이용해 주세요.";
+    static final String FALLBACK = "지금은 질문에 맞는 답변을 만들지 못했어요. 아래 연관 질문 버튼이나 계산 내역 보기를 이용해 주세요.";
     static final String PERSONAL_INFO = "주민등록번호, 연락처 및 이메일 같은 고객 개인정보는 입력하지 말아 주세요. 상품 비교 결과와 수수료 용어만 답해 드려요.";
 
     static final int MAX_LENGTH = 600;
@@ -99,7 +101,7 @@ public class CompareAskService {
             Pattern.compile("순위.{0,6}(?:어떻게|무슨|뭘|무엇).{0,6}(?:정해|정하|결정|산정|매겨|나와|나뉘)", Pattern.CANON_EQ),
             Pattern.compile("순위.{0,4}(?:기준|방식)", Pattern.CANON_EQ),
             Pattern.compile("(?:정하는|정해지는|매기는)\\s*(?:기준|방식)", Pattern.CANON_EQ));
-    static final String RANK_CRITERIA = "이 서비스가 쓰는 프로젝트 가정 산식(compare-net-v1, D-01 가정)이에요. 확정된 업무 기준이 아니라 가정이고, 이 기준으로 순위는 보수적 순수령액이 큰 순서로 정해요. 같으면 환수 노출액이 작은 쪽이, 그래도 같으면 상품 등록 순서가 앞서요. 순위는 참고용이라 최종 선택은 설계사님이 해요.";
+    static final String RANK_CRITERIA = "이 서비스가 쓰는 프로젝트 가정 산식(compare-net-v1, D-01 가정)이에요. 확정된 업무 기준이 아니라 가정이고, 이 기준으로 순위는 순수령액이 큰 순서로 정해요. 같으면 예상 환수액이 적은 쪽이, 그래도 같으면 상품 등록 순서가 앞서요. 순위는 참고용이라 최종 선택은 설계사님이 해요.";
     private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)(?!급)|순위|차이|비교", Pattern.CANON_EQ);
     private static final List<String> FORBIDDEN = CompareSummaryService.FORBIDDEN;
 
@@ -336,7 +338,7 @@ public class CompareAskService {
     /** 두 상품을 직접 견준다. 앞선 순위를 기준으로 뒤 순위의 차이를 말한다. */
     static String pairAnswer(CompareRankingResponse.Item base, CompareRankingResponse.Item it) {
         // 이월 예정액은 0원도 서버 값으로 보여 준다(이월액을 물어도 금액이 나오도록).
-        return "%d위는 %s %s예요. 보수적 순수령액은 %,d원이에요. %d위는 %s %s예요. 보수적 순수령액은 %,d원이에요. "
+        return "%d위는 %s %s예요. 순수령액은 %,d원이에요. %d위는 %s %s예요. 순수령액은 %,d원이에요. "
                 .formatted(base.rank(), base.insurer(), base.product(), base.conservativeNet(),
                         it.rank(), it.insurer(), it.product(), it.conservativeNet()) + comparison(base, it)
                 + " 이월 예정액은 %d위 %,d원, %d위 %,d원이에요.".formatted(base.rank(), base.carryover(), it.rank(), it.carryover());
@@ -354,9 +356,9 @@ public class CompareAskService {
         int rank = asked.isEmpty() ? (items.size() > 1 ? 2 : 1) : asked.get(0);
         CompareRankingResponse.Item top = items.get(0);
         CompareRankingResponse.Item it = items.get(rank - 1);
-        String head = "%d위는 %s %s예요. 보수적 순수령액은 %,d원이에요.".formatted(it.rank(), it.insurer(), it.product(), it.conservativeNet());
+        String head = "%d위는 %s %s예요. 순수령액은 %,d원이에요.".formatted(it.rank(), it.insurer(), it.product(), it.conservativeNet());
         String body = it == top
-                ? " 한도를 반영한 수령 예상액 %,d원에서 환수 노출액 %,d원을 뺀 값이에요.".formatted(it.cappedReceipt(), it.clawbackExposure())
+                ? " 한도를 반영한 수령액 %,d원에서 예상 환수액 %,d원을 뺀 값이에요.".formatted(it.cappedReceipt(), it.clawbackExposure())
                 : " " + comparison(top, it);
         String carry = it.carryover() > 0 ? " 한도를 넘는 %,d원은 이월 예정액으로 따로 계산해요.".formatted(it.carryover()) : "";
         return head + body + carry;
@@ -368,11 +370,11 @@ public class CompareAskService {
         long net = top.conservativeNet() - it.conservativeNet();
         // 서버 정렬: 순수령액 내림차순 → 환수 노출액 오름차순 → 상품 ID 오름차순. 실제로 순위를 가른 기준을 말한다.
         String tie = top.clawbackExposure() == it.clawbackExposure()
-                ? base + "와 보수적 순수령액과 환수 노출액이 같아서 상품 등록 순서로 순위를 정했어요."
-                : base + "와 보수적 순수령액이 같고, 환수 노출액이 더 작은 쪽이 앞섰어요.";
-        String netText = net == 0 ? tie : "%s보다 보수적 순수령액이 %,d원 적어요.".formatted(base, net);
-        return netText + " " + diff(base, "한도 반영 수령 예상액", it.cappedReceipt() - top.cappedReceipt(), "많고", "적고", "같고")
-                + ", " + diff(base, "환수 노출액", it.clawbackExposure() - top.clawbackExposure(), "더 커요.", "더 작아요.", "같아요.");
+                ? base + "와 순수령액과 예상 환수액이 같아서 상품 등록 순서로 순위를 정했어요."
+                : base + "와 순수령액이 같고, 예상 환수액이 더 적은 쪽이 앞섰어요.";
+        String netText = net == 0 ? tie : "%s보다 순수령액이 %,d원 적어요.".formatted(base, net);
+        return netText + " " + diff(base, "한도 반영 수령액", it.cappedReceipt() - top.cappedReceipt(), "많고", "적고", "같고")
+                + ", " + diff(base, "예상 환수액", it.clawbackExposure() - top.clawbackExposure(), "더 커요.", "더 작아요.", "같아요.");
     }
 
     private static String diff(String base, String label, long delta, String more, String less, String same) {

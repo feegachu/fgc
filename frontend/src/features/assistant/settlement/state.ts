@@ -128,7 +128,8 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
   if (
     ['COMPLETED', 'FINALIZED'].includes(run.status ?? '') &&
     !evidence.validation?.targets?.some(
-      (target) => target.contractNo === evidence.contract?.contractNo && target.selectionStatus === 'SELECTED',
+      (target) => target.contractNo === evidence.contract?.contractNo && (target.selectionStatus === 'SELECTED'
+        || target.selectionStatus === 'EXCLUDED' && target.selectionReason === '전체 업무 가이드 시연 계약 (월 검증 제외)'),
     )
   )
     return at(

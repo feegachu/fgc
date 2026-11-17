@@ -55,6 +55,7 @@ public class GaFcReconciliationRepository {
                 AND jh.source_entity_id = CAST(ct.commission_transaction_id AS varchar)
                 AND jh.status = 'POSTED'
                 WHERE ct.payment_stage = 'GA_TO_FC'
+                AND NOT fgc.is_workflow_demo_contract(ta.contract_id)
                 AND ct.settlement_month = :settlementMonth
                 AND ct.cashflow_type = 'PAYMENT'
                 AND ct.status = 'CONFIRMED'

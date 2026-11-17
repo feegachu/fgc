@@ -1,5 +1,6 @@
 package com.susukkang.fgc.validation.repository;
 
+import com.susukkang.fgc.cap.repository.CapDisplaySql;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.validation.dto.AgentCapMonitoringRow;
 import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
@@ -434,11 +435,13 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                       FROM fgc.validation_target
                      WHERE validation_run_id = :validationRunId) vt
              CROSS JOIN (SELECT COUNT(*) FILTER (WHERE result_status <> 'NOT_APPLICABLE')   AS capCheckedCount,
-                                COUNT(*) FILTER (WHERE result_status = 'VIOLATION')       AS capViolationCount,
+                                COUNT(*) FILTER (WHERE result_status = 'VIOLATION'
+                                    AND NOT """ + CapDisplaySql.RESOLVED_VIOLATION + """
+                                ) AS capViolationCount,
                                 COUNT(*) FILTER (WHERE result_status = 'WARNING')         AS capWarningCount,
                                 COUNT(*) FILTER (WHERE result_status = 'REVIEW_REQUIRED') AS capReviewRequiredCount
-                           FROM fgc.cap_check
-                          WHERE validation_run_id = :validationRunId) cc
+                           FROM """ + CapDisplaySql.MONTHLY_DISPLAY_CHECKS + """
+                           cc) cc
              CROSS JOIN (SELECT COUNT(*) FILTER (WHERE result_status <> 'NOT_APPLICABLE')   AS arbitrageCheckedCount,
                                 COUNT(*) FILTER (WHERE result_status = 'CANDIDATE')       AS arbitrageCandidateCount,
                                 COUNT(*) FILTER (WHERE result_status = 'REVIEW_REQUIRED') AS arbitrageReviewRequiredCount
@@ -508,14 +511,16 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                    ag.agent_name                                                  AS agentName,
                    cc.payment_stage                                               AS paymentStage,
                    COUNT(*) FILTER (WHERE cc.result_status <> 'NOT_APPLICABLE')    AS checkedCount,
-                   COUNT(*) FILTER (WHERE cc.result_status = 'VIOLATION')         AS violationCount,
+                   COUNT(*) FILTER (WHERE cc.result_status = 'VIOLATION'
+                       AND NOT """ + CapDisplaySql.RESOLVED_VIOLATION + """
+                   ) AS violationCount,
                    COUNT(*) FILTER (WHERE cc.result_status = 'WARNING')           AS warningCount,
                    COUNT(*) FILTER (WHERE cc.result_status = 'REVIEW_REQUIRED')   AS reviewRequiredCount
-              FROM fgc.cap_check cc
+              FROM """ + CapDisplaySql.MONTHLY_DISPLAY_CHECKS + """
+                   cc
               JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
               JOIN fgc.agent ag ON ag.agent_id = ic.agent_id
-             WHERE cc.validation_run_id = :validationRunId
-               AND cc.result_status <> 'NOT_APPLICABLE'
+             WHERE cc.result_status <> 'NOT_APPLICABLE'
              GROUP BY ag.agent_id, ag.agent_name, cc.payment_stage
              ORDER BY ag.agent_id, cc.payment_stage
             """, sqlResultSetMapping = "AgentCapMonitoringRowMapping")

@@ -1,19 +1,23 @@
 import { test, expect } from '@playwright/test'
 
-test('지급 안내의 다음은 저장 및 검증 통과 및 확정 완료 전까지 잠기고 이유를 보여준다', async ({ page }) => {
+test('지급 안내의 다음은 저장 및 검증 통과 및 확정 완료 전까지 잠기고 이유를 보여준다', async ({ page }, info) => {
   const contract = { contractId: 3, contractNo: 'C-003', contractDate: '2026-07-01' }
   const item = { commissionItemId: 1, itemName: '기본수수료', cashflowType: 'PAYMENT' }
   const header = { scheduleHeaderId: 5, activeYn: true, paymentStage: 'GA_TO_FC', scheduleRegime: 'CURRENT', schedulePurpose: 'OPERATIONAL', status: 'CONFIRMED' }
   const line = { scheduleLineId: 7, contractId: 3, installmentNo: 1, beneficiaryAgentId: 2, recipientName: '설계사', commissionItemId: 1, commissionItemName: '기본수수료', cashflowType: 'PAYMENT', expectedAmount: 1000, attributionDate: '2026-07-01', dueDate: '2026-07-01', lineStatus: 'PLANNED' }
   let payment: Record<string, unknown> | undefined
   let confirmable = false
+  let pendingPrecheck: Promise<void> | undefined
   await page.route('**/api/v1/**', async route => {
     const request = route.request(), path = new URL(request.url()).pathname
     let data: unknown = { content: [], totalPages: 1 }
     if (path.endsWith('/transactions/batch')) {
       payment = { ...request.postDataJSON().payments[0], commissionTransactionId: 12, status: 'DRAFT', updatedAt: '2026-07-01T12:00:00' }
       data = [payment]
-    } else if (path.endsWith('/transactions/12/precheck')) data = { paymentId: 12, confirmable, blockers: [] }
+    } else if (path.endsWith('/transactions/12/precheck')) {
+      await pendingPrecheck
+      data = { paymentId: 12, confirmable, blockers: [] }
+    }
     else if (path.endsWith('/transactions/12/confirm')) { payment = { ...payment, status: 'CONFIRMED' }; data = payment }
     else if (path.endsWith('/transactions/12')) data = payment
     else if (path.endsWith('/auth/refresh')) data = { accessToken: 'guide-gates' }
@@ -27,6 +31,7 @@ test('지급 안내의 다음은 저장 및 검증 통과 및 확정 완료 전�
     await route.fulfill({ json: { data, error: null, requestId: 'guide-gates' } })
   })
   await page.setViewportSize({ width: 1440, height: 900 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/transactions/new?month=2026-07&contractId=3')
   await expect(page.getByRole('spinbutton', { name: '귀속금액 7' })).toBeEnabled()
   await page.getByRole('button', { name: '도움말', exact: true }).click()
@@ -51,12 +56,45 @@ test('지급 안내의 다음은 저장 및 검증 통과 및 확정 완료 전�
       && Math.abs(bounds.y + bounds.height - savedPosition!.y - savedPosition!.height) < 2
   }).toBe(true)
   await expect(next).toBeDisabled()
+  const expectedSchedule = page.locator('[data-guide-target="payment.batch.expected"]')
+  const capPanel = page.locator('.contract-batch-cap')
+  const expectValidationHighlighted = async () => expect.poll(async () => {
+    const box = await page.locator('.screen-step-spotlight').boundingBox()
+    const gates = await page.locator('.contract-payment-gates').boundingBox()
+    const cap = await capPanel.boundingBox()
+    return !!box && !!gates && !!cap && box.x <= gates.x && box.y <= gates.y
+      && box.x + box.width >= cap.x + cap.width - 1
+      && box.y + box.height >= Math.min(900, cap.y + cap.height) - 1
+  }).toBe(true)
+  await expect(expectedSchedule).toBeVisible()
+  let finishPrecheck!: () => void
+  pendingPrecheck = new Promise(resolve => { finishPrecheck = resolve })
   await page.locator('[data-guide-target="payment.batch.precheck"]').click()
+  await expect(expectedSchedule).toBeHidden()
+  await expect(capPanel.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'true')
+  await expectValidationHighlighted()
+  finishPrecheck()
+  pendingPrecheck = undefined
+  await expect(capPanel.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'false')
+  await expect(expectedSchedule).toBeHidden()
   await expect(page.locator('[data-guide-target="payment.batch.precheck"]')).toHaveAttribute('data-guide-completed', 'false')
   await expect(next).toBeDisabled()
   confirmable = true
   await page.locator('[data-guide-target="payment.batch.precheck"]').click()
   await expect(card.getByRole('heading', { name: '확정 전 6단계 점검' })).toBeVisible()
+  await expectValidationHighlighted()
+  await expect.poll(async () => {
+    const gates = await page.locator('.contract-payment-gates').boundingBox()
+    const cap = await capPanel.boundingBox()
+    return !!gates && !!cap && cap.y >= gates.y + gates.height && cap.y - gates.y - gates.height <= 20
+  }).toBe(true)
+  await expect.poll(() => page.locator('.transaction-gate-check').evaluateAll(checks => checks.length === 5 && checks.every(check => {
+    const mark = check.getBoundingClientRect(), circle = check.parentElement!.getBoundingClientRect()
+    return Math.abs(mark.x + mark.width / 2 - circle.x - circle.width / 2) < 0.5
+      && Math.abs(mark.y + mark.height / 2 - circle.y - circle.height / 2) < 0.5
+      && mark.width < circle.width && mark.height < circle.height
+  }))).toBe(true)
+  await page.locator('.contract-payment-gates').screenshot({ path: info.outputPath('payment-checks-centered.png') })
   await next.click()
   await expect(card.getByRole('heading', { name: '지급 확정' })).toBeVisible()
   await expect(card.getByRole('button', { name: '안내 마치기' })).toBeDisabled()

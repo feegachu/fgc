@@ -23,8 +23,8 @@ const item = (rank: number, patch: Partial<CompareItem> = {}): CompareItem => ({
   capImpactPct: 67.083333,
   associationGrade: null,
   evidence: [
-    { label: '수령 예상액', rule: '현행수수료 1~1회차, 기준 보험료 × 650%', value: 650_000, source: '수수료 규칙', policyVersion: 'GA-CUR-2026-V1 v1', asOf: '2026-07-31' },
-    { label: '환수 노출액', rule: '현행수수료 1~1회차, 한도 반영 지급액 × 환수율 34.8%', value: 226_200, source: '환수 규칙', policyVersion: 'CLAW-GA-VIRTUAL-2026 v1', asOf: '2026-07-31' },
+    { label: '수령액(한도 적용 전)', rule: '현행수수료 1~1회차, 기준 보험료 × 650%', value: 650_000, source: '수수료 규칙', policyVersion: 'GA-CUR-2026-V1 v1', asOf: '2026-07-31' },
+    { label: '예상 환수액', rule: '현행수수료 1~1회차, 한도 반영 지급액 × 환수율 34.8%', value: 226_200, source: '환수 규칙', policyVersion: 'CLAW-GA-VIRTUAL-2026 v1', asOf: '2026-07-31' },
   ],
   ...patch,
 })
@@ -154,11 +154,16 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     expect(within(hero).getByText('상품1')).toBeInTheDocument()
     expect(within(hero).getByText('650,000원')).toBeInTheDocument()
     expect(screen.getAllByRole('row')).toHaveLength(6)
+    for (const label of ['순수령액', '수령액', '예상 환수액', '한도 여유', '계산 내역']) {
+      expect(within(hero).getByRole('columnheader', { name: label })).toBeInTheDocument()
+    }
+    expect(within(hero).getByText('210,000원')).toBeInTheDocument()
+    expect(within(hero).queryByText('−210,000원')).not.toBeInTheDocument()
     expect(await screen.findByText('건강보험 5개 보험사를 정렬했어요.')).toBeInTheDocument()
     expect(screen.getAllByText('자료 없음').length).toBeGreaterThan(0)
   })
 
-  it('결과 화면에 순위 기준이 회사가 정한 가정이고 환수 노출액은 환수 규칙으로 계산했다는 안내를 개발용 산식 코드 없이 보여 준다', async () => {
+  it('결과 화면에 순위 기준이 회사가 정한 가정이고 예상 환수액은 환수 규칙으로 계산했다는 안내를 개발용 산식 코드 없이 보여 준다', async () => {
     renderModal()
     await pickHealth()
     await result()
@@ -166,7 +171,7 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     expect(note).toHaveTextContent('이 순위 기준은 회사가 정한 계산 가정이에요.')
     expect(note).not.toHaveTextContent('PROJECT_ASSUMPTION')
     expect(note).not.toHaveTextContent('TEST-RULE')
-    expect(note).toHaveTextContent('12개월차에 해지된다고 보고 환수 규칙의 환수율로 계산했어요')
+    expect(note).toHaveTextContent('12개월 차에 해지한다고 가정하고, 수령액에서 예상 환수액을 뺀 금액이에요')
     expect(note).not.toHaveTextContent('해약환급률')
   })
 
@@ -212,15 +217,15 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     expect(await screen.findByRole('button', { name: /연금저축보험/ })).toBeDisabled()
   })
 
-  it('근거 보기를 누르면 서버 근거와 정책 버전·기준일이 서랍에 나온다', async () => {
+  it('계산 내역 보기를 누르면 서버 근거와 정책 버전·기준일이 서랍에 나온다', async () => {
     renderModal()
     await pickHealth()
     await result()
-    await userEvent.click(screen.getByRole('button', { name: '1번보험 상품1 근거 보기' }))
-    const drawer = screen.getByRole('complementary', { name: '산출 근거' })
+    await userEvent.click(screen.getByRole('button', { name: '1번보험 상품1 계산 내역 보기' }))
+    const drawer = screen.getByRole('complementary', { name: '계산 내역' })
     expect(within(drawer).getByText('현행수수료 1~1회차, 기준 보험료 × 650%')).toBeInTheDocument()
     expect(within(drawer).getByText(/GA-CUR-2026-V1 v1, 기준일 2026-07-31/)).toBeInTheDocument()
-    // 보수적 순수령액(650,000원)과 수령 예상 근거 줄(650,000원)에 같은 금액이 함께 나온다
+    // 순수령액(650,000원)과 수령액 근거 줄(650,000원)에 같은 금액이 함께 나온다
     expect(within(drawer).getAllByText('650,000원')).toHaveLength(2)
   })
 
@@ -229,45 +234,44 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     renderModal()
     await pickHealth()
     await result()
-    await userEvent.click(screen.getByRole('button', { name: '1번보험 상품1 근거 보기' }))
-    const drawer = screen.getByRole('complementary', { name: '산출 근거' })
+    await userEvent.click(screen.getByRole('button', { name: '1번보험 상품1 계산 내역 보기' }))
+    const drawer = screen.getByRole('complementary', { name: '계산 내역' })
     expect(within(drawer).getByText('한도 초과로 이월되는 예정액')).toBeInTheDocument()
     expect(within(drawer).getByText('130,000원')).toBeInTheDocument()
-    expect(within(drawer).getByText('110.8% 초과/이월')).toBeInTheDocument()
+    expect(within(drawer).getByText('110.8% 사용 초과/이월')).toBeInTheDocument()
   })
 
   it('Esc는 서랍을 먼저 닫고 그다음에 모달을 닫는다', async () => {
     const onClose = renderModal()
     await pickHealth()
     await result()
-    await userEvent.click(screen.getByRole('button', { name: '1번보험 상품1 근거 보기' }))
+    await userEvent.click(screen.getByRole('button', { name: '1번보험 상품1 계산 내역 보기' }))
     await userEvent.keyboard('{Escape}')
-    expect(screen.queryByRole('complementary', { name: '산출 근거' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('complementary', { name: '계산 내역' })).not.toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('다른 카테고리 보기로 1단계에 돌아간다', async () => {
+  it('다른 카테고리 버튼을 누르면 바로 1단계에 돌아간다', async () => {
     renderModal()
     await pickHealth()
     await result()
     await userEvent.click(screen.getByRole('button', { name: '다른 카테고리도 추천 받기' }))
-    await userEvent.click(screen.getByRole('button', { name: '보내기' }))
     expect(await screen.findByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()
   })
 
-  it('질문을 고르기 전에는 보내기가 눌리지 않고, 골라서 보내면 답변이 붙는다', async () => {
+  it('추천 질문을 누르면 보내기를 누르지 않아도 바로 질문과 답변이 붙는다', async () => {
     renderModal()
     await pickHealth()
     await result()
     expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled()
 
     await userEvent.click(screen.getByRole('button', { name: /왜 1위가 1번보험 상품1인지/ }))
-    expect(screen.getByRole('button', { name: '보내기' })).toBeEnabled()
-    await userEvent.click(screen.getByRole('button', { name: '보내기' }))
 
     expect(await screen.findByText(/1위는 1번보험 상품1예요/)).toBeInTheDocument()
+    expect(document.querySelector('.cb-asked .cb-bubble-user')).toHaveTextContent('왜 1위가 1번보험 상품1인지 궁금해요')
+    expect(screen.getByLabelText('질문 입력')).toHaveValue('')
     // 이미 받은 질문 버튼은 다시 누를 수 없고 보내기는 다시 잠긴다
     expect(screen.getByRole('button', { name: /왜 1위가 1번보험 상품1인지/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled()
@@ -313,9 +317,47 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     await pickHealth()
     await result()
     await userEvent.click(screen.getByRole('button', { name: '한도와 환수가 어떻게 반영됐는지 궁금해요' }))
-    await userEvent.click(screen.getByRole('button', { name: '보내기' }))
-    expect(await screen.findByText(/1위 상품의 한도 영향은/)).toBeInTheDocument()
+    expect(await screen.findByText(/1위 상품의 한도 여유는/)).toBeInTheDocument()
     expect(screen.getByText(/환수 규칙의 항목별 환수율을 지급액에 곱한 값이에요/)).toBeInTheDocument()
+  })
+
+  it('추천 질문을 바로 보내도 작성 중인 질문은 보존하고 Enter로 따로 보낼 수 있다', async () => {
+    const ask = vi.fn(async () => envelope({ answer: '직접 쓴 질문의 답변이에요.', source: 'RULE' }))
+    onAsk = ask
+    renderModal()
+    await pickHealth()
+    await result()
+    const input = screen.getByLabelText('질문 입력')
+    await userEvent.type(input, '이월이 뭐예요?')
+
+    await userEvent.click(screen.getByRole('button', { name: /왜 1위가 1번보험 상품1인지/ }))
+
+    expect(await screen.findByText(/1위는 1번보험 상품1예요/)).toBeInTheDocument()
+    expect(input).toHaveValue('이월이 뭐예요?')
+    expect(ask).not.toHaveBeenCalled()
+    await userEvent.click(input)
+    await userEvent.keyboard('{Enter}')
+    expect(await screen.findByText('직접 쓴 질문의 답변이에요.')).toBeInTheDocument()
+    expect(ask).toHaveBeenCalledExactlyOnceWith({ rankResultId: 'r-1', question: '이월이 뭐예요?' })
+    expect(input).toHaveValue('')
+  })
+
+  it('답변 대기 중에는 추천 질문을 중복 전송하지 않고 다른 카테고리로 바로 돌아갈 수 있다', async () => {
+    let finish!: (value: unknown) => void
+    onAsk = () => new Promise((resolve) => { finish = resolve })
+    renderModal()
+    await pickHealth()
+    await result()
+    await userEvent.type(screen.getByLabelText('질문 입력'), '이월이 뭐예요?{Enter}')
+
+    expect(await screen.findByText('답변을 쓰고 있어요…')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /왜 1위가 1번보험 상품1인지/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '한도와 환수가 어떻게 반영됐는지 궁금해요' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: '다른 카테고리도 추천 받기' }))
+    expect(await screen.findByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()
+
+    finish(envelope({ answer: '이전 질문의 답변이에요.', source: 'RULE' }))
+    await waitFor(() => expect(screen.queryByText('이전 질문의 답변이에요.')).not.toBeInTheDocument())
   })
 
   it('후보 상품이 없으면 답변을 찾지 못했어요를 보여 준다', async () => {

@@ -52,6 +52,14 @@ function evidence(): Evidence {
   }
 }
 describe('FUN-088 server evidence decisions', () => {
+  it('continues after the server explicitly excludes a workflow demo contract', () => {
+    const state = evidence()
+    state.validation!.targets = [{ contractNo: 'C1', selectionStatus: 'EXCLUDED',
+      selectionReason: '전체 업무 가이드 시연 계약 (월 검증 제외)' }]
+    expect(decide(selection, state, 'GA_ADMIN').step).toBe('ledger.review')
+    state.validation!.targets[0].selectionReason = '다른 제외 사유'
+    expect(decide(selection, state, 'GA_ADMIN').step).toBe('validation.execute')
+  })
   it('registers exactly nine logical stages', () => expect(STEPS).toHaveLength(9))
   it('does not call a completed calculation finalized', () =>
     expect(decide(selection, evidence(), 'GA_ADMIN')).toMatchObject({ step: 'ledger.review' }))

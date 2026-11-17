@@ -35,7 +35,14 @@ it('places the comparison coach below the first three rows of a long panel', () 
   } finally { panel.remove() }
 })
 
-it.each([0, 2, 20])('highlights columns and at most three of %i result rows without scrolling to the table end', count => {
+it.each([
+  { count: 0, rowLimit: undefined },
+  { count: 2, rowLimit: undefined },
+  { count: 20, rowLimit: undefined },
+  { count: 0, rowLimit: 2 },
+  { count: 1, rowLimit: 2 },
+  { count: 20, rowLimit: 2 },
+])('highlights columns and the configured rows ($count rows, limit $rowLimit) without scrolling to the table end', ({ count, rowLimit }) => {
   vi.useFakeTimers()
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1280)
@@ -52,10 +59,10 @@ it.each([0, 2, 20])('highlights columns and at most three of %i result rows with
     vi.spyOn(row, 'getClientRects').mockReturnValue([rect] as unknown as DOMRectList)
   }
   try {
-    render(<Card target={table} detailed />)
+    render(<Card target={table} detailed presentation={rowLimit === undefined ? undefined : { rowLimit }} />)
     act(() => { vi.advanceTimersByTime(100) })
     const box = JSON.parse(screen.getByRole('region', { name: 'Guide card' }).dataset.box!)
-    expect(box).toEqual({ left: 90, top: 90, width: 920, height: 44 + Math.min(count, 3) * 40 })
+    expect(box).toEqual({ left: 90, top: 90, width: 920, height: 44 + Math.min(count, rowLimit ?? 3) * 40 })
     expect(scroll).not.toHaveBeenCalled()
   } finally { table.remove() }
 })
@@ -76,6 +83,36 @@ it.each([40, 2400])('leaves a visible top anchor still for detailed help even wi
     expect(scroll).not.toHaveBeenCalled()
     expect(target.scrollIntoView).not.toHaveBeenCalled()
   } finally { target.remove() }
+})
+
+it('switches the highlight to newly shown results while retaining the action target', async () => {
+  vi.useFakeTimers()
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1280)
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(900)
+  const button = document.createElement('button')
+  const results = document.createElement('section')
+  document.body.append(button, results)
+  results.dataset.guideTarget = 'test.validation'
+  vi.spyOn(button, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 100, 120, 40))
+  const bounds = new DOMRect(700, 100, 500, 600)
+  vi.spyOn(results, 'getBoundingClientRect').mockReturnValue(bounds)
+  vi.spyOn(results, 'getClientRects').mockReturnValue([bounds] as unknown as DOMRectList)
+  try {
+    render(<Card target={button} detailed presentation={{
+      fixedCard: 'left', preventScroll: true,
+      highlightTarget: '[data-guide-target="test.validation"][data-guide-highlight="true"]',
+    }} />)
+    act(() => { vi.advanceTimersByTime(100) })
+    const card = screen.getByRole('region', { name: 'Guide card' })
+    expect(JSON.parse(card.dataset.box!)).toEqual({ left: 90, top: 90, width: 140, height: 60 })
+    await act(async () => {
+      results.dataset.guideHighlight = 'true'
+      await Promise.resolve()
+      vi.advanceTimersByTime(100)
+    })
+    expect(JSON.parse(card.dataset.box!)).toEqual({ left: 690, top: 90, width: 520, height: 620 })
+  } finally { button.remove(); results.remove() }
 })
 
 it('keeps user scrolling free when the guide card resizes after following an offscreen target', () => {

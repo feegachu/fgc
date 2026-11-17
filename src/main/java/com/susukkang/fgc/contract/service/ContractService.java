@@ -80,6 +80,8 @@ public interface ContractService {
      */
     ContractCreateResponse createContract(ContractCreateRequest request);
 
+    ContractCreateResponse createContract(ContractCreateRequest request, boolean workflowDemo);
+
     /**
      * 설명 : 계약을 수정하고 스케줄 산정 정보가 변경된 경우 재생성과 한도 검증을 수행한다.
      * 수정 전·후 값은 같은 트랜잭션의 감사 로그에 기록한다.

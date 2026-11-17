@@ -247,6 +247,24 @@ public class ExceptionPaymentRepository {
                 """, Long.class).setParameter("id", source.sourceId()).getResultList();
     }
 
+    /** 같은 검증 실행·월·지급단계의 최신 대사만 새 스케줄로 교체한다. */
+    public List<Long> scheduleReconciliationRuns(Source source, CapScope scope) {
+        if (source.validationRunId() == null) return List.of();
+        return em.createNativeQuery("""
+                SELECT run.reconciliation_run_id
+                FROM fgc.reconciliation_run run
+                JOIN fgc.insurance_contract contract ON contract.insurer_id = run.insurer_id
+                WHERE contract.contract_id = :contract
+                  AND run.validation_run_id = :validation
+                  AND run.settlement_month = :month AND run.payment_stage = :stage
+                  AND NOT run.superseded_yn AND run.status = 'COMPLETED'
+                ORDER BY run.reconciliation_run_id FOR UPDATE OF run
+                """, Long.class).setParameter(CONTRACT_PARAM, scope.contractId())
+                .setParameter("validation", source.validationRunId())
+                .setParameter("month", scope.asOfDate().withDayOfMonth(1))
+                .setParameter("stage", scope.stage().name()).getResultList();
+    }
+
     public List<com.susukkang.fgc.exceptioncase.dto.ExceptionReconciliationIssue> remainingIssues(Source source) {
         if (!"RECONCILIATION_MISMATCH".equals(source.type())) return List.of();
         List<?> rows = em.createNativeQuery("""

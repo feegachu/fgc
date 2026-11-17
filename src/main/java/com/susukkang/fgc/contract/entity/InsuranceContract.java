@@ -117,6 +117,13 @@ public class InsuranceContract {
     @Column(name = "data_origin", nullable = false, length = 20)
     private DataOrigin dataOrigin;
 
+    @Column(name = "workflow_demo_excluded", nullable = false)
+    private boolean workflowDemoExcluded;
+
+    public void markWorkflowDemo() {
+        this.workflowDemoExcluded = true;
+    }
+
     @Column(name = "created_by")
     private Long createdBy;
 

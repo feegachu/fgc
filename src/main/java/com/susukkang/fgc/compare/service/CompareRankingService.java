@@ -208,7 +208,7 @@ public class CompareRankingService {
     static String ruleSummary(String label, List<CompareRankingResponse.Item> items) {
         long insurers = items.stream().map(CompareRankingResponse.Item::insurer).distinct().count();
         var top = items.get(0);
-        return "%s %d개 보험사의 상품 %d개를 보수적 순수령액 기준으로 정렬했어요. 1위는 %s %s(%,d원)예요. 선택은 설계사님이 하세요."
+        return "%s %d개 보험사의 상품 %d개를 순수령액 기준으로 정렬했어요. 1위는 %s %s(%,d원)예요. 선택은 설계사님이 하세요."
                 .formatted(label, insurers, items.size(), top.insurer(), top.product(), top.conservativeNet());
     }
 

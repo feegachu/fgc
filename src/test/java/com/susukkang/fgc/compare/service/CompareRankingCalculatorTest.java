@@ -79,7 +79,7 @@ class CompareRankingCalculatorTest {
         assertThat(result.grossReceipt()).isEqualTo(900_000 + 11 * 5_000);
         assertThat(result.clawbackExposure()).isEqualTo(900_000);
         assertThat(result.conservativeNet()).isEqualTo(55_000);
-        assertThat(result.evidence()).anyMatch(e -> e.label().equals("환수 노출액") && e.rule().contains("2~12회차")
+        assertThat(result.evidence()).anyMatch(e -> e.label().equals("예상 환수액") && e.rule().contains("2~12회차")
                 && e.rule().contains("환수 규칙 대상 아님") && e.value() == null);
     }
 
@@ -89,7 +89,7 @@ class CompareRankingCalculatorTest {
         Result result = calc(candidate(1, "A", null, rate(1, 1, "650", "100"), rate(1, 1, "100", "50")), 100_000);
 
         assertThat(result.clawbackExposure()).isEqualTo(650_000 + 50_000);
-        assertThat(result.evidence()).filteredOn(e -> e.label().equals("환수 노출액"))
+        assertThat(result.evidence()).filteredOn(e -> e.label().equals("예상 환수액"))
                 .extracting(e -> e.rule() + "=" + e.value())
                 .containsExactly("현행수수료 1~1회차, 한도 반영 지급액 × 환수율 100%=650000",
                         "현행수수료 1~1회차, 한도 반영 지급액 × 환수율 50%=50000");
@@ -139,7 +139,7 @@ class CompareRankingCalculatorTest {
 
         assertThat(result.cappedReceipt()).isEqualTo(2_000_000);
         assertThat(result.capImpactPct()).isNull();
-        assertThat(result.evidence()).anyMatch(e -> e.label().equals("한도 영향") && e.rule().contains("자료 없음"));
+        assertThat(result.evidence()).anyMatch(e -> e.label().equals("한도 적용 내역") && e.rule().contains("자료 없음"));
     }
 
     @Test

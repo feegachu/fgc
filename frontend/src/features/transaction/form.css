@@ -181,8 +181,7 @@
 .contract-payment-gates > .surface-body { padding: 0 14px 8px; }
 .contract-payment-gates .transaction-gate-step { padding-block: 7px; align-items: center; }
 .contract-payment-gates .transaction-gate-fail .transaction-gate-detail { color: var(--color-status-error-text); }
-.contract-payment-check { width: 18px; height: 18px; }
-.contract-payment-check path {
+.contract-payment-gates .transaction-gate-check path {
   stroke-dasharray: 1;
   stroke-dashoffset: 0;
   animation: contract-payment-check-draw 300ms var(--check-delay, 0ms) ease-in-out both;
@@ -232,7 +231,7 @@ body:has(.contract-payment-comparison-overlay) .payment-guide-spotlight.screen-s
   box-shadow: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .contract-payment-check path,
+  .contract-payment-gates .transaction-gate-check path,
   .contract-payment-gates .transaction-gate-pass .transaction-gate-icon,
   .contract-comparison-panel-reveal,
   .contract-comparison-moving-amount { animation: none; transition: none; }

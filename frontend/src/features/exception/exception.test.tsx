@@ -319,12 +319,12 @@ describe('EXCP-W01 예외함', () => {
     expect(screen.getByLabelText('상태')).toHaveValue('ALL')
   })
 
-  it('미처리 예외가 없어도 기본 7개 요약 카드를 0건으로 유지한다', async () => {
+  it('미처리 예외가 없으면 별도 안내 없이 기본 7개 요약 카드만 0건으로 유지한다', async () => {
     searchResponse = () => ({ ...search([]), summary: [] })
     renderPage()
-    await screen.findByText('미처리 예외가 없습니다.')
-    const summary = screen.getByRole('region', { name: '예외와 모니터링 요약' })
-    expect(within(summary).getAllByRole('link', { name: /0건$/ })).toHaveLength(7)
+    const summary = await screen.findByRole('region', { name: '예외와 모니터링 요약' })
+    expect(await within(summary).findAllByRole('link', { name: /0건$/ })).toHaveLength(7)
+    expect(screen.queryByText('미처리 예외가 없습니다.')).not.toBeInTheDocument()
   })
 
   it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건을 유지한다', async () => {
@@ -719,7 +719,14 @@ describe('EXCP-W01 예외함', () => {
   it('금액 차이 예외는 해당 지급 원장을 모달로 열고 기존 역분개 및 재기표 절차로 연결한다', async () => {
     const mismatch: ExceptionCase = { ...baseCase, type: 'RECONCILIATION_MISMATCH', reconciliationResultType: 'AMOUNT_DIFFERENCE', title: '금액 차이 20,000원 — 예상 845,000 / 실제 825,000',
       status: 'IN_REVIEW', assignedTo: 7, assigneeLoginId: 'settle01' }
-    searchResponse = () => search([mismatch])
+    let corrected = false
+    searchResponse = path => {
+      if (corrected && new URLSearchParams(path.split('?')[1]).get('status') === 'OPEN') return search([])
+      return search([corrected ? { ...mismatch, status: 'RESOLVED', statusLabel: '해결', actions: [{
+        actionSeq: 1, actionType: 'CORRECT', actionTypeLabel: '정정', fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED',
+        reason: '원장 정정 후 재대사 일치 확인',
+      }] } : mismatch])
+    }
     const original = vi.mocked(apiClient.request).getMockImplementation()!
     vi.mocked(apiClient.request).mockImplementation((async (path: string, init: Parameters<typeof apiClient.request>[1] = {}) => {
       if (path.endsWith('/payment-correction') && !init.method) return envelope({ payments: [
@@ -739,9 +746,10 @@ describe('EXCP-W01 예외함', () => {
         { originalLineNo: 1, debitAmount: 845000, creditAmount: 0 },
         { originalLineNo: 2, debitAmount: 0, creditAmount: 845000 },
       ] })
+      corrected = true
       return { reversalOfId: 70, journalHeaderId: 71, repostedJournalHeaderId: 72 }
     }
-    const { actions } = renderPage('/app/exceptions?selected=11')
+    const { actions, router } = renderPage('/app/exceptions?status=OPEN&selected=11')
     await actions.click(await screen.findByRole('button', { name: '예외 건 처리' }))
     const ledger = await screen.findByRole('dialog', { name: '검증원장 지급 기록 정정' })
     expect(await within(ledger).findByRole('table', { name: '분개별 차변 및 대변 내역' })).toHaveTextContent('825,000')
@@ -758,6 +766,12 @@ describe('EXCP-W01 예외함', () => {
     await actions.type(correction.getByLabelText(/사유/), '기록 오류 정정')
     await actions.click(correction.getByRole('button', { name: '등록' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /^역분개 \+ 재기표$/ })).not.toBeInTheDocument())
+    const detail = await screen.findByRole('dialog', { name: /^예외 상세/ })
+    expect(await within(detail).findByText('해결', { exact: true })).toBeInTheDocument()
+    expect(within(detail).getByText('원장 정정 후 재대사 일치 확인')).toBeInTheDocument()
+    expect(document.querySelector('.exception-table')).toHaveTextContent('조건에 맞는 자료가 없습니다.')
+    expect(new URLSearchParams(router.state.location.search).get('status')).toBe('OPEN')
+    expect(new URLSearchParams(router.state.location.search).get('selected')).toBe('11')
     expect(requests().filter(([path, init]) => init?.method === 'POST' && path.includes('/payment-correction'))).toHaveLength(0)
   })
 
@@ -898,10 +912,12 @@ describe('EXCP-W01 예외함', () => {
     const list = await table()
     expect(within(list).getByRole('link', { name: /^1,200% 판정$/ })).toHaveAttribute('href', '/app/cap-checks?contractNo=C-0001')
   })
-  it.each(['뒤로가기', 'Escape', '창 닫기'])('지급건 참조는 숨기고 계산근거 모달의 %s는 원래 예외 상세로 돌아온다', async (closeAction) => {
+  it.each(['COMMISSION_TRANSACTION', 'CAP_CHECK'].flatMap(sourceType =>
+    ['뒤로가기', 'Escape', '창 닫기'].map(closeAction => ({ sourceType, closeAction })),
+  ))('$sourceType 참조는 숨기고 계산근거 모달의 $closeAction은 원래 예외 상세로 돌아온다', async ({ sourceType, closeAction }) => {
     searchResponse = () => search([{ ...baseCase,
-      sourceEntityType: 'COMMISSION_TRANSACTION', sourceEntityId: '91',
-      sourceLink: '/payments?selected=91', capBasisLink: '/cap-checks?capCheckId=42',
+      sourceEntityType: sourceType, sourceEntityId: '91',
+      sourceLink: sourceType === 'CAP_CHECK' ? '/cap-checks?capCheckId=91' : '/payments?selected=91', capBasisLink: '/cap-checks?capCheckId=42',
     }])
     const original = vi.mocked(apiClient.request).getMockImplementation()!
     vi.mocked(apiClient.request).mockImplementation((async (path: string, init: Parameters<typeof apiClient.request>[1] = {}) => {
@@ -910,6 +926,7 @@ describe('EXCP-W01 예외함', () => {
     }) as typeof apiClient.request)
     const { router, actions } = renderPage('/app/exceptions?selected=11&status=ALL&contractNo=C-0001')
     const dialog = await screen.findByRole('dialog', { name: /^예외 상세/ })
+    expect(within(dialog).queryByText('참조')).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('link', { name: '지급 건 열기' })).not.toBeInTheDocument()
     const before = router.state.location.pathname + router.state.location.search
     await actions.click(within(dialog).getByRole('button', { name: '1,200% 계산근거 열기' }))
@@ -1033,7 +1050,7 @@ describe('EXCP-W01 예외함', () => {
     fireEvent.change(dateInput, { target: { value: '2027-11-07' } })
     const updatedPlanned = within(dialog).getByRole('table', { name: '이연 지급 및 귀속 내역' })
     expect(within(updatedPlanned).getByLabelText('2번 귀속 내역 귀속일')).toHaveValue('2027-11-07')
-    expect(within(updatedPlanned).getByLabelText('2번 귀속 내역 귀속월')).toHaveValue('2027-11-01')
+    expect(within(updatedPlanned).getByLabelText('2번 귀속 내역 귀속월')).toHaveValue('2027-11')
     expect(within(dialog).getByLabelText(/^정산월/)).toHaveValue('2027-11')
     expect(within(dialog).getByLabelText(/이연 금액 \(원\)/)).toHaveValue(60000)
     await actions.click(within(dialog).getByRole('button', { name: '사전검증' }))

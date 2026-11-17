@@ -115,6 +115,25 @@ class ContractServiceImplTest {
     @InjectMocks
     private ContractServiceImpl contractService;
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void workflowDemoMarkerRequiresExplicitEnvironmentOptIn(boolean enabled) {
+        ReflectionTestUtils.setField(contractService, "workflowDemoEnabled", enabled);
+        ContractCreateRequest request = createRequest();
+        givenValidReferences(request);
+        given(insuranceContractRepository.saveAndFlush(any())).willAnswer(invocation -> {
+            InsuranceContract contract = invocation.getArgument(0);
+            ReflectionTestUtils.setField(contract, "contractId", 21L);
+            return contract;
+        });
+        given(scheduleService.generateSchedulesByContractId(21L))
+                .willReturn(new ScheduleGenerationResult(List.of(100L, 101L), 3));
+        contractService.createContract(request, true);
+        ArgumentCaptor<InsuranceContract> saved = ArgumentCaptor.forClass(InsuranceContract.class);
+        verify(insuranceContractRepository).saveAndFlush(saved.capture());
+        assertThat(saved.getValue().isWorkflowDemoExcluded()).isEqualTo(enabled);
+    }
+
     @Test
     @DisplayName("설계사에게는 상태 변경을 처리한 직원을 보이지 않는다")
     void selectStatusEventsHidesRegistrantFromAgent() {

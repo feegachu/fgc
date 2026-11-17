@@ -98,7 +98,7 @@ export const runDetailQuery = (id: string) =>
   })
 
 /** IF-API-49 — 진행 중인 동안 2초 간격으로 폴링하고, 끝나면(COMPLETED/FAILED/FINALIZED) 멈춘다. */
-export const POLL_INTERVAL = 2000
+export const POLL_INTERVAL = 500
 export const isRunning = (status?: string) => status === 'RUNNING' || status === 'CREATED'
 export const hasNewAttempt = (data: ValidationProgress | undefined, previousAttemptId: number | null) =>
   previousAttemptId === null || (data?.attemptId ?? 0) > previousAttemptId

@@ -81,6 +81,20 @@ class CompareAskToolsTest {
     }
 
     @Test
+    @DisplayName("화면의 새 용어로 물어도 순수령액·수령액·환수액 비교의 방향을 검증한다")
+    void simplifiedMetricNamesKeepComparisonChecks() {
+        CompareAskTools tools = toolsWith("compare", PAIR_2_3);
+
+        assertThat(tools.verify("3위는 2위보다 순수령액이 적어요.")).isNull();
+        assertThat(tools.verify("3위는 2위보다 순수령액이 많아요.")).isEqualTo("DIRECTION_MISMATCH");
+        assertThat(tools.verify("3위는 2위보다 한도를 반영한 수령액이 적어요.")).isNull();
+        assertThat(tools.verify("3위는 2위보다 한도를 반영한 수령액이 많아요.")).isEqualTo("DIRECTION_MISMATCH");
+        assertThat(tools.verify("3위는 2위보다 한도 적용 전 수령액이 적어요.")).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+        assertThat(tools.verify("3위는 2위보다 예상 환수액이 많아요.")).isNull();
+        assertThat(tools.verify("3위는 2위보다 예상 환수액이 적어요.")).isEqualTo("DIRECTION_MISMATCH");
+    }
+
+    @Test
     @DisplayName("숫자 없이 상품 이름과 이유를 말로 쓴 답은 통과하고, 용어 이름 1,200% 룰과 상품명 안의 숫자는 허용한다")
     void proseWithoutNumbersPasses() {
         CompareAskTools tools = toolsWith("get_item", RANK_1);

@@ -31,7 +31,7 @@ export function ExceptionDetail({ item }: { item: ExceptionCase }) {
   const contract = useExceptionContract(reconciliationId ? item.contractId : undefined)
   const basisId = item.capCheckId ?? new URL(item.capBasisLink ?? '', 'http://workspace.local').searchParams.get('capCheckId')
   const reference = sourceReference(item.sourceEntityType, item.contractNo)
-  const showReference = item.sourceEntityType !== 'COMMISSION_TRANSACTION'
+  const showReference = item.sourceEntityType !== 'COMMISSION_TRANSACTION' && item.sourceEntityType !== 'CAP_CHECK'
   return (<>
     <dl className="exception-detail-grid">
       <div>

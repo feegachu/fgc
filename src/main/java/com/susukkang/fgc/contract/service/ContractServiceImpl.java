@@ -91,6 +91,9 @@ public class ContractServiceImpl implements ContractService {
     private static final String AUDIT_CAP_RECHECKED = "CONTRACT_CAP_RECHECKED";
     private static final String AUDIT_SCHEDULES_REGENERATED = "CONTRACT_SCHEDULES_REGENERATED";
     private static final String AGENT_ID_FIELD = "agentId";
+
+    @org.springframework.beans.factory.annotation.Value("${fgc.demo.workflow-exclusion-enabled:false}")
+    private boolean workflowDemoEnabled;
     // 상태 사건의 원천키(source_event_key)로 쓰므로 화면이 만드는 요청 UUID만 받는다.
     private static final Pattern IDEMPOTENCY_KEY =
             Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
@@ -228,6 +231,12 @@ public class ContractServiceImpl implements ContractService {
     @Override
     @Transactional
     public ContractCreateResponse createContract(ContractCreateRequest request) {
+        return createContract(request, false);
+    }
+
+    @Override
+    @Transactional
+    public ContractCreateResponse createContract(ContractCreateRequest request, boolean workflowDemo) {
         // 1. 계약일·기준정보·소속 관계와 계약번호 중복 여부 검증
         validateInput(request);
 
@@ -238,6 +247,7 @@ public class ContractServiceImpl implements ContractService {
                 );
         // 3. 검증된 요청을 수기 등록(MANUAL) 출처의 계약 엔티티로 변환
         var contractEntity = toContractEntity(request, conversionRuleCode);
+        if (workflowDemo && workflowDemoEnabled) contractEntity.markWorkflowDemo();
         // 4. 계약을 저장하고 DB에 반영하여 ID와 후속 스냅샷·스케줄 조회에 사용할 행 확보
         InsuranceContract savedContract = insuranceContractRepository.saveAndFlush(contractEntity);
         Long contractId = savedContract.getContractId();
@@ -1042,6 +1052,7 @@ public class ContractServiceImpl implements ContractService {
         snapshot.put("standardSurrenderDeductionAmount", contract.getStandardSurrenderDeductionAmount());
         snapshot.put("currentStatus", contract.getCurrentStatus());
         snapshot.put("dataOrigin", contract.getDataOrigin());
+        if (contract.isWorkflowDemoExcluded()) snapshot.put("workflowDemoExcluded", true);
         // 기존 Mapper 조회와 요청 DTO 모두 createdBy를 설정하지 않았다.
         snapshot.put("createdBy", null);
         snapshot.put("updatedAt", updatedAt);

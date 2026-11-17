@@ -33,7 +33,7 @@ export function useGuideStep(step: Behavior | undefined, target: HTMLElement | n
     let timer = 0
     const completed = () => { clearTimeout(timer); timer = window.setTimeout(() => {
       if (!step.requireAction || target.dataset.guideCompleted === 'true') advance.current()
-    }, 350) }
+    }, 250) }
     target.addEventListener(step.advanceOnEvent, completed)
     return () => { clearTimeout(timer); target.removeEventListener(step.advanceOnEvent!, completed) }
   }, [enabled, target, step?.advanceOnEvent, step?.requireAction])
@@ -46,7 +46,7 @@ export function useGuideStep(step: Behavior | undefined, target: HTMLElement | n
       if (!target.isConnected || target.matches(':disabled')) return
       target.focus({ preventScroll: true })
       target.dispatchEvent(new Event('fgc-guide-open'))
-    }, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 750)
+    }, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 550)
     return () => {
       clearTimeout(timer)
       target.dispatchEvent(new Event('fgc-guide-close'))
@@ -63,7 +63,7 @@ export function useGuideStep(step: Behavior | undefined, target: HTMLElement | n
       clearTimeout(timer)
       const explicit = event instanceof Event && event.type === 'fgc-guide-selected'
       if (!value() || !explicit && value() === initial || field.matches(':disabled') || field.validity?.valid === false) return
-      timer = window.setTimeout(() => advance.current(), 250)
+      timer = window.setTimeout(() => advance.current(), 180)
     }
     const observer = new MutationObserver(selected)
     observer.observe(target, { attributes: true, attributeFilter: ['data-selected-value'] })

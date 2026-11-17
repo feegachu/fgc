@@ -23,7 +23,7 @@ export function useValidationPlaybackGuide(enabled: boolean, step: string | unde
   useEffect(() => {
     if (!enabled || step !== 'validation.playback' || state.status !== 'ready') return
     // Let the final card's staggered reveal finish before bringing the coach back.
-    const timer = window.setTimeout(() => advance.current(), 900)
+    const timer = window.setTimeout(() => advance.current(), 180)
     return () => window.clearTimeout(timer)
   }, [enabled, step, state.status])
   const watching = step === 'validation.start' || step === 'validation.playback'

@@ -30,7 +30,7 @@ import java.util.List;
  *
  * 06_배치_Step_협업계약.md:18 "기표 오류는 Step 실패" 원칙에 따라 원천 1건 처리 중 예외가
  * 나면 catch하지 않고 그대로 전파해 Step을 실패시킨다 — capCheckStep·arbitrageCheckStep처럼
- * 건별 skip으로 넘기지 않는다. JournalPersistenceService.saveDraft가 이미 멱등이라
+ * 건별 skip으로 넘기지 않는다. 공유 트랜잭션의 분개 저장이 멱등이므로
  * (journal_type, source_entity_type, source_entity_id, revision_no) 원천은 재실행해도
  * 중복 기표되지 않는다 — 이미 POSTED인 원천은 postedJournalCount(신규 기표 건수)가 아니라
  * skips(ALREADY_POSTED)로 집계한다(코드리뷰 반영: 재실행 시 postedJournalCount가 항상
@@ -59,33 +59,12 @@ public class JournalPostingPortImpl implements JournalPostingPort {
         List<ContractSkip> skips = new ArrayList<>();
 
         for (ScheduleJournalSourceRow row : sourceRepository.findExpectedInsurerIncomeSources(validationRunId, validationMonth)) {
-            JournalHeaderDraft draft = draftService.draftExpectedInsurerIncome(
-                    ExpectedInsurerIncomeJournalCommand.builder()
-                            .scheduleLineId(row.getScheduleLineId())
-                            .contractId(row.getContractId())
-                            .policyVersionId(row.getPolicyVersionId())
-                            .validationRunId(validationRunId)
-                            .commissionItemId(row.getCommissionItemId())
-                            .journalDate(row.getJournalDate())
-                            .expectedAmount(row.getAmount())
-                            .description(row.getDescription())
-                            .build());
+            JournalHeaderDraft draft = expectedInsurerDraft(row, validationRunId);
             newlyPostedCount += postAndCommit(draft, row.getContractId(), triggeredBy, requestId, skips);
         }
 
         for (ScheduleJournalSourceRow row : sourceRepository.findExpectedFcPayoutSources(validationRunId, validationMonth)) {
-            JournalHeaderDraft draft = draftService.draftExpectedFcPayout(
-                    ExpectedFcPayoutJournalCommand.builder()
-                            .scheduleLineId(row.getScheduleLineId())
-                            .contractId(row.getContractId())
-                            .policyVersionId(row.getPolicyVersionId())
-                            .validationRunId(validationRunId)
-                            .beneficiaryAgentId(row.getBeneficiaryAgentId())
-                            .commissionItemId(row.getCommissionItemId())
-                            .journalDate(row.getJournalDate())
-                            .expectedAmount(row.getAmount())
-                            .description(row.getDescription())
-                            .build());
+            JournalHeaderDraft draft = expectedFcDraft(row, validationRunId);
             newlyPostedCount += postAndCommit(draft, row.getContractId(), triggeredBy, requestId, skips);
         }
 
@@ -123,15 +102,66 @@ public class JournalPostingPortImpl implements JournalPostingPort {
         return new JournalPostingResult(newlyPostedCount, skips.size(), 0, skips);
     }
 
+    /** 스케줄 정정 후 같은 계약·검증월의 새 예상 분개만 같은 트랜잭션에서 기표한다. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void postExpectedForContract(Long contractId, Long validationRunId, LocalDate month, Long actor) {
+        if (validationRunId == null) return;
+        String requestId = "EXCP-SCHEDULE-" + validationRunId + "-" + contractId;
+        for (var row : sourceRepository.findExpectedInsurerIncomeSources(validationRunId, month)) {
+            if (contractId.equals(row.getContractId())) {
+                postCorrectionDraft(expectedInsurerDraft(row, validationRunId), actor, requestId);
+            }
+        }
+        for (var row : sourceRepository.findExpectedFcPayoutSources(validationRunId, month)) {
+            if (contractId.equals(row.getContractId())) {
+                postCorrectionDraft(expectedFcDraft(row, validationRunId), actor, requestId);
+            }
+        }
+    }
+
+    private void postCorrectionDraft(JournalHeaderDraft draft, Long actor, String requestId) {
+        var saved = persistenceService.saveDraftInCurrentTransaction(draft, actor, requestId);
+        if ("DRAFT".equals(saved.getStatus())) {
+            journalHeaderRepository.markPosted(saved.getJournalHeaderId(), actor);
+        }
+    }
+
+    private JournalHeaderDraft expectedInsurerDraft(ScheduleJournalSourceRow row, Long validationRunId) {
+        return draftService.draftExpectedInsurerIncome(
+                    ExpectedInsurerIncomeJournalCommand.builder()
+                            .scheduleLineId(row.getScheduleLineId())
+                            .contractId(row.getContractId())
+                            .policyVersionId(row.getPolicyVersionId())
+                            .validationRunId(validationRunId)
+                            .commissionItemId(row.getCommissionItemId())
+                            .journalDate(row.getJournalDate())
+                            .expectedAmount(row.getAmount())
+                            .description(row.getDescription())
+                            .build());
+    }
+
+    private JournalHeaderDraft expectedFcDraft(ScheduleJournalSourceRow row, Long validationRunId) {
+        return draftService.draftExpectedFcPayout(
+                    ExpectedFcPayoutJournalCommand.builder()
+                            .scheduleLineId(row.getScheduleLineId())
+                            .contractId(row.getContractId())
+                            .policyVersionId(row.getPolicyVersionId())
+                            .validationRunId(validationRunId)
+                            .beneficiaryAgentId(row.getBeneficiaryAgentId())
+                            .commissionItemId(row.getCommissionItemId())
+                            .journalDate(row.getJournalDate())
+                            .expectedAmount(row.getAmount())
+                            .description(row.getDescription())
+                            .build());
+    }
+
     /**
-     * 저장(멱등) 후 아직 DRAFT면 POSTED로 전이한다. 이미 POSTED/REVERSED이거나 다른 실행이
-     * 먼저 기표해 상태 변경이 0건이면 ALREADY_POSTED skip으로 기록한다.
-     *
-     * @return 이번 호출로 새로 POSTED가 됐으면 1, 이전 실행에서 이미 처리돼 있었으면 0
+     * 저장(멱등) 후 아직 DRAFT면 POSTED로 전이한다. 이미 처리된 원천은 skip으로 기록한다.
+     * @return 이번 호출로 새로 POSTED가 됐으면 1, 이전에 처리됐으면 0
      */
     private long postAndCommit(JournalHeaderDraft draft, Long contractId, Long triggeredBy,
                                 String requestId, List<ContractSkip> skips) {
-        JournalHeaderRow saved = persistenceService.saveDraft(draft, triggeredBy, requestId);
+        JournalHeaderRow saved = persistenceService.saveDraftInCurrentTransaction(draft, triggeredBy, requestId);
         if ("DRAFT".equals(saved.getStatus())
                 && journalHeaderRepository.markPosted(saved.getJournalHeaderId(), triggeredBy) == 1) {
             return 1;

@@ -19,15 +19,15 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * #142 journalPostingStep(Step 6a) 실제 DB 통합테스트. 정상 기표, 재실행 중복 방지,
  * 검증 실행 범위 제한(다른 실행·다른 월 데이터가 섞이지 않는지)을 확인한다.
  *
- * 클래스에 @Transactional을 붙이지 않는다 — JournalPersistenceServiceImpl.saveDraft()가
- * REQUIRES_NEW로 실제 커밋하기 때문에(JournalPersistenceServiceImplIntegrationTest와 같은
- * 이유), 테스트 트랜잭션에 걸어 두면 saveDraft가 아직 커밋 전인 validation_run/schedule_line을
- * 보지 못해 FK 위반이 난다. 대신 각 테스트가 만든 행을 @AfterEach에서 직접, 실제로 지운다.
+ * 클래스에 @Transactional을 붙이지 않고 실제 기표 커밋과 재실행을 확인한다.
+ * 배치 기표는 호출한 단계의 트랜잭션에 참여하며, 롤백 전파도 별도로 검증한다.
+ * 각 테스트가 만든 행은 @AfterEach에서 직접 정리한다.
  */
 @SpringBootTest
 class JournalPostingPortImplIntegrationTest {
@@ -192,6 +192,55 @@ class JournalPostingPortImplIntegrationTest {
                 "UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?",
                 transactionId);
         return transactionId;
+    }
+
+    @Test
+    void postingRollsBackWithTheCallingStepInsteadOfLeavingPartiallyCommittedDrafts() {
+        var contract = anyContract();
+        Long contractId = ((Number) contract.get("contract_id")).longValue();
+        Long run = insertValidationRun(VALIDATION_MONTH);
+        selectContract(run, contractId, ((Number) contract.get("product_offering_id")).longValue());
+        insertScheduleLine(contractId, "GA_TO_FC", anyPolicyVersionId(), anyCommissionItemId(),
+                ((Number) contract.get("agent_id")).longValue(), VALIDATION_MONTH.plusDays(9));
+
+        assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            assertThat(journalPostingPort.post(newContext(run, VALIDATION_MONTH)).postedJournalCount()).isEqualTo(1);
+            throw new IllegalStateException("posting rollback probe");
+        })).isInstanceOf(IllegalStateException.class).hasMessage("posting rollback probe");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.journal_header WHERE validation_run_id=?",
+                Long.class, run)).isZero();
+    }
+
+    @Test
+    void postsTwoHundredSourcesWithoutDuplicatesAndMeasuresThePostingCost() {
+        var contract = anyContract();
+        Long contractId = ((Number) contract.get("contract_id")).longValue();
+        Long run = insertValidationRun(VALIDATION_MONTH);
+        selectContract(run, contractId, ((Number) contract.get("product_offering_id")).longValue());
+        Long first = insertScheduleLine(contractId, "GA_TO_FC", anyPolicyVersionId(), anyCommissionItemId(),
+                ((Number) contract.get("agent_id")).longValue(), VALIDATION_MONTH.plusDays(9));
+        jdbcTemplate.update("""
+                INSERT INTO fgc.schedule_line
+                    (schedule_header_id,line_no,installment_no,contract_month_no,due_date,
+                     commission_item_id,beneficiary_agent_id,basis_code,basis_amount,
+                     calculation_type,rate_pct,expected_amount)
+                SELECT sl.schedule_header_id,n,n,n,sl.due_date,sl.commission_item_id,
+                       sl.beneficiary_agent_id,sl.basis_code,sl.basis_amount,
+                       sl.calculation_type,sl.rate_pct,sl.expected_amount
+                FROM fgc.schedule_line sl CROSS JOIN generate_series(2,200) n WHERE sl.schedule_line_id=?
+                """, first);
+        long started = System.nanoTime();
+        var result = journalPostingPort.post(newContext(run, VALIDATION_MONTH));
+        long firstMillis = (System.nanoTime() - started) / 1_000_000;
+        assertThat(result.postedJournalCount()).isEqualTo(200);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.journal_header "
+                + "WHERE validation_run_id=? AND status='POSTED'", Long.class, run)).isEqualTo(200);
+        started = System.nanoTime();
+        var repeated = journalPostingPort.post(newContext(run, VALIDATION_MONTH));
+        long repeatMillis = (System.nanoTime() - started) / 1_000_000;
+        assertThat(repeated.postedJournalCount()).isZero();
+        assertThat(repeated.skippedCount()).isEqualTo(200);
+        System.out.printf("JOURNAL_POST_200 firstMs=%d repeatMs=%d%n", firstMillis, repeatMillis);
     }
 
     @Test

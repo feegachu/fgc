@@ -142,6 +142,7 @@ export function ContractPaymentForm({
   const [savedLines, setSavedLines] = useState<ScheduleLine[] | null>(null)
   const [saved, setSaved] = useState<Record<number, Saved>>({})
   const [checks, setChecks] = useState<Record<number, Precheck>>({})
+  const [precheckStarted, setPrecheckStarted] = useState(false)
   const [selectedResult, setSelectedResult] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [uncertain, setUncertain] = useState(false)
@@ -327,6 +328,7 @@ export function ContractPaymentForm({
     setAttributionDate(null)
     setPaymentDate(monthStart)
     setChecks({})
+    setPrecheckStarted(false)
     setError('')
     setSelectedResult('')
     setResumeError('')
@@ -435,6 +437,7 @@ export function ContractPaymentForm({
   async function precheck() {
     if (!clean || !balanced || uncertain) return
     await run('precheck', async () => {
+      setPrecheckStarted(true)
       setChecks({})
       for (const line of remaining) await verifiedPrecheck(line)
     })
@@ -850,7 +853,7 @@ export function ContractPaymentForm({
             </div>
           </section>
         </div>
-        <div className="transaction-form-column">
+        <div className="transaction-form-column" data-guide-target="payment.batch.validation" data-guide-highlight={precheckStarted ? 'true' : undefined}>
           <ContractPaymentGates
             rows={selected.length}
             inputsReady={selected.length > 0 && selected.every((line) => !!fingerprint(line))}
@@ -864,7 +867,7 @@ export function ContractPaymentForm({
             confirmedRows={selected.filter((line) => done(line.scheduleLineId!)).length}
             uncertain={uncertain}
           />
-          <section data-guide-feature="features.contract-payment-form.section-22" className="surface contract-payment-preview" data-guide-target="payment.batch.expected" aria-labelledby="contract-payment-preview-title">
+          <section data-guide-feature="features.contract-payment-form.section-22" className="surface contract-payment-preview" data-guide-target="payment.batch.expected" aria-labelledby="contract-payment-preview-title" hidden={precheckStarted && !comparing}>
             <header className="surface-header transaction-surface-header">
               <h2 className="surface-title" id="contract-payment-preview-title">
                 설계사별 예상 스케줄

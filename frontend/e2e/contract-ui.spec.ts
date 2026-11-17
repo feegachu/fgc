@@ -508,6 +508,32 @@ test('페이지네이션은 현재 페이지 hover 색상과 비활성 화살표
 })
 
 
+test('계약 상세 도움말은 현재 탭을 유지하고 직접 선택한 탭의 설명을 보여 준다', async ({ page }) => {
+  await fixture(page)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('contracts/1?tab=cap&month=2026-07')
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  const guide = page.locator('.screen-step-guide')
+  const next = guide.getByRole('button', { name: '다음', exact: true })
+  await next.click()
+  await next.click()
+  await expect(guide.getByRole('heading', { name: '계약 상세 탭', exact: true })).toBeVisible()
+  const cap = page.getByRole('tab', { name: '1,200%', exact: true })
+  // The removed auto-cycle ran every two seconds; cover two ticks.
+  await page.waitForTimeout(4500)
+  await expect(cap).toHaveAttribute('aria-selected', 'true')
+  await expect(page).toHaveURL(/tab=cap/)
+
+  const schedules = page.getByRole('tab', { name: '예상 스케줄', exact: true })
+  await schedules.click()
+  await expect(guide).toContainText('예상 스케줄 회차별 수령인과 예상 지급액을 확인합니다.')
+  await page.waitForTimeout(4500)
+  await expect(schedules).toHaveAttribute('aria-selected', 'true')
+  await guide.getByRole('button', { name: '종료', exact: true }).click()
+  await expect(schedules).toHaveAttribute('aria-selected', 'true')
+  await expect(page).toHaveURL(/tab=schedules/)
+})
+
 test('전체 업무 가이드의 계약 상세 다음 단계는 카드와 다음 버튼 위치를 유지한다', async ({ page }, info) => {
   await fixture(page)
   await page.setViewportSize({ width: 1440, height: 1000 })
@@ -537,6 +563,11 @@ test('전체 업무 가이드의 계약 상세 다음 단계는 카드와 다음
   await next.click()
   await expect(guide.getByRole('heading', { name: '계약 상세 탭', exact: true })).toBeVisible()
   expect((await guide.boundingBox())!.x).toBeGreaterThan(1440 / 2)
+  await page.waitForTimeout(4500)
+  await expect(page.getByRole('tab', { name: '기본정보', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await page.getByRole('tab', { name: '1,200%', exact: true }).click()
+  await expect(guide).toContainText('1,200% 지급단계별 한도와 산입액, 최신 판정을 확인합니다.')
+  await expect(page).toHaveURL(/tab=cap/)
   await next.click()
   await expect(guide.getByRole('heading', { name: '계약 상태와 변경 이력', exact: true })).toBeVisible()
   await expect.poll(async () => {

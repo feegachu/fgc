@@ -166,8 +166,10 @@ export const contractJournalsQuery = (id: string) => contractTabQuery<ContractJo
 export const contractTransactionsQuery = (id: string) => contractTabQuery<ContractTransactions>(id, 'transactions')
 
 export class ContractSaveReceiptError extends Error {}
-export async function createContract(body: ContractCreateRequest) {
-  const data = await request<Schema['ContractCreateResponse']>('/api/v1/contracts', { method: 'POST', body })
+export async function createContract(body: ContractCreateRequest, workflowDemo = false) {
+  const data = await request<Schema['ContractCreateResponse']>('/api/v1/contracts', {
+    method: 'POST', body, ...(workflowDemo ? { headers: { 'X-FGC-Workflow-Demo': 'true' } } : {}),
+  })
   if (data.contractId == null) throw new ContractSaveReceiptError('등록된 계약을 확인할 수 없습니다.')
   return data
 }

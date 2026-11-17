@@ -61,6 +61,7 @@ class ReconciliationExpectedSourceQuery {
                    AND jh.source_entity_id = CAST(sl.schedule_line_id AS varchar)
                    AND jh.status = 'POSTED'
                  WHERE sh.payment_stage = :stage
+                   AND NOT fgc.is_workflow_demo_contract(sh.contract_id)
                    AND (:stage = 'GA_TO_FC' OR jh.journal_header_id IS NOT NULL)
                    AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn = TRUE
                    AND sh.status NOT IN ('HOLD', 'CANCELLED')

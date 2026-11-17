@@ -49,8 +49,8 @@ class CompareAskServiceTest {
         CompareAskResponse response = service.ask("2순위인 이유 알려줘", twoItems());
 
         assertThat(response.source()).isEqualTo("RULE");
-        assertThat(response.answer()).contains("2위는 나보험 튼튼건강", "1위보다 보수적 순수령액이 50,000원 적어요",
-                "수령 예상액은 1위보다 84,000원 적고", "환수 노출액은 1위보다 34,000원 더 작아요");
+        assertThat(response.answer()).contains("2위는 나보험 튼튼건강", "1위보다 순수령액이 50,000원 적어요",
+                "수령액은 1위보다 84,000원 적고", "예상 환수액은 1위보다 34,000원 더 작아요");
     }
 
     @Test
@@ -82,7 +82,7 @@ class CompareAskServiceTest {
     @DisplayName("LLM 근거에 순위별 비교 근거가 담긴다")
     void describeIncludesRankComparison() {
         assertThat(CompareAskService.describe(twoItems())).contains("[순위별 비교 근거]",
-                "2위 나보험 튼튼건강: 1위보다 보수적 순수령액이 50,000원 적어요");
+                "2위 나보험 튼튼건강: 1위보다 순수령액이 50,000원 적어요");
     }
 
     private static CompareRankingResponse tiedItems(long secondClawback) {
@@ -96,20 +96,20 @@ class CompareAskServiceTest {
     }
 
     @Test
-    @DisplayName("순수령액·환수 노출액이 모두 같으면 상품 등록 순서라고 밝히고 모순된 문장을 만들지 않는다")
+    @DisplayName("순수령액·예상 환수액이 모두 같으면 상품 등록 순서라고 밝히고 모순된 문장을 만들지 않는다")
     void fullyTiedItemsAreExplainedByDisplayOrder() {
         String text = CompareAskService.rankAnswer(tiedItems(50_000).items(), "2순위인 이유");
 
-        assertThat(text).contains("상품 등록 순서로 순위를 정했어요").doesNotContain("환수 노출액이 더 작은 쪽")
+        assertThat(text).contains("상품 등록 순서로 순위를 정했어요").doesNotContain("예상 환수액이 더 적은 쪽")
                 .doesNotContain("상품 ID");
     }
 
     @Test
-    @DisplayName("순수령액만 같으면 환수 노출액이 작은 쪽이 앞섰다고 설명한다")
+    @DisplayName("순수령액만 같으면 예상 환수액이 작은 쪽이 앞섰다고 설명한다")
     void netTieIsDecidedByClawback() {
         String text = CompareAskService.rankAnswer(tiedItems(80_000).items(), "2순위인 이유");
 
-        assertThat(text).contains("보수적 순수령액이 같고, 환수 노출액이 더 작은 쪽이 앞섰어요").doesNotContain("상품 ID");
+        assertThat(text).contains("순수령액이 같고, 예상 환수액이 더 적은 쪽이 앞섰어요").doesNotContain("상품 ID");
     }
 
     @Test
@@ -136,7 +136,7 @@ class CompareAskServiceTest {
     void productNamesPointToTheSamePairAsRankNumbers() {
         assertThat(CompareAskService.askedRanks(threeItems().items(), "튼튼건강이랑 편한건강 비교해줘")).containsExactly(2, 3);
         assertThat(CompareAskService.rankAnswer(threeItems().items(), "튼튼건강이랑 편한건강 비교해줘"))
-                .contains("2위는 나보험 튼튼건강", "3위는 다보험 편한건강", "2위보다 보수적 순수령액이 84,000원 적어요")
+                .contains("2위는 나보험 튼튼건강", "3위는 다보험 편한건강", "2위보다 순수령액이 84,000원 적어요")
                 .doesNotContain("1위보다");
     }
 
@@ -253,10 +253,10 @@ class CompareAskServiceTest {
     void criteriaQuestionHasNoRankSentence() {
         String question = "순위가 어떻게 정해졌어?";
 
-        llmReturns(true, "보수적 순수령액이 큰 순서로 정하고 같으면 환수가 작은 쪽이 앞서요.");
+        llmReturns(true, "순수령액이 큰 순서로 정하고 같으면 환수가 작은 쪽이 앞서요.");
         CompareAskResponse response = service.ask(question, threeItems());
         assertThat(response.source()).isEqualTo("LLM");
-        assertThat(response.answer()).isEqualTo("보수적 순수령액이 큰 순서로 정하고 같으면 환수가 작은 쪽이 앞서요.");
+        assertThat(response.answer()).isEqualTo("순수령액이 큰 순서로 정하고 같으면 환수가 작은 쪽이 앞서요.");
 
         llmReturns(false, "");
         assertThat(service.ask(question, threeItems()).answer()).isEqualTo(CompareAskService.RANK_CRITERIA)
@@ -349,7 +349,7 @@ class CompareAskServiceTest {
         String text = CompareAskService.rankAnswer(threeItems().items(), "3위랑 2위를 비교해줘");
 
         assertThat(text).contains("2위는 나보험 튼튼건강", "3위는 다보험 편한건강",
-                "2위보다 보수적 순수령액이 84,000원 적어요", "환수 노출액은 2위보다 14,000원 더 커요")
+                "2위보다 순수령액이 84,000원 적어요", "예상 환수액은 2위보다 14,000원 더 커요")
                 .doesNotContain("1위보다");
     }
 
@@ -415,14 +415,14 @@ class CompareAskServiceTest {
         CompareAskResponse response = service.ask("왜 1위야?", ranking());
 
         assertThat(response.source()).isEqualTo("LLM");
-        assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요. 보수적 순수령액은 684,000원이에요.")
+        assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요. 순수령액은 684,000원이에요.")
                 .endsWith(" 가보험 든든건강은 환수 부담이 작아 가장 앞섰어요.");
     }
 
     @Test
     @DisplayName("도구로 얻은 금액이라도 AI 문장에 숫자를 쓰면 서버 문장으로 대체한다")
     void toolAmountInAiTextIsReplaced() {
-        llmCallsTools(true, "1위 가보험 든든건강의 보수적 순수령액은 684,000원이에요.", "get_item", "{\"rank\":1}");
+        llmCallsTools(true, "1위 가보험 든든건강의 순수령액은 684,000원이에요.", "get_item", "{\"rank\":1}");
 
         CompareAskResponse response = service.ask("왜 1위야?", ranking());
 
@@ -433,13 +433,13 @@ class CompareAskServiceTest {
     @Test
     @DisplayName("AI 답에 금액 문장이 섞여 있으면 그 문장만 빼고 나머지 설명을 서버 문장 뒤에 붙인다")
     void sentencesWithAmountsAreDroppedAndTheRestKept() {
-        llmCallsTools(true, "가보험 든든건강은 환수 부담이 작아요. 보수적 순수령액은 684,000원이에요. 그래서 앞섰어요.",
+        llmCallsTools(true, "가보험 든든건강은 환수 부담이 작아요. 순수령액은 684,000원이에요. 그래서 앞섰어요.",
                 "get_item", "{\"rank\":1}");
 
         CompareAskResponse response = service.ask("왜 1위야?", ranking());
 
         assertThat(response.source()).isEqualTo("LLM");
-        assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요. 보수적 순수령액은 684,000원이에요.")
+        assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요. 순수령액은 684,000원이에요.")
                 .endsWith(" 가보험 든든건강은 환수 부담이 작아요. 그래서 앞섰어요.");
         assertThat(response.answer().indexOf("684,000원")).isEqualTo(response.answer().lastIndexOf("684,000원"));
     }
@@ -477,12 +477,12 @@ class CompareAskServiceTest {
                         new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 0, 16_000, 634_000, 80.0, null, List.of()),
                         new Item(3, 3, "가보험", "편한건강", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of())),
                 List.of(), CompareRankingFilters.NONE);
-        llmCallsTools(true, "나보험 튼튼건강이 가보험 든든건강보다 환수 노출액이 더 작아요.", "compare", "{\"rankA\":1,\"rankB\":2}");
+        llmCallsTools(true, "나보험 튼튼건강이 가보험 든든건강보다 예상 환수액이 더 작아요.", "compare", "{\"rankA\":1,\"rankB\":2}");
 
         CompareAskResponse response = service.ask("1위랑 2위 비교해줘", shared);
 
         assertThat(response.source()).isEqualTo("LLM");
-        assertThat(response.answer()).endsWith(" 나보험 튼튼건강이 가보험 든든건강보다 환수 노출액이 더 작아요.");
+        assertThat(response.answer()).endsWith(" 나보험 튼튼건강이 가보험 든든건강보다 예상 환수액이 더 작아요.");
     }
 
     @Test
@@ -506,7 +506,7 @@ class CompareAskServiceTest {
     @Test
     @DisplayName("도구를 부르지 않고 금액을 쓰면 서버 문장으로 대체한다")
     void amountWithoutToolCallIsReplaced() {
-        llmReturns(true, "1위 가보험 든든건강의 보수적 순수령액은 684,000원이에요.");
+        llmReturns(true, "1위 가보험 든든건강의 순수령액은 684,000원이에요.");
 
         CompareAskResponse response = service.ask("왜 1위야?", ranking());
 
@@ -517,7 +517,7 @@ class CompareAskServiceTest {
     @Test
     @DisplayName("AI 문장에 금액을 쓰면(다른 순위의 금액이어도) 서버 문장으로 대체한다")
     void amountAttachedToWrongRankIsReplaced() {
-        llmCallsTools(true, "3위 다보험 편한건강의 보수적 순수령액은 634,000원이에요.",
+        llmCallsTools(true, "3위 다보험 편한건강의 순수령액은 634,000원이에요.",
                 "get_item", "{\"rank\":2}", "get_item", "{\"rank\":3}");
 
         CompareAskResponse response = service.ask("3위 순수령액이 얼마야?", threeItems());
@@ -529,7 +529,7 @@ class CompareAskServiceTest {
     @Test
     @DisplayName("많고 적음이 서버 값과 반대인 비교 답은 서버 문장으로 대체한다")
     void reversedDirectionIsReplaced() {
-        llmCallsTools(true, "다보험 편한건강이 나보험 튼튼건강보다 보수적 순수령액이 더 많아요.",
+        llmCallsTools(true, "다보험 편한건강이 나보험 튼튼건강보다 순수령액이 더 많아요.",
                 "compare", "{\"rankA\":2,\"rankB\":3}");
 
         CompareAskResponse response = service.ask("3위랑 2위 순수령액 차이가 뭐야?", threeItems());
@@ -540,15 +540,15 @@ class CompareAskServiceTest {
     @Test
     @DisplayName("많고 적음이 서버 값과 같은 비교 답은 서버 문장 뒤에 붙여 낸다")
     void correctDirectionIsReturned() {
-        llmCallsTools(true, "다보험 편한건강이 나보험 튼튼건강보다 보수적 순수령액이 더 적어요.",
+        llmCallsTools(true, "다보험 편한건강이 나보험 튼튼건강보다 순수령액이 더 적어요.",
                 "compare", "{\"rankA\":2,\"rankB\":3}");
 
         CompareAskResponse response = service.ask("3위랑 2위 순수령액 차이가 뭐야?", threeItems());
 
         assertThat(response.source()).isEqualTo("LLM");
         // 금액은 서버 문장에만 있고, AI 문장은 방향만 말로 쓴다.
-        assertThat(response.answer()).contains("2위보다 보수적 순수령액이 84,000원 적어요")
-                .endsWith(" 다보험 편한건강이 나보험 튼튼건강보다 보수적 순수령액이 더 적어요.");
+        assertThat(response.answer()).contains("2위보다 순수령액이 84,000원 적어요")
+                .endsWith(" 다보험 편한건강이 나보험 튼튼건강보다 순수령액이 더 적어요.");
     }
 
     @Test
@@ -588,16 +588,16 @@ class CompareAskServiceTest {
     @ParameterizedTest
     @DisplayName("근거에 있는 값을 다른 항목에 옮겨 쓰거나 한글·전각 숫자로 쓴 AI 답변은 서버 문장(RULE)으로 대체한다")
     @ValueSource(strings = {
-            "가보험 든든건강의 보수적 순수령액은 50,000원이에요.",
-            "가보험 든든건강의 보수적 순수령액은 구백만원이에요.",
-            "가보험 든든건강의 보수적 순수령액은 ９９９９９９９원이에요."})
+            "가보험 든든건강의 순수령액은 50,000원이에요.",
+            "가보험 든든건강의 순수령액은 구백만원이에요.",
+            "가보험 든든건강의 순수령액은 ９９９９９９９원이에요."})
     void numbersFromAiAreReplacedByServerFacts(String answer) {
         llmReturns(true, answer);
 
         CompareAskResponse response = service.ask("1위 순수령액이 얼마야?", ranking());
 
         assertThat(response.source()).isEqualTo("RULE");
-        assertThat(response.answer()).contains("보수적 순수령액은 684,000원이에요").doesNotContain(answer);
+        assertThat(response.answer()).contains("순수령액은 684,000원이에요").doesNotContain(answer);
     }
 
     @Test

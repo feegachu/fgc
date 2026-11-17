@@ -82,6 +82,31 @@ export const exceptionOptionsQueryOptions = () =>
     staleTime: 5 * 60_000,
   })
 
+/** Refresh a selected case independently of list filters, including after it is resolved. */
+export const exceptionDetailQueryOptions = (seed: ExceptionCase | null) =>
+  queryOptions({
+    queryKey: ['exceptions', 'detail', seed?.exceptionCaseId ?? null],
+    enabled: Boolean(seed?.exceptionCaseId),
+    initialData: seed ?? undefined,
+    staleTime: Infinity,
+    queryFn: async ({ signal }): Promise<ExceptionCase> => {
+      if (!seed?.exceptionCaseId) throw new Error('조회할 예외를 선택하세요.')
+      for (let page = 1; ; page++) {
+        const result = await get<ExceptionSearchResult>(searchPath({
+          type: seed.type ?? '', reasonCode: '', severity: '', status: ALL_STATUS,
+          assigneeFilter: '', validationMonth: seed.validationMonth ?? '', contractNo: seed.contractNo ?? '',
+          sort: 'exceptionCaseId,desc', page,
+        }), signal)
+        const item = result.content?.find(row => row.exceptionCaseId === seed.exceptionCaseId)
+        if (item) return item
+        if (!result.content?.length || page >= (result.totalPages ?? 1)) {
+          throw new Error('선택한 예외를 다시 불러오지 못했습니다.')
+        }
+      }
+    },
+    meta: { errorToast: false },
+  })
+
 export const journalAccountsQueryOptions = () =>
   queryOptions({
     queryKey: ['journals', 'accounts'],
@@ -140,26 +165,27 @@ export function applyActionToCache(
   action: ExceptionAction,
   extra: Partial<ExceptionCase> = {},
 ) {
+  const update = (item: ExceptionCase): ExceptionCase =>
+    item.exceptionCaseId === exceptionCaseId && !item.actions?.some(existing => Number(existing.actionSeq) >= Number(action.actionSeq))
+      ? {
+          ...item,
+          status: action.toStatus,
+          statusLabel: action.toStatusLabel,
+          ...(['ASSIGN', 'START_REVIEW', 'REOPEN'].includes(action.actionType ?? '')
+            ? { assignedTo: action.actionBy, assigneeLoginId: action.actionByLoginId }
+            : {}),
+          ...extra,
+          actions: [...(item.actions ?? []), action],
+        }
+      : item
   client.setQueriesData<ExceptionSearchResult>({ queryKey: ['exceptions', 'search'] }, (current) => {
     if (!current) return current
     return {
       ...current,
-      content: current.content?.map((item) =>
-        item.exceptionCaseId === exceptionCaseId && !item.actions?.some((existing) => Number(existing.actionSeq) >= Number(action.actionSeq))
-          ? {
-              ...item,
-              status: action.toStatus,
-              statusLabel: action.toStatusLabel,
-              ...(['ASSIGN', 'START_REVIEW', 'REOPEN'].includes(action.actionType ?? '')
-                ? { assignedTo: action.actionBy, assigneeLoginId: action.actionByLoginId }
-                : {}),
-              ...extra,
-              actions: [...(item.actions ?? []), action],
-            }
-          : item,
-      ),
+      content: current.content?.map(update),
     }
   })
+  client.setQueryData<ExceptionCase>(['exceptions', 'detail', exceptionCaseId], current => current ? update(current) : undefined)
   void client.invalidateQueries({ queryKey: ['exceptions', 'search'], refetchType: 'none' })
   if (action.fromStatus !== action.toStatus) void client.invalidateQueries({ queryKey: ['exceptions', 'counts'] })
   if (action.actionType === 'ASSIGN') void client.invalidateQueries({ queryKey: ['exceptions', 'options'] })

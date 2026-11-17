@@ -1,4 +1,5 @@
 import { SaveGuide } from '../assistant/guide/save-guide'
+import { useWorkflowGuide } from '../assistant/workflow-state'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
@@ -290,7 +291,7 @@ function ContractEditor({
           }
         : undefined
       const updated = request ? await updateContract(id!, request, requestKey(request)) : undefined
-      const saved = updated ?? (await createContract(body))
+      const saved = updated ?? (await createContract(body, useWorkflowGuide.getState().settlementActive))
       committed = true
       setSavedSuccessfully(true)
       clearUnsaved()

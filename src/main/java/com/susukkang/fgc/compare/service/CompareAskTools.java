@@ -41,20 +41,29 @@ final class CompareAskTools {
 
     private static final Set<Metric> RECEIPT = EnumSet.of(Metric.CAPPED, Metric.EXPECTED);
     private static final List<MetricPhrase> METRIC_PHRASES = List.of(
+            new MetricPhrase("예상 순수령액", EnumSet.of(Metric.NET)),
             new MetricPhrase("보수적 순수령액", EnumSet.of(Metric.NET)),
             new MetricPhrase("순수령액", EnumSet.of(Metric.NET)),
             new MetricPhrase("순수령", EnumSet.of(Metric.NET)),
             new MetricPhrase("한도 반영 수령 예상액", EnumSet.of(Metric.CAPPED)),
             new MetricPhrase("한도를 반영한 수령 예상액", EnumSet.of(Metric.CAPPED)),
+            new MetricPhrase("한도 반영 예상 수령액", EnumSet.of(Metric.CAPPED)),
+            new MetricPhrase("한도를 반영한 예상 수령액", EnumSet.of(Metric.CAPPED)),
+            new MetricPhrase("한도 반영 수령액", EnumSet.of(Metric.CAPPED)),
+            new MetricPhrase("한도를 반영한 수령액", EnumSet.of(Metric.CAPPED)),
             new MetricPhrase("한도 반영 수령", EnumSet.of(Metric.CAPPED)),
             new MetricPhrase("한도를 반영한 수령", EnumSet.of(Metric.CAPPED)),
             new MetricPhrase("한도 적용 전 수령 예상액", EnumSet.of(Metric.EXPECTED)),
+            new MetricPhrase("한도 적용 전 예상 수령액", EnumSet.of(Metric.EXPECTED)),
+            new MetricPhrase("한도 적용 전 수령액", EnumSet.of(Metric.EXPECTED)),
             new MetricPhrase("한도 적용 전", EnumSet.of(Metric.EXPECTED)),
             new MetricPhrase("수령 예상액", RECEIPT),
             new MetricPhrase("수령 예상", RECEIPT),
+            new MetricPhrase("예상 수령액", RECEIPT),
             new MetricPhrase("수령액", RECEIPT),
             new MetricPhrase("환수 노출액", EnumSet.of(Metric.CLAWBACK)),
             new MetricPhrase("환수 노출", EnumSet.of(Metric.CLAWBACK)),
+            new MetricPhrase("예상 환수액", EnumSet.of(Metric.CLAWBACK)),
             new MetricPhrase("환수액", EnumSet.of(Metric.CLAWBACK)),
             new MetricPhrase("환수 부담", EnumSet.of(Metric.CLAWBACK)),
             new MetricPhrase("환수", EnumSet.of(Metric.CLAWBACK)),
@@ -67,12 +76,12 @@ final class CompareAskTools {
             new MetricPhrase("한도 소진", EnumSet.of(Metric.CAP_IMPACT)));
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String NET_LABEL = "보수적 순수령액";
-    private static final String CAPPED_LABEL = "한도 반영 수령 예상액";
-    private static final String EXPECTED_LABEL = "한도 적용 전 수령 예상액";
-    private static final String CLAWBACK_LABEL = "환수 노출액";
+    private static final String NET_LABEL = "순수령액";
+    private static final String CAPPED_LABEL = "한도 반영 수령액";
+    private static final String EXPECTED_LABEL = "한도 적용 전 수령액";
+    private static final String CLAWBACK_LABEL = "예상 환수액";
     private static final String CARRY_LABEL = "이월 예정액";
-    private static final String CAP_IMPACT_LABEL = "한도 영향";
+    private static final String CAP_IMPACT_LABEL = "한도 사용률";
     private static final String ERROR = "error";
     private static final String UNIT_PERCENT = "%";
     /** '1위'처럼 순위를 말하는 표기. 소수점·쉼표 뒤의 숫자(금액 일부)는 순위로 보지 않는다. */
@@ -160,9 +169,9 @@ final class CompareAskTools {
 
     static List<ToolSpec> specs() {
         return List.of(
-                new ToolSpec(GET_ITEM, "순위 하나의 금액(순수령액·수령 예상액·환수 노출액·이월 예정액)과 계산 근거를 돌려준다.", RankArgs.class),
+                new ToolSpec(GET_ITEM, "순위 하나의 금액(순수령액·수령액·예상 환수액·이월 예정액)과 계산 근거를 돌려준다.", RankArgs.class),
                 new ToolSpec(COMPARE, "두 순위의 금액과 차이, 어느 쪽이 더 큰지를 돌려준다.", PairArgs.class),
-                new ToolSpec(EXPLAIN_TERM, "용어(1,200% 룰, 이월, 환수, 보수적 순수령액, 협회 수수료 등급)의 설명을 돌려준다.", TermArgs.class));
+                new ToolSpec(EXPLAIN_TERM, "용어(1,200% 룰, 이월, 환수, 순수령액, 협회 수수료 등급)의 설명을 돌려준다.", TermArgs.class));
     }
 
     /** 모델이 부른 도구를 실행한다. 인자가 잘못되면 오류 JSON 을 돌려줘 모델이 스스로 고치게 한다. */

@@ -1,6 +1,40 @@
 import { expect, test } from '@playwright/test'
 import { chooseDetailedHelp, readDetailedHelp } from './screenHelp'
 
+test('예상 스케줄 목록 도움말은 머리글과 첫 두 행만 강조한다', async ({ page }) => {
+  const rows = Array.from({ length: 4 }, (_, index) => ({
+    scheduleHeaderId: index + 1, contractId: index + 1, contractNo: `C-PREVIEW-${index + 1}`,
+    paymentStage: 'GA_TO_FC', scheduleRegime: 'CURRENT', schedulePurpose: 'OPERATIONAL',
+    scheduleVersionNo: 1, status: 'PLANNED', activeYn: true, installmentCount: 12,
+    lineCount: 12, expectedTotal: 895000, policyVersionLabel: '현행 지급기준 v1',
+  }))
+  await page.route('**/api/v1/**', route => {
+    const path = new URL(route.request().url()).pathname
+    const data = path.endsWith('/auth/refresh') ? { accessToken: 'schedule-preview-fixture', expiresIn: 1800 }
+      : path.endsWith('/auth/me') ? { loginId: 'settle01', userName: '정산', roleCode: 'SETTLEMENT', canProcess: true, demoMonth: '2026-07' }
+        : path === '/api/v1/schedules' ? { content: rows, page: 1, size: 20, totalPages: 1, totalElements: rows.length }
+          : { content: [], totalPages: 1 }
+    return route.fulfill({ json: { data, error: null, requestId: 'schedule-two-rows' } })
+  })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('schedules')
+  const table = page.getByRole('table', { name: '예상 지급 스케줄 검색 결과' })
+  await expect(table.locator('tbody tr')).toHaveCount(4)
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  const guide = page.locator('.screen-step-guide')
+  await guide.getByRole('button', { name: '다음', exact: true }).click()
+  await guide.getByRole('button', { name: '다음', exact: true }).click()
+  await expect(guide.getByRole('heading', { name: '스케줄 목록', exact: true })).toBeVisible()
+  await expect.poll(async () => {
+    const box = await page.locator('.screen-step-spotlight').boundingBox()
+    const header = await table.locator('thead').boundingBox()
+    const second = await table.locator('tbody tr').nth(1).boundingBox()
+    return !!box && !!header && !!second && Math.abs(box.y - header.y + 10) < 2
+      && Math.abs(box.y + box.height - second.y - second.height - 10) < 2
+  }).toBe(true)
+})
+
 for (const seven of [false, true]) {
   const regime = seven ? 'SEVEN_YEAR_2029' : 'FOUR_YEAR_2027'
   const count = seven ? 84 : 48
