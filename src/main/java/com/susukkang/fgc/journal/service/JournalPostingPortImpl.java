@@ -45,6 +45,7 @@ import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
 @RequiredArgsConstructor
 public class JournalPostingPortImpl implements JournalPostingPort {
 
+    private static final String DRAFT_STATUS = "DRAFT";
     private static final String ALREADY_POSTED_REASON = "ALREADY_POSTED";
 
     private final JournalPostingSourceQueryRepository sourceRepository;
@@ -134,12 +135,12 @@ public class JournalPostingPortImpl implements JournalPostingPort {
 
     private void postCorrectionDraft(JournalHeaderDraft draft, Long actor, String requestId, String groupKey) {
         var saved = persistenceService.saveDraftInCurrentTransaction(draft, actor, requestId);
-        if (groupKey != null && !"DRAFT".equals(saved.getStatus())) {
+        if (groupKey != null && !DRAFT_STATUS.equals(saved.getStatus())) {
             // A normal batch may already have posted this replacement. Never leave an unlinked reversal.
-            throw new FgcBusinessException(FgcErrorCode.LEDG_002,
+            throw new FgcBusinessException(FgcErrorCode.LEDG_005,
                     Map.of("journalHeaderId", saved.getJournalHeaderId()));
         }
-        if ("DRAFT".equals(saved.getStatus())) {
+        if (DRAFT_STATUS.equals(saved.getStatus())) {
             if (groupKey != null && journalHeaderRepository.linkReplacementGroup(saved.getJournalHeaderId(), groupKey) != 1) {
                 throw new IllegalStateException("대체 예상 분개의 정정 연결을 저장하지 못했습니다.");
             }
@@ -183,7 +184,7 @@ public class JournalPostingPortImpl implements JournalPostingPort {
     private long postAndCommit(JournalHeaderDraft draft, Long contractId, Long triggeredBy,
                                 String requestId, List<ContractSkip> skips) {
         JournalHeaderRow saved = persistenceService.saveDraft(draft, triggeredBy, requestId);
-        if ("DRAFT".equals(saved.getStatus())
+        if (DRAFT_STATUS.equals(saved.getStatus())
                 && journalHeaderRepository.markPosted(saved.getJournalHeaderId(), triggeredBy) == 1) {
             return 1;
         }

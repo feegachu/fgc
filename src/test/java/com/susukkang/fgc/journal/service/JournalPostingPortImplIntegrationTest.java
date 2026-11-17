@@ -39,6 +39,8 @@ class JournalPostingPortImplIntegrationTest {
     @Autowired
     private JournalPostingPortImpl expectedJournals;
     @Autowired
+    private JournalCorrectionService journalCorrections;
+    @Autowired
     private com.susukkang.fgc.exceptioncase.repository.ExceptionPaymentRepository exceptionPayments;
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -283,7 +285,7 @@ class JournalPostingPortImplIntegrationTest {
     }
 
     @Test
-    void alreadyPostedReplacementRejectsCorrectionAndRollsBackItsReversal() {
+    void alreadyPostedReplacementRollsBackThenRecoversThroughAnExplicitReversal() {
         var contract = anyContract();
         Long contractId = ((Number) contract.get("contract_id")).longValue();
         Long actor = jdbcTemplate.queryForObject("SELECT user_id FROM fgc.app_user WHERE login_id='settle01'", Long.class);
@@ -295,6 +297,7 @@ class JournalPostingPortImplIntegrationTest {
         insertScheduleLine(contractId, "GA_TO_FC", policy, item, agent, VALIDATION_MONTH.plusDays(9));
         journalPostingPort.post(newContext(run, VALIDATION_MONTH));
         insertScheduleLine(contractId, "GA_TO_FC", policy, item, agent, VALIDATION_MONTH.plusDays(9));
+        Long original = jdbcTemplate.queryForObject("SELECT journal_header_id FROM fgc.journal_header WHERE validation_run_id=?", Long.class, run);
         // An ordinary batch posts the regenerated schedule before the operator rechecks the exception.
         journalPostingPort.post(newContext(run, VALIDATION_MONTH));
 
@@ -302,7 +305,7 @@ class JournalPostingPortImplIntegrationTest {
         assertThatThrownBy(() -> tx.executeWithoutResult(status ->
                 expectedJournals.postExpectedForContract(contractId, run, VALIDATION_MONTH, actor)))
                 .isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class)
-                .hasMessageContaining("FGC-LEDG-002");
+                .hasMessageContaining("FGC-LEDG-005");
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.journal_header WHERE validation_run_id=? AND status='POSTED'",
                 Long.class, run)).isEqualTo(2);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.journal_header WHERE validation_run_id=? AND (journal_type='REVERSAL' OR correction_group_key IS NOT NULL)",
@@ -311,6 +314,18 @@ class JournalPostingPortImplIntegrationTest {
                 SELECT count(*) FROM fgc.journal_correction_group g JOIN fgc.journal_header h
                   ON h.journal_header_id=g.original_journal_header_id WHERE h.validation_run_id=?
                 """, Long.class, run)).isZero();
+
+        // The conflict message directs the operator to the existing ledger reversal operation.
+        journalCorrections.reverse(new com.susukkang.fgc.journal.dto.ReverseJournalCommand(original,
+                "선기표된 대체 예상 분개로 인한 이전 예상 분개 정리", "schedule-recheck-recovery", actor));
+        tx.executeWithoutResult(status -> expectedJournals.postExpectedForContract(contractId, run, VALIDATION_MONTH, actor));
+        tx.executeWithoutResult(status -> expectedJournals.postExpectedForContract(contractId, run, VALIDATION_MONTH, actor));
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.journal_header WHERE validation_run_id=? AND journal_type='EXPECTED_FC_PAYOUT' AND status='POSTED'",
+                Long.class, run)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.journal_header WHERE validation_run_id=? AND journal_type='REVERSAL'",
+                Long.class, run)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.journal_header WHERE journal_header_id=?",
+                String.class, original)).isEqualTo("REVERSED");
     }
 
     @Test
