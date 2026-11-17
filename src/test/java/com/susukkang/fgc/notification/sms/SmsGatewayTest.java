@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.crypto.Mac;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** IF-EXT-05 문자 발송 게이트웨이. 실제 사업자를 부르지 않고 같은 규격의 가짜 서버로 확인한다. */
 class SmsGatewayTest {
@@ -37,8 +39,10 @@ class SmsGatewayTest {
     private HttpServer server;
     private int status = 200;
     private String responseBody = ACCEPTED;
-    private long delayMillis;
-    private long bodyDelayMillis;
+    // 느린 사업자를 흉내 내는 문. 닫아 두면 가짜 사업자가 그 자리에서 테스트가 끝날 때까지 답하지 않는다.
+    private volatile CountDownLatch beforeHeaders = new CountDownLatch(0);
+    private volatile CountDownLatch beforeBody = new CountDownLatch(0);
+    private volatile boolean headersSent;
 
     private record Received(String method, String path, String authorization, String body) {
     }
@@ -50,19 +54,12 @@ class SmsGatewayTest {
             received.add(new Received(exchange.getRequestMethod(), exchange.getRequestURI().getPath(),
                     exchange.getRequestHeaders().getFirst("Authorization"),
                     new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
-            try {
-                Thread.sleep(delayMillis);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            waitFor(beforeHeaders);
             byte[] body = responseBody.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(status, body.length);
-            try {
-                Thread.sleep(bodyDelayMillis);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            headersSent = true;
+            waitFor(beforeBody);
             exchange.getResponseBody().write(body);
             exchange.close();
         });
@@ -71,7 +68,18 @@ class SmsGatewayTest {
 
     @AfterEach
     void stopServer() {
+        // 멈춰 세운 응답을 먼저 풀어야 서버가 멈춘다.
+        beforeHeaders.countDown();
+        beforeBody.countDown();
         server.stop(0);
+    }
+
+    private static void waitFor(CountDownLatch gate) {
+        try {
+            gate.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     // 다른 통합 테스트와 함께 돌 때도 응답이 제한 안에 들도록 넉넉히 둔다. 시간 초과 테스트만 짧은 제한을 쓴다.
@@ -169,10 +177,11 @@ class SmsGatewayTest {
     }
 
     @Test
+    @Timeout(10)
     @DisplayName("응답이 제한 시간을 넘기면 다시 보낼 수 있는 실패로 남긴다")
     void retriesTimeouts() {
         timeout = Duration.ofMillis(300);
-        delayMillis = 1_500;
+        beforeHeaders = new CountDownLatch(1);
 
         assertThatThrownBy(() -> gateway().send("01000001234", "문자"))
                 .isInstanceOfSatisfying(SmsSendException.class, failure -> {
@@ -182,19 +191,21 @@ class SmsGatewayTest {
     }
 
     @Test
+    @Timeout(10)
     @DisplayName("응답 머리만 오고 본문이 오지 않아도 제한 시간이 지나면 다시 보낼 수 있는 실패로 남긴다")
     void retriesWhenTheBodyStalls() {
-        timeout = Duration.ofMillis(300);
-        bodyDelayMillis = 1_500;
+        // 머리가 제한 안에 넉넉히 들어오게 1초를 준다. 머리가 늦어 난 시간 초과와 섞이지 않게 한다.
+        timeout = Duration.ofSeconds(1);
+        beforeBody = new CountDownLatch(1);
+        SmsGateway gateway = gateway();
 
-        long started = System.nanoTime();
-        assertThatThrownBy(() -> gateway().send("01000001234", "문자"))
+        assertThatThrownBy(() -> gateway.send("01000001234", "문자"))
                 .isInstanceOfSatisfying(SmsSendException.class, failure -> {
                     assertThat(failure.code()).isEqualTo("TIMEOUT");
                     assertThat(failure.retryable()).isTrue();
                 });
-        // JDK HttpClient 의 요청 제한 시간은 응답 머리까지만 본다. 본문까지 기다리면 1.5초가 걸린다.
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(1_200));
+        // JDK HttpClient 의 요청 제한 시간은 응답 머리까지만 본다. 머리는 왔고 본문은 이 테스트가 끝날 때까지 오지 않는다.
+        assertThat(headersSent).isTrue();
     }
 
     @Test
