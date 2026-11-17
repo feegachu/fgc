@@ -224,7 +224,7 @@ export const screenWalkthroughs: Record<string, readonly ScreenHelpStep[]> = {
       '연결된 은행과 가린 계좌번호를 확인합니다.'),
     target('bank.result', '확정 지급과 은행 출금 비교',
       '그 달의 설계사별 확정 지급 순액과 계좌에서 실제로 나간 출금을 맞춘 결과입니다. 정산담당자가 대사를 돌리며, 확정된 정산월만 할 수 있습니다.',
-      '금액 다름은 보낸 금액이 다른 것이고, 이체 없음은 보낸 기록이 없는 것이고, 확인 안 된 출금은 참조코드 없이 나간 돈입니다.',
+      '금액 다름은 보낸 금액이 다른 것이고, 이체 없음은 보낸 기록이 없는 것이고, 확인 안 된 출금은 참조코드가 없거나 이 달에 보낼 설계사가 아닌 참조코드로 나간 돈입니다.',
       '어긋난 줄부터 확인합니다.')),
   'RECO-W02.detail': tour('대사 원천 비교',
     region('reconciliation.match', '.reco-react-compare-summary', '비교 대상과 매칭 기준',

@@ -40,6 +40,7 @@ const result: BankReconciliation = {
   unknownWithdrawalCount: 1,
   items: [
     {
+      bankReconciliationItemId: 101,
       result: 'AMOUNT_MISMATCH',
       agentCode: 'A-FC-002',
       agentName: '이보험',
@@ -51,6 +52,7 @@ const result: BankReconciliation = {
       printContent: 'FGC2610-000002',
     },
     {
+      bankReconciliationItemId: 102,
       result: 'NOT_TRANSFERRED',
       agentCode: 'A-FC-003',
       agentName: '박신인',
@@ -59,8 +61,17 @@ const result: BankReconciliation = {
       bankAmount: 0,
       differenceAmount: -500000,
     },
-    { result: 'UNKNOWN_WITHDRAWAL', expectedAmount: 0, bankAmount: 55000, differenceAmount: 55000, bankTranDate: '2026-11-18', printContent: '관리비' },
     {
+      bankReconciliationItemId: 103,
+      result: 'UNKNOWN_WITHDRAWAL',
+      expectedAmount: 0,
+      bankAmount: 55000,
+      differenceAmount: 55000,
+      bankTranDate: '2026-11-18',
+      printContent: '관리비',
+    },
+    {
+      bankReconciliationItemId: 104,
       result: 'MATCHED',
       agentCode: 'A-FC-001',
       agentName: '김정산',
@@ -78,6 +89,9 @@ let requested: { url: string; method?: string; body?: unknown }[]
 let link: BankLink
 let latest: BankReconciliation | null
 let runFailure: ApiError | null
+/** 응답을 붙잡아 두는 문. 요청 순서와 응답 순서가 뒤바뀌는 경우를 만든다. */
+let linkGate: Promise<void> | null
+let runGate: Promise<void> | null
 
 function renderAt(path: string, roleCode = 'SETTLEMENT') {
   requested = []
@@ -95,15 +109,21 @@ function renderAt(path: string, roleCode = 'SETTLEMENT') {
       link = linked
       return envelope(linked)
     }
-    if (url === '/api/v1/bank/link') return envelope(link)
+    if (url === '/api/v1/bank/link') {
+      const answered = link
+      if (linkGate) await linkGate
+      return envelope(answered)
+    }
     if (url === '/api/v1/bank/link/authorize-url')
       return envelope({ authorizeUrl: '/api/v1/mock-bank/oauth/2.0/authorize?state=abc' })
     if (url === '/api/v1/bank-reconciliations' && options?.method === 'POST') {
       if (runFailure) throw runFailure
+      if (runGate) await runGate
       latest = result
       return envelope(result)
     }
-    if (url.startsWith('/api/v1/bank-reconciliations?')) return envelope(latest)
+    // 결과는 2026-10 의 것이다. 다른 달은 아직 대사하지 않았다.
+    if (url.startsWith('/api/v1/bank-reconciliations?')) return envelope(url.endsWith('month=2026-10') ? latest : null)
     throw new Error(`unexpected ${url}`)
   })
   const router = createMemoryRouter(routes, { initialEntries: [path] })
@@ -125,6 +145,8 @@ beforeEach(() => {
   link = linked
   latest = result
   runFailure = null
+  linkGate = null
+  runGate = null
   vi.mocked(goToBank).mockClear()
   useAuthStore.setState({ accessToken: 'bank-fixture', loggingOut: false })
   useWorkspaceStore.getState().clear()
@@ -208,6 +230,59 @@ describe('BANK-W01 지급 이체 대사', () => {
     expect(posts('/api/v1/bank-reconciliations')).toEqual([
       { url: '/api/v1/bank-reconciliations', method: 'POST', body: { settlementMonth: '2026-10' } },
     ])
+  })
+
+  it('대사를 돌리는 사이 정산월을 바꿔도 결과는 돌린 달에만 남는다', async () => {
+    latest = null
+    let finish = () => {}
+    runGate = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    const { actions, router } = renderAt('/bank-reconciliations')
+    await actions.click(await screen.findByRole('button', { name: '은행 거래내역으로 대사' }))
+    await waitFor(() => expect(posts('/api/v1/bank-reconciliations')).toHaveLength(1))
+
+    await router.navigate('/bank-reconciliations?month=2026-09')
+    await waitFor(() => expect(requested.map((request) => request.url)).toContain('/api/v1/bank-reconciliations?month=2026-09'))
+    finish()
+    await waitFor(() => expect(latest).toBe(result))
+
+    // 10월 결과가 9월 화면에 보이면 안 된다.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(screen.getByText('아직 대사하지 않았습니다.')).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: '지급 이체 대사 결과' })).not.toBeInTheDocument()
+  })
+
+  it('연결 조회 응답이 늦게 와도 방금 마친 연결을 연결 전 상태로 되돌리지 않는다', async () => {
+    link = notLinked
+    latest = null
+    let finish = () => {}
+    linkGate = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    renderAt('/bank-reconciliations?code=CODE-1&state=STATE-1')
+
+    await waitFor(() => expect(posts('/api/v1/bank/link')).toHaveLength(1))
+    expect(await screen.findByText('모의은행 110-***-***001')).toBeInTheDocument()
+    // 화면을 열 때 보낸 조회가 이제야 "연결 전"으로 답한다.
+    finish()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(screen.getByText('모의은행 110-***-***001')).toBeInTheDocument()
+    expect(screen.queryByText('연결한 계좌가 없습니다.')).not.toBeInTheDocument()
+  })
+
+  it('내용이 같은 출금 두 건도 서로 다른 줄로 보여 준다', async () => {
+    const repeated = { ...result.items![2], bankReconciliationItemId: 105 }
+    latest = { ...result, unknownWithdrawalCount: 2, items: [...result.items!, repeated] }
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    renderAt('/bank-reconciliations')
+
+    const table = await screen.findByRole('table', { name: '지급 이체 대사 결과' })
+    await within(table).findByText('금액 다름')
+    expect(within(table).getAllByText('관리비')).toHaveLength(2)
+    // 줄을 내용으로 구분하면 React 가 같은 키가 둘이라고 알린다.
+    expect(errors.mock.calls.flat().join(' ')).not.toMatch(/same key/)
   })
 
   it('서버가 대사를 거절하면 그 이유를 보여 준다', async () => {

@@ -200,6 +200,22 @@ class OpenBankingClientTest {
     }
 
     @Test
+    @DisplayName("성공 코드인데 목록이 빠진 응답은 빈 목록으로 보지 않고 잘못된 응답으로 알린다")
+    void rejectsSuccessResponsesWithoutTheList() {
+        // 빈 목록으로 받으면 확정 지급 전부가 "이체 없음"으로 저장된다.
+        respond("/v2.0/account/transaction_list/fin_num", """
+                {"api_tran_id":"T1","rsp_code":"A0000","rsp_message":"","next_page_yn":"N"}""");
+        respond("/v2.0/user/me", """
+                {"api_tran_id":"T1","rsp_code":"A0000","rsp_message":"","user_seq_no":"1100000001","res_list":null}""");
+        LocalDate day = LocalDate.of(2026, 11, 18);
+
+        assertThatThrownBy(() -> client().withdrawals(token(), "199000000000000000000002", day, day))
+                .isInstanceOfSatisfying(OpenBankingException.class, e -> assertThat(e.code()).isEqualTo("BAD_RESPONSE"));
+        assertThatThrownBy(() -> client().accounts(token()))
+                .isInstanceOfSatisfying(OpenBankingException.class, e -> assertThat(e.code()).isEqualTo("BAD_RESPONSE"));
+    }
+
+    @Test
     @DisplayName("쪽이 끝없이 이어지면 멈추고 실패로 알린다")
     void stopsWhenPagesNeverEnd() {
         respond("/v2.0/account/transaction_list/fin_num", page("Y", "TRACE-LOOP", """

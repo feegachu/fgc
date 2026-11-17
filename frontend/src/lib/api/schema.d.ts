@@ -3268,6 +3268,11 @@ export interface components {
             /** @description 같은 참조코드로 나간 출금 합계 */
             bankAmount?: number;
             /**
+             * Format: int64
+             * @description 결과 줄의 번호. 내용이 같은 출금 두 건도 이 번호로 구분한다
+             */
+            bankReconciliationItemId?: number;
+            /**
              * Format: date
              * @description 이체가 없으면 null
              */

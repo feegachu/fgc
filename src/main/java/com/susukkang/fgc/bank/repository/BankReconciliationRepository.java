@@ -46,17 +46,18 @@ public class BankReconciliationRepository {
     }
 
     /**
-     * 설계사별 확정 지급(GA_TO_FC) 합계에서 확정 차감 합계를 뺀 금액. 원 단위로 반올림하고 0보다 큰 것만 준다.
+     * 설계사별 확정 지급(GA_TO_FC) 합계에서 확정 차감 합계를 뺀 금액. 0보다 큰 것만 준다.
+     * 지급 건마다 먼저 원 단위로 반올림한 뒤 더한다(운영정책서 제17조의2). 합계를 낸 뒤 반올림하면 1원이 어긋날 수 있다.
      * 원천징수는 FGC가 다루지 않으므로 빼지 않는다(운영정책서 제36조의2, 가상 GA 정책).
      */
     public List<ExpectedTransfer> findExpectedTransfers(LocalDate settlementMonth) {
         return jdbc.query("""
                 SELECT recipient_agent_id,
-                       ROUND(SUM(CASE WHEN cashflow_type = 'PAYMENT' THEN amount ELSE -amount END), 0) AS net
+                       SUM(CASE WHEN cashflow_type = 'PAYMENT' THEN ROUND(amount, 0) ELSE -ROUND(amount, 0) END) AS net
                   FROM fgc.commission_transaction
                  WHERE payment_stage = 'GA_TO_FC' AND status = 'CONFIRMED' AND settlement_month = ?
                  GROUP BY recipient_agent_id
-                HAVING ROUND(SUM(CASE WHEN cashflow_type = 'PAYMENT' THEN amount ELSE -amount END), 0) > 0
+                HAVING SUM(CASE WHEN cashflow_type = 'PAYMENT' THEN ROUND(amount, 0) ELSE -ROUND(amount, 0) END) > 0
                  ORDER BY recipient_agent_id
                 """, (rs, row) -> new ExpectedTransfer(rs.getLong(1), rs.getBigDecimal(2)), settlementMonth);
     }
@@ -93,15 +94,16 @@ public class BankReconciliationRepository {
 
     public Optional<BankReconciliationResponse> findById(Long runId) {
         List<Item> items = jdbc.query("""
-                SELECT i.result, a.agent_code, a.agent_name, i.reference_code, i.expected_amount, i.bank_amount,
-                       i.bank_amount - i.expected_amount, i.bank_tran_date, i.print_content
+                SELECT i.bank_reconciliation_item_id, i.result, a.agent_code, a.agent_name, i.reference_code,
+                       i.expected_amount, i.bank_amount, i.bank_amount - i.expected_amount, i.bank_tran_date,
+                       i.print_content
                   FROM fgc.bank_reconciliation_item i
                   LEFT JOIN fgc.agent a ON a.agent_id = i.agent_id
                  WHERE i.bank_reconciliation_run_id = ?
                  ORDER BY i.bank_reconciliation_item_id
-                """, (rs, row) -> new Item(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
-                rs.getBigDecimal(5), rs.getBigDecimal(6), rs.getBigDecimal(7), rs.getObject(8, LocalDate.class),
-                rs.getString(9)), runId);
+                """, (rs, row) -> new Item(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4),
+                rs.getString(5), rs.getBigDecimal(6), rs.getBigDecimal(7), rs.getBigDecimal(8),
+                rs.getObject(9, LocalDate.class), rs.getString(10)), runId);
         return jdbc.query("""
                 SELECT r.bank_reconciliation_run_id, r.settlement_month, r.inquiry_from, r.inquiry_to, r.bank_name,
                        r.account_num_masked, r.withdrawal_count, u.login_id, r.created_at

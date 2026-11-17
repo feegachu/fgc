@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.bank.service.BankInquiryStarting;
+import com.susukkang.fgc.bank.service.BankLinkService;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +43,8 @@ import org.springframework.transaction.annotation.Transactional;
 class MockBankControllerIntegrationTest {
 
     private static final String BASE = "/api/v1/mock-bank";
-    private static final String STATE = "0123456789abcdef0123456789abcdef";
+    /** FGC가 방금 낸 연결 요청의 state. 모의 은행은 이런 요청으로만 동의 화면을 연다. */
+    private String state;
     private static final String FINTECH_USE_NUM = "199000000000000000000001";
     private static final LocalDate MARCH = LocalDate.of(2026, 3, 1);
     private static final DateTimeFormatter DATE = DateTimeFormatter.BASIC_ISO_DATE;
@@ -52,7 +55,28 @@ class MockBankControllerIntegrationTest {
     private JdbcTemplate jdbc;
     @Autowired
     private ApplicationEventPublisher events;
+    @Autowired
+    private BankLinkService linkService;
     private final ObjectMapper json = new ObjectMapper();
+
+    @BeforeEach
+    void startALinkRequest() {
+        String url = linkService.authorizeUrl(1L).authorizeUrl();
+        state = url.substring(url.indexOf("state=") + "state=".length(), url.indexOf("state=") + "state=".length() + 32);
+    }
+
+    @Test
+    @DisplayName("FGC가 낸 연결 요청이 아니면 동의 화면을 열지 않는다")
+    void opensTheConsentPageOnlyForRequestsIssuedByFgc() throws Exception {
+        // 모의 은행에는 은행 로그인이 없다. 처리 권한자가 FGC에서 낸 요청이라는 것이 그 자리를 대신한다.
+        // 이 확인이 없으면 로그인하지 않은 사람이 코드와 토큰을 받아 확정 지급액을 읽을 수 있다.
+        String madeUp = "0123456789abcdef0123456789abcdef";
+        mvc.perform(authorize(get(BASE + "/oauth/2.0/authorize"), "fgc-mock-client", "/bank-reconciliations", madeUp))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.rsp_code").value("O0001"));
+        mvc.perform(fromConsentPage(
+                        authorize(post(BASE + "/oauth/2.0/authorize/approve"), "fgc-mock-client", "/bank-reconciliations", madeUp)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.rsp_code").value("O0001"));
+    }
 
     @Test
     @DisplayName("동의 화면을 보여 주고, 동의하면 인가 코드와 state 를 붙여 돌려보낸다")
@@ -61,12 +85,12 @@ class MockBankControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("모의 은행")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(STATE)));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(state)));
 
         String location = mvc.perform(fromConsentPage(authorize(post(BASE + "/oauth/2.0/authorize/approve"))))
                 .andExpect(status().isFound()).andReturn().getResponse().getHeader("Location");
 
-        assertThat(location).startsWith("/bank-reconciliations?code=").contains("&state=" + STATE)
+        assertThat(location).startsWith("/bank-reconciliations?code=").contains("&state=" + state)
                 .contains("scope=login%20inquiry");
     }
 
@@ -92,7 +116,7 @@ class MockBankControllerIntegrationTest {
         String location = mvc.perform(fromConsentPage(authorize(post(BASE + "/oauth/2.0/authorize/deny"))))
                 .andExpect(status().isFound()).andReturn().getResponse().getHeader("Location");
 
-        assertThat(location).isEqualTo("/bank-reconciliations?error=access_denied&state=" + STATE);
+        assertThat(location).isEqualTo("/bank-reconciliations?error=access_denied&state=" + state);
     }
 
     @Test
@@ -263,9 +287,14 @@ class MockBankControllerIntegrationTest {
 
     private MockHttpServletRequestBuilder authorize(MockHttpServletRequestBuilder request, String clientId,
                                                     String redirectUri) {
+        return authorize(request, clientId, redirectUri, state);
+    }
+
+    private MockHttpServletRequestBuilder authorize(MockHttpServletRequestBuilder request, String clientId,
+                                                    String redirectUri, String requestState) {
         return request.param("response_type", "code").param("client_id", clientId)
                 .param("redirect_uri", redirectUri).param("scope", "login inquiry")
-                .param("state", STATE).param("auth_type", "0");
+                .param("state", requestState).param("auth_type", "0");
     }
 
     /** 브라우저처럼 동의 화면을 먼저 열어, 화면이 준 쿠키와 숨은 입력 값을 폼 요청에 싣는다. */

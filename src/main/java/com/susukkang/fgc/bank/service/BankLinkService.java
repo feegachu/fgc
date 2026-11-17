@@ -23,6 +23,7 @@ import java.util.HexFormat;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 설명 : FUN-090 수수료 지급 계좌 연결. 오픈뱅킹 사용자 인증(3-legged)으로 조회 동의를 받는다.
@@ -48,13 +49,14 @@ public class BankLinkService {
     private final AuditLogService auditLogService;
     private final TransactionTemplate transaction;
     private final Map<String, Pending> pending = new ConcurrentHashMap<>();
-    private volatile Connected connected;
+    /** 연결한 계좌와 그 계좌의 토큰은 한 묶음으로만 바뀐다. 다른 연결의 토큰으로 이 계좌를 묻는 일이 없게 한다. */
+    private final AtomicReference<Connected> connected = new AtomicReference<>();
 
     /** 동의 화면으로 보낸 요청. 돌아왔을 때 같은 사용자의 같은 요청인지 본다. */
     private record Pending(Long userId, Instant expiresAt) {
     }
 
-    private record Connected(BankToken token, Instant expiresAt) {
+    private record Connected(String fintechUseNum, BankToken token, Instant expiresAt) {
     }
 
     /** 은행을 부를 수 있는 상태: 연결한 계좌와 살아 있는 토큰. */
@@ -73,7 +75,7 @@ public class BankLinkService {
     public BankLinkResponse status() {
         boolean mock = properties.mock() != null && properties.mock().enabled();
         return links.find()
-                .map(link -> new BankLinkResponse(true, liveToken().isPresent(), link.bankName(),
+                .map(link -> new BankLinkResponse(true, liveTokenFor(link).isPresent(), link.bankName(),
                         link.accountNumMasked(), link.accountHolderName(), link.linkedAt(), mock))
                 .orElseGet(() -> new BankLinkResponse(false, false, null, null, null, null, mock));
     }
@@ -106,6 +108,22 @@ public class BankLinkService {
             throw new FgcBusinessException(FgcErrorCode.BANK_003, Map.of("bankCode", failure.code()));
         }
         BankAccount account = agreed.orElseThrow(() -> new FgcBusinessException(FgcErrorCode.BANK_005));
+        // 계좌 저장과 토큰 교체를 한 번에 한 연결씩 한다. 두 사람이 동시에 연결해도 나중에 끝난 쪽의 계좌와 토큰이 함께 남는다.
+        synchronized (connected) {
+            saveLink(userId, account);
+            connected.set(new Connected(account.fintechUseNum(), token,
+                    Instant.now().plusSeconds(token.expiresInSeconds())));
+        }
+        return status();
+    }
+
+    /** 지금 동의 화면에 가 있는 연결 요청인지. 모의 은행이 FGC가 낸 요청으로만 동의 화면을 열도록 묻는다. */
+    public boolean isPending(String state) {
+        Pending requested = pending.get(state);
+        return requested != null && requested.expiresAt().isAfter(Instant.now());
+    }
+
+    private void saveLink(Long userId, BankAccount account) {
         transaction.executeWithoutResult(status -> {
             Optional<Link> before = links.find();
             links.save(account.fintechUseNum(), account.bankName(), account.accountNumMasked(),
@@ -120,25 +138,28 @@ public class BankLinkService {
                     .reason("수수료 지급 계좌 연결")
                     .build());
         });
-        connected = new Connected(token, Instant.now().plusSeconds(token.expiresInSeconds()));
-        return status();
     }
 
     /** 연결한 계좌와 살아 있는 토큰을 준다. 없으면 다시 연결하라고 알린다. */
     Session requireSession() {
         Link link = links.find().orElseThrow(() -> new FgcBusinessException(FgcErrorCode.BANK_001));
-        BankToken token = liveToken().orElseThrow(() -> new FgcBusinessException(FgcErrorCode.BANK_001));
+        BankToken token = liveTokenFor(link).orElseThrow(() -> new FgcBusinessException(FgcErrorCode.BANK_001));
         return new Session(link, token);
     }
 
-    /** 은행이 토큰을 거절했을 때 버린다. 계좌 연결 정보는 남긴다. */
-    void disconnect() {
-        connected = null;
+    /**
+     * 은행이 이 토큰을 거절했을 때 버린다. 계좌 연결 정보는 남긴다.
+     * 그사이 다른 요청이 다시 연결했으면 그 새 연결은 건드리지 않는다.
+     */
+    void disconnect(BankToken rejected) {
+        connected.updateAndGet(current -> current != null && current.token().equals(rejected) ? null : current);
     }
 
-    private Optional<BankToken> liveToken() {
-        Connected current = connected;
-        return current != null && current.expiresAt().isAfter(Instant.now())
+    /** 이 계좌로 받은 살아 있는 토큰. 다른 계좌의 토큰은 주지 않는다. */
+    private Optional<BankToken> liveTokenFor(Link link) {
+        Connected current = connected.get();
+        return current != null && current.fintechUseNum().equals(link.fintechUseNum())
+                && current.expiresAt().isAfter(Instant.now())
                 ? Optional.of(current.token()) : Optional.empty();
     }
 

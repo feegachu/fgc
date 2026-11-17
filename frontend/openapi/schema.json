@@ -2813,6 +2813,11 @@
             "description" : "같은 참조코드로 나간 출금 합계",
             "type" : "number"
           },
+          "bankReconciliationItemId" : {
+            "description" : "결과 줄의 번호. 내용이 같은 출금 두 건도 이 번호로 구분한다",
+            "format" : "int64",
+            "type" : "integer"
+          },
           "bankTranDate" : {
             "description" : "이체가 없으면 null",
             "format" : "date",

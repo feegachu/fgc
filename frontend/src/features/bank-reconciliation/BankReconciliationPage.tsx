@@ -86,15 +86,21 @@ export default function BankReconciliationPage() {
   const complete = useMutation({
     mutationFn: completeBankLink,
     meta: { errorToast: false },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      // 화면을 열 때 보낸 조회가 아직 오는 중이면 버린다. 늦게 온 "연결 전" 응답이 방금 마친 연결을 덮어쓰지 않게 한다.
+      await client.cancelQueries({ queryKey: bankLinkQuery().queryKey })
       client.setQueryData(bankLinkQuery().queryKey, data)
       toast('은행 계좌를 연결했습니다.', 'success')
     },
   })
   const run = useMutation({
-    mutationFn: () => runBankReconciliation(month ?? ''),
+    // 돌린 달을 요청과 함께 넘긴다. 응답을 기다리는 사이 정산월을 바꿔도 결과가 다른 달에 저장되지 않는다.
+    mutationFn: (target: string) => runBankReconciliation(target),
     meta: { errorToast: false },
-    onSuccess: (data) => client.setQueryData(bankReconciliationQuery(month ?? '').queryKey, data),
+    onSuccess: async (data, target) => {
+      await client.cancelQueries({ queryKey: bankReconciliationQuery(target).queryKey })
+      client.setQueryData(bankReconciliationQuery(target).queryKey, data)
+    },
   })
 
   // 은행 동의 화면에서 돌아오면 받은 값을 한 번만 처리한다. 새로 고침으로 다시 보내지 않게 주소에서는 지운다.
@@ -187,7 +193,7 @@ export default function BankReconciliationPage() {
               data-guide-feature="features.bank-reconciliation.bank-reconciliation-page.button-2"
               variant="primary"
               disabled={run.isPending || month === null}
-              onClick={() => run.mutate()}
+              onClick={() => run.mutate(month ?? '')}
             >
               은행 거래내역으로 대사
             </Button>
@@ -214,7 +220,7 @@ export default function BankReconciliationPage() {
                 caption="지급 이체 대사 결과"
                 columns={columns}
                 rows={result.items ?? []}
-                rowKey={(row) => `${row.result}-${row.referenceCode ?? row.printContent}-${row.bankTranDate ?? ''}-${row.bankAmount}`}
+                rowKey={(row) => String(row.bankReconciliationItemId)}
               />
             </>
           ) : (

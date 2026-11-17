@@ -1,6 +1,7 @@
 package com.susukkang.fgc.bank.mock;
 
 import com.susukkang.fgc.bank.openbanking.OpenBankingProperties;
+import com.susukkang.fgc.bank.service.BankLinkService;
 import com.susukkang.fgc.common.util.DateUtil;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
@@ -90,6 +91,7 @@ public class MockBankController {
 
     private final OpenBankingProperties properties;
     private final MockBankLedger ledger;
+    private final BankLinkService linkRequests;
     /** 인가 코드와 접근 토큰은 메모리에만 둔다. 서버를 다시 띄우면 모두 사라진다. */
     private final Map<String, Instant> codes = new ConcurrentHashMap<>();
     private final Set<String> accessTokens = ConcurrentHashMap.newKeySet();
@@ -263,7 +265,10 @@ public class MockBankController {
                 && properties.redirectUri().equals(query.get("redirect_uri"))
                 && SCOPE.equals(query.get("scope"))
                 && query.get("state") != null && STATE.matcher(query.get("state")).matches()
-                && query.get("auth_type") != null;
+                && query.get("auth_type") != null
+                // 모의 은행에는 은행 로그인이 없다. 처리 권한자가 FGC에서 방금 낸 연결 요청인지가 그 자리를 대신한다.
+                // 이 확인이 없으면 로그인하지 않은 사람이 코드와 토큰을 받아 확정 지급액을 읽을 수 있다.
+                && linkRequests.isPending(query.get("state"));
     }
 
     private boolean authorized(String authorization) {

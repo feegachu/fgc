@@ -79,7 +79,7 @@ public class BankReconciliationService {
             withdrawals = client.withdrawals(session.token(), session.link().fintechUseNum(), from, to);
         } catch (OpenBankingException failure) {
             if (TOKEN_REJECTED.contains(failure.code())) {
-                linkService.disconnect();
+                linkService.disconnect(session.token());
                 throw new FgcBusinessException(FgcErrorCode.BANK_001);
             }
             throw new FgcBusinessException(FgcErrorCode.BANK_003, Map.of("bankCode", failure.code()));

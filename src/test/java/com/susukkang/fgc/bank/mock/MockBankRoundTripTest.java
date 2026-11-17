@@ -9,6 +9,7 @@ import com.susukkang.fgc.bank.openbanking.BankWithdrawal;
 import com.susukkang.fgc.bank.openbanking.OpenBankingClient;
 import com.susukkang.fgc.bank.openbanking.OpenBankingException;
 import com.susukkang.fgc.bank.openbanking.OpenBankingProperties;
+import com.susukkang.fgc.bank.service.BankLinkService;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -36,7 +37,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
         properties = "fgc.openbanking.mock.enabled=true")
 class MockBankRoundTripTest {
 
-    private static final String STATE = "0123456789abcdef0123456789abcdef";
     /** 다른 테스트가 쓰지 않는 옛 날짜. 이 테스트가 넣은 줄만 지운다. */
     private static final LocalDate DAY = LocalDate.of(2001, 2, 1);
 
@@ -46,6 +46,8 @@ class MockBankRoundTripTest {
     private OpenBankingProperties configured;
     @Autowired
     private JdbcTemplate jdbc;
+    @Autowired
+    private BankLinkService linkService;
 
     @Test
     @DisplayName("동의 화면에서 동의하고 받은 코드로 토큰, 계좌, 두 쪽에 걸친 출금 내역까지 읽는다")
@@ -57,7 +59,10 @@ class MockBankRoundTripTest {
                 new OpenBankingProperties.Mock(true)));
         HttpClient browser = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
 
-        String authorizeUrl = client.authorizeUrl(STATE);
+        // 모의 은행은 FGC가 방금 낸 연결 요청으로만 동의 화면을 연다.
+        String issued = linkService.authorizeUrl(1L).authorizeUrl();
+        String state = issued.substring(issued.indexOf("state=") + "state=".length(), issued.indexOf("state=") + "state=".length() + 32);
+        String authorizeUrl = client.authorizeUrl(state);
         HttpResponse<String> consent = browser.send(HttpRequest.newBuilder(URI.create(authorizeUrl)).GET().build(),
                 HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         assertThat(consent.statusCode()).isEqualTo(200);
@@ -87,7 +92,7 @@ class MockBankRoundTripTest {
                 HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         assertThat(approved.statusCode()).isEqualTo(302);
         String location = approved.headers().firstValue("Location").orElseThrow();
-        assertThat(location).startsWith(configured.redirectUri() + "?code=").endsWith("&state=" + STATE);
+        assertThat(location).startsWith(configured.redirectUri() + "?code=").endsWith("&state=" + state);
         Matcher code = Pattern.compile("code=([^&]+)").matcher(location);
         assertThat(code.find()).isTrue();
 

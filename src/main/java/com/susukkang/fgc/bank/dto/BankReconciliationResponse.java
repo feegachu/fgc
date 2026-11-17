@@ -27,6 +27,7 @@ public record BankReconciliationResponse(
     // API 문서에서 다른 DTO의 Item 과 이름이 겹치지 않게 한다.
     @Schema(name = "BankReconciliationItem")
     public record Item(
+            @Schema(description = "결과 줄의 번호. 내용이 같은 출금 두 건도 이 번호로 구분한다") Long bankReconciliationItemId,
             @Schema(description = "MATCHED 일치, AMOUNT_MISMATCH 금액 다름, NOT_TRANSFERRED 이체 없음, UNKNOWN_WITHDRAWAL 확인 안 된 출금")
             String result,
             @Schema(nullable = true, description = "확인 안 된 출금이면 null") String agentCode,

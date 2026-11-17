@@ -180,6 +180,71 @@ class BankReconciliationServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("소수 금액은 지급 건마다 원 단위로 반올림한 뒤 더한다")
+    void roundsEachPaymentBeforeSumming() {
+        finalizeMonth(MARCH, DateUtil.nowSeoul());
+        link("settle01");
+        Map<String, Object> first = expectedTransfers(MARCH).get(0);
+        // 운영정책서 제17조의2: 상세행을 먼저 원 단위로 반올림하고 합계는 그 값을 더한다. 100.50 + 100.50 은 201 이 아니라 202 다.
+        confirmedLine((Long) first.get("agent_id"), MARCH, "100.50", "PAYMENT");
+        confirmedLine((Long) first.get("agent_id"), MARCH, "100.50", "PAYMENT");
+        LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
+        when(client.withdrawals(TOKEN, FINTECH_USE_NUM, today, today)).thenReturn(List.of());
+
+        BankReconciliationResponse result = reconciliationService.run(userId("settle01"), "2026-03");
+
+        assertThat(result.items()).filteredOn(item -> reference(MARCH, first).equals(item.referenceCode()))
+                .singleElement().satisfies(item -> assertThat(item.expectedAmount())
+                        .isEqualByComparingTo(amount(first).add(new BigDecimal("202"))));
+    }
+
+    @Test
+    @DisplayName("순액이 0원 이하인 설계사는 이체 대상이 아니고, 1원이라도 남으면 대상이다")
+    void transfersOnlyPositiveNetAmounts() {
+        finalizeMonth(MARCH, DateUtil.nowSeoul());
+        link("settle01");
+        Map<String, Object> first = expectedTransfers(MARCH).get(0);
+        Long agentId = (Long) first.get("agent_id");
+        LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
+        when(client.withdrawals(TOKEN, FINTECH_USE_NUM, today, today)).thenReturn(List.of());
+
+        // 1원이 남으면 이체 대상이다.
+        confirmedDeduction(agentId, MARCH, amount(first).subtract(BigDecimal.ONE).toPlainString());
+        assertThat(reconciliationService.run(userId("settle01"), "2026-03").items())
+                .filteredOn(item -> reference(MARCH, first).equals(item.referenceCode()))
+                .singleElement().satisfies(item -> {
+                    assertThat(item.result()).isEqualTo("NOT_TRANSFERRED");
+                    assertThat(item.expectedAmount()).isEqualByComparingTo("1");
+                });
+
+        // 0원이면 대상이 아니다.
+        confirmedDeduction(agentId, MARCH, "1");
+        assertThat(reconciliationService.run(userId("settle01"), "2026-03").items())
+                .extracting(BankReconciliationResponse.Item::referenceCode).doesNotContain(reference(MARCH, first));
+
+        // 차감이 더 많아 -1원이어도 대상이 아니다.
+        confirmedDeduction(agentId, MARCH, "1");
+        assertThat(reconciliationService.run(userId("settle01"), "2026-03").items())
+                .extracting(BankReconciliationResponse.Item::referenceCode).doesNotContain(reference(MARCH, first));
+    }
+
+    @Test
+    @DisplayName("결과 줄마다 서로 다른 번호를 준다")
+    void numbersEveryResultLine() {
+        finalizeMonth(MARCH, DateUtil.nowSeoul());
+        link("settle01");
+        LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
+        // 같은 날 같은 내용, 같은 금액의 출금 두 건. 화면이 줄을 구분하려면 내용이 아니라 번호가 있어야 한다.
+        when(client.withdrawals(TOKEN, FINTECH_USE_NUM, today, today)).thenReturn(List.of(
+                withdrawal(today, "관리비", new BigDecimal("55000")), withdrawal(today, "관리비", new BigDecimal("55000"))));
+
+        BankReconciliationResponse result = reconciliationService.run(userId("settle01"), "2026-03");
+
+        assertThat(result.items()).extracting(BankReconciliationResponse.Item::bankReconciliationItemId)
+                .doesNotContainNull().doesNotHaveDuplicates();
+    }
+
+    @Test
     @DisplayName("확정 차감은 이체할 금액에서 뺀다")
     void subtractsConfirmedDeductionsFromTheExpectedTransfer() {
         finalizeMonth(MARCH, DateUtil.nowSeoul());
@@ -274,6 +339,26 @@ class BankReconciliationServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("이전 연결의 토큰이 거절돼도 그사이 새로 한 연결은 끊지 않는다")
+    void keepsANewerConnectionWhenAnOlderTokenIsRejected() {
+        finalizeMonth(MARCH, DateUtil.nowSeoul());
+        link("settle01");
+        BankToken newer = new BankToken("ACCESS-2", "1100000001", 7_776_000L);
+        when(client.exchange("CODE-2")).thenReturn(newer);
+        when(client.accounts(newer)).thenReturn(accounts());
+        when(client.withdrawals(eq(TOKEN), eq(FINTECH_USE_NUM), any(), any())).thenAnswer(call -> {
+            // 은행 응답을 기다리는 사이 다른 요청이 다시 연결했다.
+            String state = stateOf(linkService.authorizeUrl(userId("settle01")).authorizeUrl());
+            linkService.link(userId("settle01"), "CODE-2", state);
+            throw new OpenBankingException("O0003");
+        });
+
+        assertBank(FgcErrorCode.BANK_001, () -> reconciliationService.run(userId("settle01"), "2026-03"));
+
+        assertThat(linkService.status().connected()).isTrue();
+    }
+
+    @Test
     @DisplayName("대사한 적 없는 달은 결과가 없다")
     void hasNoResultBeforeTheFirstRun() {
         assertThat(reconciliationService.latest("2026-03")).isNull();
@@ -349,6 +434,11 @@ class BankReconciliationServiceIntegrationTest {
 
     /** 그 설계사의 확정 지급 1건을 본떠 확정 차감 1건을 만든다. */
     private void confirmedDeduction(Long agentId, LocalDate month, String amount) {
+        confirmedLine(agentId, month, amount, "DEDUCTION");
+    }
+
+    /** 그 설계사의 확정 지급 1건을 본떠 확정 지급이나 확정 차감 1건을 더 만든다. */
+    private void confirmedLine(Long agentId, LocalDate month, String amount, String cashflowType) {
         Long source = jdbc.queryForObject("""
                 SELECT min(commission_transaction_id) FROM fgc.commission_transaction
                  WHERE payment_stage = 'GA_TO_FC' AND status = 'CONFIRMED' AND cashflow_type = 'PAYMENT'
@@ -358,10 +448,11 @@ class BankReconciliationServiceIntegrationTest {
                 INSERT INTO fgc.commission_transaction(payment_stage, source_type, source_business_key, source_contract_id,
                     recipient_agent_id, commission_item_id, settlement_month, due_date, amount, cashflow_type, status)
                 SELECT payment_stage, 'ADJUSTMENT', ?, source_contract_id, recipient_agent_id, commission_item_id,
-                       settlement_month, due_date, ?::numeric, 'DEDUCTION', 'DRAFT'
+                       settlement_month, due_date, ?::numeric, ?, 'DRAFT'
                   FROM fgc.commission_transaction WHERE commission_transaction_id = ?
                 RETURNING commission_transaction_id
-                """, Long.class, "FUN090-DEDUCTION-" + ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE), amount, source);
+                """, Long.class, "FUN090-LINE-" + ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE), amount,
+                cashflowType, source);
         jdbc.update("""
                 INSERT INTO fgc.transaction_attribution(commission_transaction_id, attribution_seq, attribution_scope,
                     contract_id, agent_id, attribution_date, attribution_month, attributed_amount,

@@ -102,7 +102,7 @@ public class OpenBankingClient {
         JsonNode json = get("/v2.0/user/me", Map.of("user_seq_no", token.userSeqNo()), token);
         requireSuccess("/v2.0/user/me", json);
         List<BankAccount> accounts = new ArrayList<>();
-        for (JsonNode row : json.path("res_list")) {
+        for (JsonNode row : list("/v2.0/user/me", json)) {
             accounts.add(new BankAccount(row.path("fintech_use_num").asText(), row.path("bank_name").asText(),
                     row.path("account_num_masked").asText(), row.path("account_holder_name").asText(),
                     "Y".equals(row.path("inquiry_agree_yn").asText())));
@@ -134,7 +134,7 @@ public class OpenBankingClient {
                 return withdrawals;
             }
             requireSuccess(path, json);
-            for (JsonNode row : json.path("res_list")) {
+            for (JsonNode row : list(path, json)) {
                 withdrawals.add(withdrawal(path, row));
             }
             if (!"Y".equals(json.path("next_page_yn").asText())) {
@@ -143,6 +143,15 @@ public class OpenBankingClient {
             trace = json.path("befor_inquiry_trace_info").asText();
         }
         throw failed(path, "TOO_MANY_PAGES");
+    }
+
+    /** 성공 응답의 목록. 목록이 빠졌으면 빈 목록으로 보지 않는다. 빈 목록으로 받으면 확정 지급 전부가 이체 없음으로 남는다. */
+    private static JsonNode list(String path, JsonNode json) {
+        JsonNode rows = json.path("res_list");
+        if (!rows.isArray()) {
+            throw failed(path, "BAD_RESPONSE");
+        }
+        return rows;
     }
 
     private static BankWithdrawal withdrawal(String path, JsonNode row) {
