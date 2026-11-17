@@ -25,7 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-/** IF-EXT-05 문자 발송 게이트웨이. 실제 사업자를 부르지 않고 같은 규격의 가짜 서버로 확인한다. */
+/** FGC-FUN-089, IF-EXT-05 문자 발송 게이트웨이. 실제 사업자를 부르지 않고 같은 규격의 가짜 서버로 확인한다. */
 class SmsGatewayTest {
 
     private static final Pattern AUTHORIZATION = Pattern.compile(
@@ -39,7 +39,8 @@ class SmsGatewayTest {
     private HttpServer server;
     private int status = 200;
     private String responseBody = ACCEPTED;
-    // 느린 사업자를 흉내 내는 문. 닫아 두면 가짜 사업자가 그 자리에서 테스트가 끝날 때까지 답하지 않는다.
+    // FGC-FUN-089 호출 제한 시간(응답 본문까지 5초)을 확인하려고 느린 사업자를 흉내 내는 문.
+    // 닫아 두면 가짜 사업자가 그 자리에서 테스트가 끝날 때까지 답하지 않는다.
     private volatile CountDownLatch beforeHeaders = new CountDownLatch(0);
     private volatile CountDownLatch beforeBody = new CountDownLatch(0);
     private volatile boolean headersSent;
@@ -176,9 +177,10 @@ class SmsGatewayTest {
                 });
     }
 
+    // 기한이 사라져 끝없이 기다리는 회귀만 잡는 제한이다. 첫 호출 준비가 느린 환경에서도 걸리지 않게 넉넉히 둔다.
     @Test
-    @Timeout(10)
-    @DisplayName("응답이 제한 시간을 넘기면 다시 보낼 수 있는 실패로 남긴다")
+    @Timeout(60)
+    @DisplayName("FGC-FUN-089 응답이 제한 시간을 넘기면 다시 보낼 수 있는 실패로 남긴다")
     void retriesTimeouts() {
         timeout = Duration.ofMillis(300);
         beforeHeaders = new CountDownLatch(1);
@@ -191,12 +193,15 @@ class SmsGatewayTest {
     }
 
     @Test
-    @Timeout(10)
-    @DisplayName("응답 머리만 오고 본문이 오지 않아도 제한 시간이 지나면 다시 보낼 수 있는 실패로 남긴다")
+    @Timeout(60)
+    @DisplayName("FGC-FUN-089 응답 머리만 오고 본문이 오지 않아도 제한 시간이 지나면 다시 보낼 수 있는 실패로 남긴다")
     void retriesWhenTheBodyStalls() {
+        // 첫 호출의 준비 시간(클래스 적재, 연결)이 아래 제한 시간에 섞이지 않게 넉넉한 제한으로 한 번 보내 둔다.
+        gateway().send("01000001234", "문자");
         // 머리가 제한 안에 넉넉히 들어오게 1초를 준다. 머리가 늦어 난 시간 초과와 섞이지 않게 한다.
         timeout = Duration.ofSeconds(1);
         beforeBody = new CountDownLatch(1);
+        headersSent = false;
         SmsGateway gateway = gateway();
 
         assertThatThrownBy(() -> gateway.send("01000001234", "문자"))
