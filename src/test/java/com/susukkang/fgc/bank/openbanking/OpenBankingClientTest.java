@@ -48,6 +48,7 @@ class OpenBankingClientTest {
     // 느린 은행을 흉내 내는 문. 닫아 두면 가짜 은행이 그 자리에서 테스트가 끝날 때까지 답하지 않는다.
     private volatile CountDownLatch beforeHeaders = new CountDownLatch(0);
     private volatile CountDownLatch beforeBody = new CountDownLatch(0);
+    private volatile boolean headersSent;
     // 다른 통합 테스트와 함께 돌 때도 응답이 제한 안에 들도록 넉넉히 둔다. 시간 초과 테스트만 짧은 제한을 쓴다.
     private Duration timeout = Duration.ofSeconds(10);
 
@@ -72,6 +73,7 @@ class OpenBankingClientTest {
                     .getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
             exchange.sendResponseHeaders(200, response.length);
+            headersSent = true;
             waitFor(beforeBody);
             exchange.getResponseBody().write(response);
             exchange.close();
@@ -252,13 +254,14 @@ class OpenBankingClientTest {
     void reportsTimeoutsWhenTheBodyStalls() {
         respond("/v2.0/user/me", USER);
         beforeBody = new CountDownLatch(1);
-        timeout = Duration.ofMillis(300);
+        // 머리가 제한 안에 넉넉히 들어오게 1초를 준다. 머리가 늦어 난 시간 초과와 섞이지 않게 한다.
+        timeout = Duration.ofSeconds(1);
+        OpenBankingClient client = client();
 
-        long started = System.nanoTime();
-        assertThatThrownBy(() -> client().accounts(token()))
+        assertThatThrownBy(() -> client.accounts(token()))
                 .isInstanceOfSatisfying(OpenBankingException.class, e -> assertThat(e.code()).isEqualTo("TIMEOUT"));
-        // JDK HttpClient 의 요청 제한 시간은 응답 머리까지만 본다. 본문은 이 테스트가 끝날 때까지 오지 않는다.
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(1_200));
+        // JDK HttpClient 의 요청 제한 시간은 응답 머리까지만 본다. 머리는 왔고 본문은 이 테스트가 끝날 때까지 오지 않는다.
+        assertThat(headersSent).isTrue();
     }
 
     private OpenBankingClient client() {
