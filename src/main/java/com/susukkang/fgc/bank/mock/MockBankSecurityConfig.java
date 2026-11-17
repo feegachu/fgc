@@ -1,5 +1,6 @@
 package com.susukkang.fgc.bank.mock;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,11 +38,18 @@ public class MockBankSecurityConfig {
         formTokens.setCookiePath("/api/v1/mock-bank");
         http.securityMatcher("/api/v1/mock-bank/**")
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // 토큰 발급은 브라우저가 아니라 FGC 서버가 client_secret 을 실어 부르므로 뺀다.
+                // 브라우저가 보내는 폼은 동의와 취소 둘뿐이라 이 둘에 건다. 토큰 발급과 조회는 브라우저가 아니라
+                // FGC 서버가 client_secret 과 토큰을 실어 부른다. 브라우저가 보내는 폼을 더하면 여기에도 더한다.
                 .csrf(csrf -> csrf.csrfTokenRepository(formTokens)
-                        .ignoringRequestMatchers("/api/v1/mock-bank/oauth/2.0/token"))
+                        .requireCsrfProtectionMatcher(MockBankSecurityConfig::isConsentForm))
                 .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
+    }
+
+    /** 동의 화면의 폼(동의, 취소)이 보내는 요청인지. */
+    private static boolean isConsentForm(HttpServletRequest request) {
+        return "POST".equals(request.getMethod()) && request.getRequestURI()
+                .startsWith(request.getContextPath() + "/api/v1/mock-bank/oauth/2.0/authorize/");
     }
 }
