@@ -74,7 +74,7 @@ fgc:
     base-url: https://api.solapi.com
     timeout: 5s
   notification:
-    enabled: true                # 10초 주기 마감 알림 감지·발송. 끄면 알림을 만들지도 보내지도 않는다
+    enabled: true                # 10초 주기 실행(확정 대기 감지, 놓친 확정 통지 복구, 발송)만 끈다. 꺼도 확정 통지는 대기로 쌓여 켜면 나간다. 문자를 끄려면 SOLAPI 값을 비운다
   batch:
     daily-changed-contract:
       cron: "0 0 2 * * *"        # 매일 02:00. 프로젝트 운영 가정일 뿐 법정 기준 아님

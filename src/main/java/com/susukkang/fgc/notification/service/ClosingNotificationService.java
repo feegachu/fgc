@@ -42,6 +42,8 @@ public class ClosingNotificationService {
     /** 세 번 시도하면 자동 재시도를 멈춘다. 그 뒤에는 발송 이력 화면의 다시 보내기로만 보낸다. */
     static final int MAX_ATTEMPTS = 3;
     private static final int MAX_SENDS_PER_RUN = 100;
+    private static final String SKIPPED = "SKIPPED";
+    private static final String FAILED = "FAILED";
     private static final String SORT = "createdAt,desc";
 
     private final ClosingNotificationRepository notifications;
@@ -50,7 +52,8 @@ public class ClosingNotificationService {
     private final AuditLogService auditLogService;
     private final TransactionTemplate transaction;
 
-    // 테스트는 끄고 detectFinalizeReady()·dispatchPending()을 직접 부른다.
+    // 예약 실행(감지, 복구, 발송)만 끈다. 테스트가 끄고 detectFinalizeReady()·dispatchPending()을 직접 부르려고 둔 값이다.
+    // 꺼도 확정 통지는 리스너가 대기로 쌓고, 켜면 그때 나간다. 운영에서 문자를 끄려면 문자 키를 비운다(Runbook 5-6).
     @Value("${fgc.notification.enabled:true}")
     private boolean enabled;
 
@@ -136,59 +139,77 @@ public class ClosingNotificationService {
         // 마지막 시도 중에 서버가 멈춰 대기로 남은 알림은 한 번 더 보내지 않는다. 실패로 끝내 다시 보내기로만 되살린다.
         transaction.executeWithoutResult(status -> notifications.failExhausted(MAX_ATTEMPTS));
         int handled = 0;
-        while (handled < MAX_SENDS_PER_RUN) {
+        // 문자 사업자가 답하지 않으면 멈춘다. 남은 알림마다 제한 시간을 다시 쓰면 같은 스케줄러의 다른 예약 작업까지 밀린다.
+        boolean providerAnswers = true;
+        while (providerAnswers && handled < MAX_SENDS_PER_RUN) {
             // 잡으면서 시도 횟수·다음 시도 시각을 먼저 커밋한다. 발송 중에 멈춰도 그 시각 전에는 다시 잡지 않는다.
             Claimed claimed = transaction.execute(status -> notifications.claimNext(MAX_ATTEMPTS).orElse(null));
             if (claimed == null) {
                 break;
             }
             handled++;
-            if (!send(claimed)) {
-                // 문자 사업자가 답하지 않는다. 남은 알림마다 제한 시간을 다시 쓰면 같은 스케줄러의 다른 예약 작업까지 밀린다.
-                break;
-            }
+            providerAnswers = send(claimed);
         }
         return handled;
     }
 
     /** 잡은 알림 하나를 처리한다. 문자 사업자가 답하지 않아 이번 주기의 발송을 멈춰야 하면 false 다. */
     private boolean send(Claimed claimed) {
-        if (claimed.alreadyFinalized()) {
-            // 그사이 그 달이 확정됐다. "확정해 주세요"는 틀린 안내가 된다.
-            stop(claimed, "SKIPPED", "ALREADY_FINALIZED");
-            return true;
-        }
-        if (claimed.phone() == null) {
-            stop(claimed, "SKIPPED", "CONSENT_WITHDRAWN");
-            return true;
-        }
-        // 외부 호출은 트랜잭션 밖에서 한다. 사업자가 느려도 DB 연결과 행 잠금을 붙잡지 않는다.
         String messageId;
         try {
+            String reason = reasonToSkip(claimed);
+            if (reason != null) {
+                stop(claimed, SKIPPED, reason);
+                return true;
+            }
+            // 외부 호출은 트랜잭션 밖에서 한다. 사업자가 느려도 DB 연결과 행 잠금을 붙잡지 않는다.
             messageId = smsGateway.send(claimed.phone(), claimed.messageText());
         } catch (SmsSendException failure) {
-            if ("NO_API_KEY".equals(failure.code())) {
-                stop(claimed, "SKIPPED", failure.code());
-                return true;
-            }
-            if (!failure.retryable()) {
-                stop(claimed, "FAILED", failure.code());
-                return true;
-            }
-            if (claimed.attemptCount() < MAX_ATTEMPTS) {
-                transaction.executeWithoutResult(status -> notifications.markRetry(claimed.id(), failure.code()));
-            } else {
-                stop(claimed, "FAILED", failure.code());
-            }
-            return false;
+            return afterProviderFailure(claimed, failure);
         } catch (RuntimeException failure) {
             // 예상하지 못한 오류로 같은 알림을 계속 다시 잡지 않게 실패로 끝낸다. 발송 이력의 다시 보내기로만 되살린다.
             log.warn("마감 알림 발송 중 오류 closingNotificationId={}", claimed.id(), failure);
-            stop(claimed, "FAILED", "INTERNAL");
+            stop(claimed, FAILED, "INTERNAL");
             return true;
         }
         transaction.executeWithoutResult(status -> notifications.markSent(claimed.id(), messageId));
         return true;
+    }
+
+    /** 보내지 않고 건너뛸 사유. 보내도 되면 null 이다. */
+    private String reasonToSkip(Claimed claimed) {
+        if (claimed.alreadyFinalized()) {
+            // 그사이 그 달이 확정됐다. "확정해 주세요"는 틀린 안내가 된다.
+            return "ALREADY_FINALIZED";
+        }
+        if (claimed.phone() == null) {
+            return "CONSENT_WITHDRAWN";
+        }
+        // 보내는 시점에 참인 안내만 보낸다. 알린 뒤 같은 달에 새 실행이 생겼거나 예외가 다시 열렸으면 지금은 확정할 수 없다.
+        // 감지할 때와 같이 확정 API의 체크리스트로 다시 본다. 재시도와 다시 보내기도 이 길을 지난다.
+        if (ClosingNotificationRepository.FINALIZE_READY.equals(claimed.eventType())
+                && !finalization.getChecklist(claimed.validationRunId()).passed()) {
+            return "NO_LONGER_READY";
+        }
+        return null;
+    }
+
+    /** 문자 사업자가 준 실패를 남긴다. 다시 보낼 수 있는 실패면 사업자가 답하지 않는 것으로 보고 false 다. */
+    private boolean afterProviderFailure(Claimed claimed, SmsSendException failure) {
+        if ("NO_API_KEY".equals(failure.code())) {
+            stop(claimed, SKIPPED, failure.code());
+            return true;
+        }
+        if (!failure.retryable()) {
+            stop(claimed, FAILED, failure.code());
+            return true;
+        }
+        if (claimed.attemptCount() < MAX_ATTEMPTS) {
+            transaction.executeWithoutResult(status -> notifications.markRetry(claimed.id(), failure.code()));
+        } else {
+            stop(claimed, FAILED, failure.code());
+        }
+        return false;
     }
 
     private void stop(Claimed claimed, String status, String errorCode) {
@@ -211,7 +232,7 @@ public class ClosingNotificationService {
     public void resend(Long id) {
         String status = notifications.findStatusForUpdate(id).orElseThrow(() -> new FgcBusinessException(
                 FgcErrorCode.COMMON_004, "closingNotificationId", Map.of("field", "closingNotificationId", "id", id), null));
-        if (!"FAILED".equals(status) && !"SKIPPED".equals(status)) {
+        if (!FAILED.equals(status) && !SKIPPED.equals(status)) {
             throw new FgcBusinessException(FgcErrorCode.NOTI_001, Map.of("status", status));
         }
         notifications.resetToPending(id);

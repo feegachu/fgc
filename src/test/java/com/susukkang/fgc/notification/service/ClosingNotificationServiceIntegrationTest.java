@@ -240,6 +240,44 @@ class ClosingNotificationServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("같은 달에 새 실행이 생기면 옛 실행의 확정 대기 알림은 다시 보내도 나가지 않는다")
+    void doesNotSendFinalizeReadyAfterANewerRunWasCreated() {
+        LocalDate month = LocalDate.of(2088, 5, 1);
+        Long runId = readyRunFor("gaadmin", GA_ADMIN_PHONE);
+        Long id = (Long) notifications(runId).get(0).get("closing_notification_id");
+        when(smsGateway.send(anyString(), anyString())).thenThrow(new SmsSendException("NO_API_KEY", false));
+        service.dispatchPending();
+        // 같은 달을 다시 검증하려고 새 실행을 만들었다. 아직 계산 전이어도 옛 실행은 확정할 수 없다(확정 조건 7).
+        createRun(month);
+
+        service.resend(id);
+        assertThat(service.dispatchPending()).isEqualTo(1);
+
+        assertThat(notifications(runId).get(0)).containsEntry("status", "SKIPPED")
+                .containsEntry("error_code", "NO_LONGER_READY");
+        verify(smsGateway, times(1)).send(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("보내기 전에 미처리 예외가 다시 생겼으면 확정 대기 알림을 보내지 않는다")
+    void doesNotSendFinalizeReadyWhenTheChecklistNoLongerPasses() {
+        LocalDate month = LocalDate.of(2088, 5, 1);
+        Long runId = readyRunFor("gaadmin", GA_ADMIN_PHONE);
+        jdbc.update("""
+                INSERT INTO fgc.exception_case(exception_key,exception_type,severity,status,validation_run_id,
+                    validation_month,source_entity_type,source_entity_id,title)
+                VALUES (?,'RECONCILIATION_MISMATCH','HIGH','NEW',?,?,'VALIDATION_RUN',?,'알린 뒤에 생긴 대사 불일치')
+                """, "FUN089-LATE-" + runId, runId, month, runId.toString());
+
+        // 보내는 시점에 참인 안내만 보낸다. 확정 API와 같은 체크리스트로 다시 본다.
+        assertThat(service.dispatchPending()).isEqualTo(1);
+
+        assertThat(notifications(runId).get(0)).containsEntry("status", "SKIPPED")
+                .containsEntry("error_code", "NO_LONGER_READY");
+        verify(smsGateway, never()).send(anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("확정 통지는 확정된 달의 알림이므로 그대로 보낸다")
     void stillSendsRunFinalizedForAFinalizedMonth() {
         Long runId = createCompletedRun(LocalDate.of(2088, 8, 1));

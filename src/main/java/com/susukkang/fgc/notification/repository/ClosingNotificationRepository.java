@@ -36,7 +36,8 @@ public class ClosingNotificationRepository {
      * 잡은 알림 1건. phone 이 null 이면 그사이 수신 동의를 철회한 것이다.
      * alreadyFinalized 는 확정 대기 알림인데 그사이 그 달이 확정됐다는 뜻이다.
      */
-    public record Claimed(Long id, String phone, String messageText, int attemptCount, boolean alreadyFinalized) {
+    public record Claimed(Long id, String eventType, Long validationRunId, String phone, String messageText,
+                          int attemptCount, boolean alreadyFinalized) {
     }
 
     /**
@@ -126,7 +127,7 @@ public class ClosingNotificationRepository {
                        next_attempt_at = clock_timestamp() + make_interval(mins => power(2, claimed.attempt_count)::int)
                   FROM next_notification
                  WHERE claimed.closing_notification_id = next_notification.closing_notification_id
-                RETURNING claimed.closing_notification_id,
+                RETURNING claimed.closing_notification_id, claimed.event_type, claimed.validation_run_id,
                           (SELECT s.mobile_phone FROM fgc.user_notification_setting s
                             WHERE s.user_id = claimed.recipient_user_id),
                           claimed.message_text, claimed.attempt_count,
@@ -137,8 +138,8 @@ public class ClosingNotificationRepository {
                                   ON finalized.validation_month = mine.validation_month
                                WHERE mine.validation_run_id = claimed.validation_run_id
                                  AND finalized.status = 'FINALIZED')
-                """, (rs, row) -> new Claimed(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getInt(4),
-                        rs.getBoolean(5)), maxAttempts)
+                """, (rs, row) -> new Claimed(rs.getLong(1), rs.getString(2), rs.getLong(3), rs.getString(4),
+                        rs.getString(5), rs.getInt(6), rs.getBoolean(7)), maxAttempts)
                 .stream().findFirst();
     }
 
