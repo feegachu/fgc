@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { StatusBadge } from '../../components/StatusBadge'
 import { screenMessage } from '../../lib/screenText'
 import { withMonth } from '../../stores/workspace'
+import { OPEN_STATUS } from '../exception/api'
 import type { RecentException } from './api'
 import { exceptionStatusTone, severityTone } from './tones'
 
@@ -61,9 +62,9 @@ export function RecentExceptionTicker({ rows, month }: { rows: RecentException[]
         <Link
           data-guide-feature="features.dashboard.exception-ticker.all"
           className="run-list-link"
-          to={withMonth('/exceptions', month)}
+          to={withMonth(`/exceptions?status=${OPEN_STATUS}`, month)}
         >
-          전체 보기
+          전체 기간 미처리 예외 보기
         </Link>
       </header>
       <div className="data-table-viewport">
