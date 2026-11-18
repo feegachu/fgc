@@ -260,6 +260,13 @@ public enum FgcErrorCode {
             "error.ai.unavailable"
     ),
 
+    // FUN-089 마감 알림 — 발송 완료·대기 중인 알림은 다시 보내기로 되돌릴 수 없다.
+    NOTI_001(
+            "FGC-NOTI-001",
+            HttpStatus.CONFLICT,
+            "error.notification.notResendable"
+    ),
+
     IMPL_GUIDE_STATE_STALE("FGC-IMPL-GUIDE_STATE_STALE", HttpStatus.CONFLICT, "error.ai.guideStateStale"),
 
     IMPL_GUIDE_VERSION_MISMATCH("FGC-IMPL-GUIDE_VERSION_MISMATCH", HttpStatus.CONFLICT,

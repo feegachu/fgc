@@ -1730,6 +1730,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseNotificationSettingResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/NotificationSettingResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponsePageResponseAcquisitionCostCheckResponse" : {
         "properties" : {
           "data" : {
@@ -1804,6 +1818,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/PageResponseClawbackNoticeDocumentResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponsePageResponseClosingNotificationResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PageResponseClosingNotificationResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -3941,6 +3969,61 @@
           }
         },
         "required" : [ "clawbackBasisCode", "clawbackRatePct", "elapsedMonthFrom", "elapsedMonthTo" ],
+        "type" : "object"
+      },
+      "ClosingNotificationResponse" : {
+        "properties" : {
+          "attemptCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "closingNotificationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "errorCode" : {
+            "description" : "실패하거나 건너뛴 사유. 없으면 null",
+            "type" : [ "string", "null" ]
+          },
+          "eventType" : {
+            "type" : "string"
+          },
+          "messageText" : {
+            "type" : "string"
+          },
+          "recipientLoginId" : {
+            "description" : "수신 대상이 없던 사건이면 null",
+            "type" : [ "string", "null" ]
+          },
+          "recipientName" : {
+            "description" : "수신 대상이 없던 사건이면 null",
+            "type" : [ "string", "null" ]
+          },
+          "recipientPhone" : {
+            "description" : "가운데를 가린 번호. 수신 대상이 없거나 수신을 해제했으면 null",
+            "type" : [ "string", "null" ]
+          },
+          "sentAt" : {
+            "description" : "보내지 않았으면 null",
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "validationMonth" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "validationRunId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
         "type" : "object"
       },
       "CommissionItemResponse" : {
@@ -7983,6 +8066,35 @@
         },
         "type" : "object"
       },
+      "NotificationSettingRequest" : {
+        "properties" : {
+          "consent" : {
+            "type" : "boolean"
+          },
+          "mobilePhone" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "consent" ],
+        "type" : "object"
+      },
+      "NotificationSettingResponse" : {
+        "properties" : {
+          "consentedAt" : {
+            "description" : "수신 동의하지 않았으면 null",
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "mobilePhone" : {
+            "description" : "수신 동의하지 않았으면 null",
+            "type" : [ "string", "null" ]
+          },
+          "smsConfigured" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "Option" : {
         "properties" : {
           "code" : {
@@ -8258,6 +8370,36 @@
           "content" : {
             "items" : {
               "$ref" : "#/components/schemas/ClawbackNoticeDocumentResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PageResponseClosingNotificationResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ClosingNotificationResponse"
             },
             "type" : "array"
           },
@@ -15329,6 +15471,124 @@
         "tags" : [ "보험 뉴스" ]
       }
     },
+    "/api/v1/notification-settings/me" : {
+      "get" : {
+        "description" : "로그인한 사용자의 휴대폰 번호와 수신 동의 시각을 돌려준다. 동의하지 않았으면 둘 다 null 이다.",
+        "operationId" : "mySetting",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationSettingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "본인 마감 알림 수신 설정 조회",
+        "tags" : [ "마감 알림" ]
+      },
+      "put" : {
+        "description" : "consent 가 true 면 휴대폰 번호를 저장하고, false 면 번호를 지운다. 사용자 ID는 로그인 정보에서만 얻는다.",
+        "operationId" : "changeMySetting",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/NotificationSettingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationSettingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "본인 마감 알림 수신 설정 저장",
+        "tags" : [ "마감 알림" ]
+      }
+    },
+    "/api/v1/notifications" : {
+      "get" : {
+        "description" : "최신순. 수신번호는 가운데를 가려 돌려준다.",
+        "operationId" : "notifications",
+        "parameters" : [ {
+          "description" : "페이지(1-base)",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "페이지 크기(최대 100)",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePageResponseClosingNotificationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "마감 알림 발송 이력",
+        "tags" : [ "마감 알림" ]
+      }
+    },
+    "/api/v1/notifications/{id}/resend" : {
+      "post" : {
+        "description" : "실패했거나 건너뛴 알림을 대기로 되돌린다. 다음 발송 주기에 다시 보낸다.",
+        "operationId" : "resend",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "마감 알림 다시 보내기",
+        "tags" : [ "마감 알림" ]
+      }
+    },
     "/api/v1/policies" : {
       "get" : {
         "description" : "정책 유형·기준일·상태로 정책 버전 목록을 조회합니다. 기준일(asOf)은 해당 일자에 유효한 버전만 남깁니다 — 정책은 계약일 기준으로 고르는 경우가 많습니다. 조건에 맞는 자료가 없으면 200과 빈 배열을 반환합니다.",
@@ -17386,6 +17646,9 @@
   }, {
     "description" : "FUN-065 수수료 지급 건 등록·수정·확정 API",
     "name" : "수수료 지급 건"
+  }, {
+    "description" : "월 마감에서 일이 넘어가는 순간을 문자로 알리는 기능의 수신 설정과 발송 이력",
+    "name" : "마감 알림"
   }, {
     "description" : "계약 상세 통합조회 및 재검증 API",
     "name" : "계약"

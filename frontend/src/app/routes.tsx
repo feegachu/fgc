@@ -29,6 +29,7 @@ const pages: Record<string, ComponentType> = {
   '/agent/statements': lazy(() => import('../features/agent-statement/AgentStatementPage')),
   '/transactions/new': lazy(() => import('../features/transaction/TransactionFormPage')),
   '/audit-logs': lazy(() => import('../features/audit/AuditLogPage')),
+  '/notifications': lazy(() => import('../features/notification/NotificationHistoryPage')),
   '/journals': lazy(() => import('../features/ledger/LedgerPage')),
   '/validation-runs': lazy(() => import('../features/validation/ValidationRunListPage')),
   '/validation-runs/:id': lazy(() => import('../features/validation/ValidationRunDetailPage')),

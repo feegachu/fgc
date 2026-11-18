@@ -84,6 +84,7 @@ class RoleApiAuthorizationMatrixIntegrationTest {
     private static final Set<Actor> AUDIT = Set.of(Actor.SYSTEM_ADMIN, Actor.COMPLIANCE);
     private static final Set<Actor> INTERNAL = Set.of(Actor.SYSTEM_ADMIN, Actor.GA_ADMIN, Actor.SETTLEMENT, Actor.COMPLIANCE);
     private static final Set<Actor> AGENT_ONLY = Set.of(Actor.AGENT);
+    private static final Set<Actor> NOTIFIED = Set.of(Actor.SYSTEM_ADMIN, Actor.GA_ADMIN, Actor.AGENT);
 
     /** 로그인 전에 부르는 토큰 API. 역할이 아니라 Origin·X-FGC-Client 로 막으며 AuthTokenApiIntegrationTest 가 지킨다. */
     private static final Set<String> TOKEN_ENDPOINTS = Set.of(
@@ -248,7 +249,12 @@ class RoleApiAuthorizationMatrixIntegrationTest {
                 row("IF-67A", GET, "/api/v1/documents/{}.pdf?version=1", null, INTERNAL),
                 row("IF-86", GET, "/api/v1/clawbacks/{}/notice-documents", null, INTERNAL),
                 row("IF-83", GET, "/api/v1/clawbacks/candidates", null, INTERNAL),
-                row("IF-87 본인", GET, "/api/v1/agent/me/statements?month=2026-07", null, AGENT_ONLY));
+                row("IF-87 본인", GET, "/api/v1/agent/me/statements?month=2026-07", null, AGENT_ONLY),
+                // 마감 알림 FUN-089 — IF-91~94. 수신 설정은 알림을 받는 역할(확정 권한자·설계사)만, 이력·다시 보내기는 확정 권한자만
+                row("IF-91", GET, "/api/v1/notification-settings/me", null, NOTIFIED),
+                row("IF-92", PUT, "/api/v1/notification-settings/me", "{\"consent\":false}", NOTIFIED),
+                row("IF-93", GET, "/api/v1/notifications", null, APPROVER),
+                row("IF-94", POST, "/api/v1/notifications/{}/resend", null, APPROVER));
     }
 
     static Stream<Arguments> matrix() {
