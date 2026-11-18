@@ -43,7 +43,7 @@ export default function NotificationHistoryPage() {
   const page = Math.max(1, Number.parseInt(params.get('page') ?? '', 10) || 1)
   const notifications = useQuery({
     ...notificationsQuery(page),
-    // 서버가 대기 알림을 10초 주기로 보낸다. 대기 행이 있는 동안만 같은 주기로 다시 읽어 결과를 보여 준다.
+    // 새 알림은 서버가 바로 보내고, 다시 보낸 알림과 재시도는 10초 주기로 보낸다. 대기 행이 있는 동안만 같은 주기로 다시 읽어 결과를 보여 준다.
     refetchInterval: (query) => (query.state.data?.content?.some((row) => row.status === 'PENDING') ? 10_000 : false),
   })
   const client = useQueryClient()
