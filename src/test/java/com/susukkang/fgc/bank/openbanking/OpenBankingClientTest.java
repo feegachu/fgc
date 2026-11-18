@@ -25,7 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-/** IF-EXT-06 오픈뱅킹 규격 클라이언트. 실제 은행을 부르지 않고 같은 규격의 가짜 서버로 확인한다. */
+/** FGC-FUN-090, IF-EXT-06 오픈뱅킹 규격 클라이언트. 실제 은행을 부르지 않고 같은 규격의 가짜 서버로 확인한다. */
 class OpenBankingClientTest {
 
     private static final String TOKEN = """
@@ -45,7 +45,8 @@ class OpenBankingClientTest {
     private final List<Received> received = new ArrayList<>();
     private final Map<String, Deque<String>> responses = new HashMap<>();
     private HttpServer server;
-    // 느린 은행을 흉내 내는 문. 닫아 두면 가짜 은행이 그 자리에서 테스트가 끝날 때까지 답하지 않는다.
+    // FGC-FUN-090 호출 제한 시간(응답 본문까지 5초)을 확인하려고 느린 은행을 흉내 내는 문.
+    // 닫아 두면 가짜 은행이 그 자리에서 테스트가 끝날 때까지 답하지 않는다.
     private volatile CountDownLatch beforeHeaders = new CountDownLatch(0);
     private volatile CountDownLatch beforeBody = new CountDownLatch(0);
     private volatile boolean headersSent;
@@ -236,9 +237,10 @@ class OpenBankingClientTest {
         assertThat(received).hasSize(OpenBankingClient.MAX_PAGES);
     }
 
+    // 기한이 사라져 끝없이 기다리는 회귀만 잡는 제한이다. 첫 호출 준비가 느린 환경에서도 걸리지 않게 넉넉히 둔다.
     @Test
-    @Timeout(10)
-    @DisplayName("제한 시간 안에 응답이 없으면 시간 초과로 알린다")
+    @Timeout(60)
+    @DisplayName("FGC-FUN-090 제한 시간 안에 응답이 없으면 시간 초과로 알린다")
     void reportsTimeouts() {
         respond("/v2.0/user/me", USER);
         beforeHeaders = new CountDownLatch(1);
@@ -249,11 +251,14 @@ class OpenBankingClientTest {
     }
 
     @Test
-    @Timeout(10)
-    @DisplayName("응답 머리만 오고 본문이 오지 않아도 제한 시간이 지나면 시간 초과로 알린다")
+    @Timeout(60)
+    @DisplayName("FGC-FUN-090 응답 머리만 오고 본문이 오지 않아도 제한 시간이 지나면 시간 초과로 알린다")
     void reportsTimeoutsWhenTheBodyStalls() {
         respond("/v2.0/user/me", USER);
+        // 첫 호출의 준비 시간(클래스 적재, 연결)이 아래 제한 시간에 섞이지 않게 넉넉한 제한으로 한 번 불러 둔다.
+        client().accounts(token());
         beforeBody = new CountDownLatch(1);
+        headersSent = false;
         // 머리가 제한 안에 넉넉히 들어오게 1초를 준다. 머리가 늦어 난 시간 초과와 섞이지 않게 한다.
         timeout = Duration.ofSeconds(1);
         OpenBankingClient client = client();
