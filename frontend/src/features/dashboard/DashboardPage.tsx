@@ -181,7 +181,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
         ) : openCounts.isPending ? (
           '불러오는 중'
         ) : (
-          '한도 위반 및 대사 불일치 등'
+          '선택월 한도 위반 및 대사 불일치 등'
         ),
         tone: 'warning',
         to: href('/exceptions', { status: OPEN_STATUS, validationMonth: `${month}-01` }),
@@ -212,9 +212,9 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
         <Link
           data-guide-feature="features.dashboard.dashboard-page.link-3"
           className="run-list-link"
-          to={href('/exceptions')}
+          to={href('/exceptions', { status: OPEN_STATUS })}
         >
-          예외함 전체 보기
+          전체 기간 미처리 예외 보기
         </Link>
       </header>
       <div className="priority-table">

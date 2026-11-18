@@ -304,6 +304,9 @@ describe('DASH-W01 업무 대시보드', () => {
       '/app/exceptions?status=OPEN&validationMonth=2026-07-01&month=2026-07',
     )
     expect(callsTo('/exceptions/counts')).toEqual(['/api/v1/exceptions/counts?status=OPEN&validationMonth=2026-07-01'])
+    expect(screen.getByRole('link', { name: '전체 기간 미처리 예외 보기' })).toHaveAttribute(
+      'href', '/app/exceptions?status=OPEN&month=2026-07',
+    )
   })
 
   it('미처리 예외가 0건이면 0건과 안내를 보이고, 건수를 받기 전과 실패했을 때는 0을 보이지 않는다', async () => {
