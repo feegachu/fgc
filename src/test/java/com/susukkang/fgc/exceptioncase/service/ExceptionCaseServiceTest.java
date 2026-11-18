@@ -178,7 +178,8 @@ class ExceptionCaseServiceTest {
 
         service.action(11L, new ExceptionActionRequest(ExceptionActionType.START_REVIEW, "검토 시작", null), 7L, "settle01");
 
-        verify(events, never()).publishEvent(any());
+        // publishEvent 는 Object 와 ApplicationEvent 두 가지라 any() 로는 실제로 쓰는 쪽을 보지 못한다. 호출 자체가 없어야 한다.
+        verifyNoInteractions(events);
     }
 
     @Test
