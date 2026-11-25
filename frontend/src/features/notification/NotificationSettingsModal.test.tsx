@@ -20,12 +20,13 @@ function open(setting: NotificationSetting, { agent = false, fail = false } = {}
     if (fail) throw new ApiError({ code: 'FGC-COMMON-002', message: '입력값을 확인하세요.' }, 'request-1', 400)
     return envelope(setting)
   })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <NotificationSettingsModal agent={agent} onClose={onClose} />
     </QueryClientProvider>,
   )
-  return { onClose, actions: userEvent.setup() }
+  return { client, onClose, actions: userEvent.setup() }
 }
 
 afterEach(() => {
@@ -34,6 +35,21 @@ afterEach(() => {
 })
 
 describe('알림 설정 창', () => {
+  it.each([false, true])('설정이 갱신되면 편집 여부(%s)에 맞는 번호를 저장한다', async (edited) => {
+    const setting = { mobilePhone: '01000000102', smsConfigured: true }
+    const { actions, client } = open(setting)
+    const input = await screen.findByLabelText('휴대폰 번호')
+    if (edited) {
+      await actions.clear(input)
+      await actions.type(input, '01000000103')
+    }
+    client.setQueryData(['notification-setting'], { ...setting, mobilePhone: '01000000104' })
+    const expected = edited ? '01000000103' : '01000000104'
+    await waitFor(() => expect(input).toHaveValue(expected))
+    await actions.click(screen.getByRole('button', { name: '저장' }))
+    expect(saved).toEqual([{ mobilePhone: expected, consent: true }])
+  })
+
   it('등록된 번호와 동의 상태를 보여 주고, 받는 알림을 역할에 맞게 한 줄로 알려 준다', async () => {
     open({ mobilePhone: '01000000102', consentedAt: '2026-11-17T10:00:00+09:00', smsConfigured: true })
     expect(await screen.findByLabelText('휴대폰 번호')).toHaveValue('01000000102')

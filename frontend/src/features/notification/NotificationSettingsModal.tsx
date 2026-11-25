@@ -29,8 +29,11 @@ export function NotificationSettingsModal({ agent, onClose }: { agent: boolean; 
 }
 
 function SettingForm({ agent, setting, onClose }: { agent: boolean; setting: NotificationSetting; onClose: () => void }) {
-  const [mobilePhone, setMobilePhone] = useState(setting.mobilePhone ?? '')
-  const [consent, setConsent] = useState(Boolean(setting.mobilePhone))
+  const [draft, setDraft] = useState<{ mobilePhone: string; consent: boolean } | null>(null)
+  const { mobilePhone, consent } = draft ?? {
+    mobilePhone: setting.mobilePhone ?? '',
+    consent: Boolean(setting.mobilePhone),
+  }
   const [submitted, setSubmitted] = useState(false)
   const client = useQueryClient()
   // 검증한 값을 그대로 보낸다. 서버는 줄바꿈 없는 공백 같은 문자를 빼지 못해, 입력값을 보내면 화면 검증을 통과하고도 거절된다.
@@ -93,7 +96,7 @@ function SettingForm({ agent, setting, onClose }: { agent: boolean; setting: Not
             placeholder="010-0000-0000"
             value={mobilePhone}
             disabled={mutation.isPending}
-            onChange={(event) => setMobilePhone(event.target.value)}
+            onChange={(event) => setDraft({ mobilePhone: event.target.value, consent })}
           />
         </Field>
         <label className="checkbox-label">
@@ -102,7 +105,7 @@ function SettingForm({ agent, setting, onClose }: { agent: boolean; setting: Not
             type="checkbox"
             checked={consent}
             disabled={mutation.isPending}
-            onChange={(event) => setConsent(event.target.checked)}
+            onChange={(event) => setDraft({ mobilePhone, consent: event.target.checked })}
           />
           마감 알림 문자를 받습니다
         </label>
