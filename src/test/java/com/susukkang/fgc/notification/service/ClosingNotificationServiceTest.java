@@ -104,8 +104,8 @@ class ClosingNotificationServiceTest {
     @DisplayName("발송 중 예상하지 못한 오류가 나면 그 알림만 실패로 끝내고 다음 알림을 보낸다")
     void failsOnlyTheNotificationThatThrewUnexpectedly() {
         when(notifications.claimNext(anyInt())).thenReturn(
-                Optional.of(new Claimed(10L, "RUN_FINALIZED", 1L, "01000000102", "[FGC] 첫 문자", 1, false)),
-                Optional.of(new Claimed(11L, "RUN_FINALIZED", 1L, "01000000103", "[FGC] 둘째 문자", 1, false)),
+                Optional.of(new Claimed(10L, "RUN_FINALIZED", 1L, "01000000102", "[FGC] 첫 문자", 1, false, true)),
+                Optional.of(new Claimed(11L, "RUN_FINALIZED", 1L, "01000000103", "[FGC] 둘째 문자", 1, false, true)),
                 Optional.empty());
         when(smsGateway.send("01000000102", "[FGC] 첫 문자")).thenThrow(new IllegalStateException("서명 실패"));
         when(smsGateway.send("01000000103", "[FGC] 둘째 문자")).thenReturn("M-2");
@@ -123,8 +123,8 @@ class ClosingNotificationServiceTest {
     @DisplayName("문자 사업자가 답하지 않으면 그 주기의 남은 알림은 잡지 않고 다음 주기로 넘긴다")
     void stopsTheCycleWhenTheProviderDoesNotRespond() {
         when(notifications.claimNext(anyInt())).thenReturn(
-                Optional.of(new Claimed(10L, "RUN_FINALIZED", 1L, "01000000102", "[FGC] 첫 문자", 1, false)),
-                Optional.of(new Claimed(11L, "RUN_FINALIZED", 1L, "01000000103", "[FGC] 둘째 문자", 1, false)),
+                Optional.of(new Claimed(10L, "RUN_FINALIZED", 1L, "01000000102", "[FGC] 첫 문자", 1, false, true)),
+                Optional.of(new Claimed(11L, "RUN_FINALIZED", 1L, "01000000103", "[FGC] 둘째 문자", 1, false, true)),
                 Optional.empty());
         when(smsGateway.send("01000000102", "[FGC] 첫 문자")).thenThrow(new SmsSendException("TIMEOUT", true));
 

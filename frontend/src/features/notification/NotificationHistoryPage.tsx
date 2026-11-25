@@ -29,6 +29,7 @@ const statuses: Record<string, { label: string; tone: StatusTone }> = {
 const reasonLabels: Record<string, string> = {
   NO_API_KEY: '문자 발송이 꺼져 있음',
   CONSENT_WITHDRAWN: '수신 해제함',
+  RECIPIENT_INELIGIBLE: '현재 수신 대상이 아님',
   ALREADY_FINALIZED: '이미 확정됨',
   NO_LONGER_READY: '지금은 확정할 수 없음',
   TIMEOUT: '응답 없음',

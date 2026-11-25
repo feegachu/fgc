@@ -210,6 +210,9 @@ public class ClosingNotificationService {
             // 그사이 그 달이 확정됐다. "확정해 주세요"는 틀린 안내가 된다.
             return "ALREADY_FINALIZED";
         }
+        if (!claimed.eligibleRecipient()) {
+            return "RECIPIENT_INELIGIBLE";
+        }
         if (claimed.phone() == null) {
             return "CONSENT_WITHDRAWN";
         }

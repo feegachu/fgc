@@ -37,7 +37,7 @@ public class ClosingNotificationRepository {
      * alreadyFinalized 는 확정 대기 알림인데 그사이 그 달이 확정됐다는 뜻이다.
      */
     public record Claimed(Long id, String eventType, Long validationRunId, String phone, String messageText,
-                          int attemptCount, boolean alreadyFinalized) {
+                          int attemptCount, boolean alreadyFinalized, boolean eligibleRecipient) {
     }
 
     /**
@@ -137,9 +137,14 @@ public class ClosingNotificationRepository {
                                 JOIN fgc.validation_run finalized
                                   ON finalized.validation_month = mine.validation_month
                                WHERE mine.validation_run_id = claimed.validation_run_id
-                                 AND finalized.status = 'FINALIZED')
+                                 AND finalized.status = 'FINALIZED'),
+                          EXISTS (SELECT 1 FROM fgc.app_user u
+                                    JOIN fgc.app_role r ON r.role_id = u.role_id
+                                   WHERE u.user_id = claimed.recipient_user_id AND u.account_status = 'ACTIVE'
+                                     AND ((claimed.event_type = 'FINALIZE_READY' AND r.role_code IN ('GA_ADMIN', 'SYSTEM_ADMIN'))
+                                       OR (claimed.event_type = 'RUN_FINALIZED' AND r.role_code = 'AGENT')))
                 """, (rs, row) -> new Claimed(rs.getLong(1), rs.getString(2), rs.getLong(3), rs.getString(4),
-                        rs.getString(5), rs.getInt(6), rs.getBoolean(7)), maxAttempts)
+                        rs.getString(5), rs.getInt(6), rs.getBoolean(7), rs.getBoolean(8)), maxAttempts)
                 .stream().findFirst();
     }
 

@@ -46,7 +46,7 @@ class ClosingNotificationDispatchBoundaryTest {
                 VALUES (?, ?, 'PRE_CONFIRM')
                 RETURNING validation_run_id
                 """, Long.class, LocalDate.of(2089, 8, 1), ThreadLocalRandom.current().nextInt(3_000_000, 4_000_000));
-        userId = jdbc.queryForObject("SELECT user_id FROM fgc.app_user WHERE login_id = 'gaadmin'", Long.class);
+        userId = jdbc.queryForObject("SELECT user_id FROM fgc.app_user WHERE login_id = 'agent01'", Long.class);
         jdbc.update("INSERT INTO fgc.user_notification_setting (user_id, mobile_phone) VALUES (?, ?)", userId, PHONE);
         notificationId = jdbc.queryForObject("""
                 INSERT INTO fgc.closing_notification (event_type, validation_run_id, recipient_user_id, message_text)

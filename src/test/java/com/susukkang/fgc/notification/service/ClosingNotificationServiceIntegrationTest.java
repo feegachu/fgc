@@ -22,6 +22,8 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -221,6 +223,25 @@ class ClosingNotificationServiceIntegrationTest {
         verify(smsGateway, never()).send(anyString(), anyString());
     }
 
+    @ParameterizedTest
+    @CsvSource({"DISABLED,GA_ADMIN", "ACTIVE,SETTLEMENT"})
+    @DisplayName("대기열 등록 후 수신 권한이 사라지면 발송과 재전송을 건너뛴다")
+    void skipsIneligibleRecipient(String accountStatus, String role) {
+        Long runId = readyRunFor("gaadmin", GA_ADMIN_PHONE);
+        jdbc.update("""
+                UPDATE fgc.app_user SET account_status = ?, role_id = (SELECT role_id FROM fgc.app_role WHERE role_code = ?)
+                 WHERE user_id = ?
+                """, accountStatus, role, userId("gaadmin"));
+
+        service.dispatchPending();
+        Map<String, Object> row = notifications(runId).get(0);
+        assertThat(row).containsEntry("status", "SKIPPED").containsEntry("error_code", "RECIPIENT_INELIGIBLE");
+        service.resend((Long) row.get("closing_notification_id"));
+        service.dispatchPending();
+        assertThat(notifications(runId).get(0)).containsEntry("status", "SKIPPED").containsEntry("error_code", "RECIPIENT_INELIGIBLE");
+        verify(smsGateway, never()).send(anyString(), anyString());
+    }
+
     @Test
     @DisplayName("그사이 그 달이 확정됐으면 확정 대기 알림은 다시 보내도 나가지 않는다")
     void doesNotSendFinalizeReadyAfterTheMonthWasFinalized() {
@@ -282,11 +303,11 @@ class ClosingNotificationServiceIntegrationTest {
     void stillSendsRunFinalizedForAFinalizedMonth() {
         Long runId = createCompletedRun(LocalDate.of(2088, 8, 1));
         finalizeRun(runId, OffsetDateTime.now());
-        optIn("gaadmin", GA_ADMIN_PHONE);
+        optIn("agent01", "01000000201");
         jdbc.update("""
                 INSERT INTO fgc.closing_notification (event_type, validation_run_id, recipient_user_id, message_text)
                 VALUES ('RUN_FINALIZED', ?, ?, '[FGC] 시험 문자')
-                """, runId, userId("gaadmin"));
+                """, runId, userId("agent01"));
         when(smsGateway.send(anyString(), anyString())).thenReturn("M4V-TEST-2");
 
         assertThat(service.dispatchPending()).isEqualTo(1);
