@@ -4,7 +4,7 @@ import com.susukkang.fgc.bank.openbanking.OpenBankingProperties;
 import com.susukkang.fgc.bank.service.BankLinkService;
 import com.susukkang.fgc.common.util.DateUtil;
 import io.swagger.v3.oas.annotations.Hidden;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -22,6 +22,7 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -53,7 +54,6 @@ import java.util.regex.Pattern;
 @Hidden
 @RestController
 @RequestMapping("/api/v1/mock-bank")
-@RequiredArgsConstructor
 @ConditionalOnProperty(name = "fgc.openbanking.mock.enabled", havingValue = "true")
 public class MockBankController {
 
@@ -101,7 +101,20 @@ public class MockBankController {
     private final BankLinkService linkRequests;
     /** 인가 코드와 접근 토큰은 메모리에만 둔다. 서버를 다시 띄우면 모두 사라진다. */
     private final Map<String, Instant> codes = new ConcurrentHashMap<>();
-    private final Set<String> accessTokens = ConcurrentHashMap.newKeySet();
+    private final Map<String, Instant> accessTokens = new ConcurrentHashMap<>();
+    private final Clock clock;
+
+    @Autowired
+    public MockBankController(OpenBankingProperties properties, MockBankLedger ledger, BankLinkService linkRequests) {
+        this(properties, ledger, linkRequests, Clock.systemUTC());
+    }
+
+    MockBankController(OpenBankingProperties properties, MockBankLedger ledger, BankLinkService linkRequests, Clock clock) {
+        this.properties = properties;
+        this.ledger = ledger;
+        this.linkRequests = linkRequests;
+        this.clock = clock;
+    }
 
     /** 사용자 인증: 동의 화면. 진입 전 오류는 명세대로 JSON 으로 준다. */
     @GetMapping("/oauth/2.0/authorize")
@@ -125,7 +138,9 @@ public class MockBankController {
             return ResponseEntity.ok(rejected());
         }
         String code = randomHex(16);
-        codes.put(code, Instant.now().plus(CODE_TTL));
+        Instant now = clock.instant();
+        codes.values().removeIf(expiry -> !expiry.isAfter(now));
+        codes.put(code, now.plus(CODE_TTL));
         return redirect("?code=" + code + "&scope=login%20inquiry&state=" + query.get(FIELD_STATE));
     }
 
@@ -140,17 +155,21 @@ public class MockBankController {
     /** 토큰 발급. 명세대로 오류도 HTTP 200 에 rsp_code 로 준다. 인가 코드는 한 번 쓰이면 버린다. */
     @PostMapping(value = "/oauth/2.0/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public Map<String, Object> token(@RequestParam Map<String, String> form) {
-        Instant expiresAt = form.get("code") == null ? null : codes.remove(form.get("code"));
         boolean valid = "authorization_code".equals(form.get("grant_type"))
                 && properties.clientId().equals(form.get(FIELD_CLIENT_ID))
                 && properties.clientSecret().equals(form.get("client_secret"))
-                && properties.redirectUri().equals(form.get(FIELD_REDIRECT_URI))
-                && expiresAt != null && expiresAt.isAfter(Instant.now());
-        if (!valid) {
+                && properties.redirectUri().equals(form.get(FIELD_REDIRECT_URI));
+        if (!valid || form.get("code") == null) {
+            return rejected();
+        }
+        Instant now = clock.instant();
+        Instant expiresAt = codes.remove(form.get("code"));
+        if (expiresAt == null || !expiresAt.isAfter(now)) {
             return rejected();
         }
         String accessToken = randomHex(24);
-        accessTokens.add(accessToken);
+        accessTokens.values().removeIf(expiry -> !expiry.isAfter(now));
+        accessTokens.put(accessToken, now.plusSeconds(TOKEN_SECONDS));
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("access_token", accessToken);
         body.put("token_type", "Bearer");
@@ -280,8 +299,11 @@ public class MockBankController {
     }
 
     private boolean authorized(String authorization) {
-        return authorization != null && authorization.startsWith("Bearer ")
-                && accessTokens.contains(authorization.substring("Bearer ".length()));
+        if (authorization == null || !authorization.startsWith("Bearer ")) {
+            return false;
+        }
+        Instant expiry = accessTokens.get(authorization.substring("Bearer ".length()));
+        return expiry != null && expiry.isAfter(clock.instant());
     }
 
     private ResponseEntity<Object> redirect(String query) {

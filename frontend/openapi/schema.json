@@ -7995,6 +7995,24 @@
         "type" : "object"
       },
       "JsonNode" : { },
+      "LatestBankReconciliationEnvelope" : {
+        "properties" : {
+          "data" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/BankReconciliationResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "LedgerSummary" : {
         "properties" : {
           "imbalanceCount" : {
@@ -12895,7 +12913,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseBankReconciliationResponse"
+                  "$ref" : "#/components/schemas/LatestBankReconciliationEnvelope"
                 }
               }
             },

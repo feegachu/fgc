@@ -5402,6 +5402,11 @@ export interface components {
             totalPages?: number;
         };
         JsonNode: unknown;
+        LatestBankReconciliationEnvelope: {
+            data?: components["schemas"]["BankReconciliationResponse"] | null;
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         LedgerSummary: {
             /** Format: int64 */
             imbalanceCount?: number;
@@ -7801,7 +7806,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseBankReconciliationResponse"];
+                    "*/*": components["schemas"]["LatestBankReconciliationEnvelope"];
                 };
             };
         };

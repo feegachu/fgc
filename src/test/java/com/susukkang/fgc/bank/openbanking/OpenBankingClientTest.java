@@ -225,6 +225,19 @@ class OpenBankingClientTest {
     }
 
     @Test
+    @DisplayName("다음 쪽 여부 또는 커서가 빠진 응답으로 대사를 끝내지 않는다")
+    void rejectsIncompletePagingInformation() {
+        String path = "/v2.0/account/transaction_list/fin_num";
+        respond(path, "{\"rsp_code\":\"A0000\",\"res_list\":[]}",
+                "{\"rsp_code\":\"A0000\",\"next_page_yn\":\"Y\",\"res_list\":[]}");
+        LocalDate day = LocalDate.of(2026, 11, 18);
+        for (int i = 0; i < 2; i++) {
+            assertThatThrownBy(() -> client().withdrawals(token(), "199000000000000000000002", day, day))
+                    .isInstanceOfSatisfying(OpenBankingException.class, e -> assertThat(e.code()).isEqualTo("BAD_RESPONSE"));
+        }
+    }
+
+    @Test
     @DisplayName("쪽이 끝없이 이어지면 멈추고 실패로 알린다")
     void stopsWhenPagesNeverEnd() {
         respond("/v2.0/account/transaction_list/fin_num", page("Y", "TRACE-LOOP", """

@@ -1,6 +1,8 @@
 package com.susukkang.fgc.bank.mock;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -15,6 +17,8 @@ import com.susukkang.fgc.bank.service.BankLinkService;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -149,15 +153,17 @@ class MockBankControllerIntegrationTest {
     @DisplayName("인가 코드는 한 번만 토큰으로 바꿀 수 있고 비밀값이 틀리면 거절한다")
     void exchangesACodeOnceAndChecksTheSecret() throws Exception {
         String code = approvedCode();
+        mvc.perform(token(code).param("client_secret", properties.clientSecret()).header("Origin", "https://example.org"))
+                .andExpect(status().isForbidden());
+        mvc.perform(token(code).param("client_secret", properties.clientSecret()).cookie(new jakarta.servlet.http.Cookie("browser", "1")))
+                .andExpect(status().isForbidden());
+        mvc.perform(token(code).param("client_secret", properties.clientSecret()).header("Sec-Fetch-Mode", "navigate"))
+                .andExpect(status().isForbidden());
         mvc.perform(token(code).param("client_secret", "wrong"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.rsp_code").value("O0001"));
 
-        // 틀린 비밀값으로 시도한 코드는 버린다.
+        // 인증에 성공한 클라이언트만 인가 코드를 소비한다.
         mvc.perform(token(code).param("client_secret", properties.clientSecret()))
-                .andExpect(jsonPath("$.rsp_code").value("O0001"));
-
-        String second = approvedCode();
-        mvc.perform(token(second).param("client_secret", properties.clientSecret()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.access_token").isString())
                 .andExpect(jsonPath("$.token_type").value("Bearer"))
@@ -165,7 +171,7 @@ class MockBankControllerIntegrationTest {
                 .andExpect(jsonPath("$.refresh_token").isString())
                 .andExpect(jsonPath("$.scope").value("login inquiry"))
                 .andExpect(jsonPath("$.user_seq_no").value("1100000001"));
-        mvc.perform(token(second).param("client_secret", properties.clientSecret()))
+        mvc.perform(token(code).param("client_secret", properties.clientSecret()))
                 .andExpect(jsonPath("$.rsp_code").value("O0001"));
     }
 
@@ -177,6 +183,28 @@ class MockBankControllerIntegrationTest {
 
         mvc.perform(token(approvedCode()).param("client_secret", "fgc-mock-secret"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.rsp_code").value("O0001"));
+    }
+
+    @Test
+    @DisplayName("FUN-090 모의 은행 토큰은 발급된 유효 기간의 끝에서 만료된다")
+    void expiresAccessTokenAtItsAdvertisedDeadline() {
+        Clock clock = mock(Clock.class);
+        Instant issued = Instant.parse("2026-11-18T00:00:00Z");
+        when(clock.instant()).thenReturn(issued);
+        MockBankController bank = new MockBankController(properties, mock(MockBankLedger.class), linkService, clock);
+        URI redirect = bank.approve(Map.of("response_type", "code", "client_id", properties.clientId(),
+                "redirect_uri", properties.redirectUri(), "scope", "login inquiry", "state", state,
+                "auth_type", "0")).getHeaders().getLocation();
+        String code = org.springframework.web.util.UriComponentsBuilder.fromUri(redirect).build().getQueryParams().getFirst("code");
+        Map<String, Object> token = bank.token(Map.of("grant_type", "authorization_code", "client_id", properties.clientId(),
+                "client_secret", properties.clientSecret(), "redirect_uri", properties.redirectUri(), "code", code));
+        Instant expiry = issued.plusSeconds((Long) token.get("expires_in"));
+        String bearer = "Bearer " + token.get("access_token");
+        when(clock.instant()).thenReturn(expiry.minusSeconds(1));
+        assertThat(bank.me(bearer, MockBankController.USER_SEQ_NO)).containsEntry("rsp_code", "A0000");
+        when(clock.instant()).thenReturn(expiry);
+        assertThat(bank.me(bearer, MockBankController.USER_SEQ_NO)).containsEntry("rsp_code", "O0002");
+        assertThat(bank.transactions(bearer, Map.of())).containsEntry("rsp_code", "O0002");
     }
 
     @Test

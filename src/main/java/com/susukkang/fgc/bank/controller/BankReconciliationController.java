@@ -10,8 +10,11 @@ import com.susukkang.fgc.bank.service.BankLinkService;
 import com.susukkang.fgc.bank.service.BankReconciliationService;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
+import com.susukkang.fgc.common.web.ApiError;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -74,11 +77,16 @@ public class BankReconciliationController {
         return ApiResponse.success(reconciliationService.run(principal.getUserId(), request.settlementMonth()));
     }
 
-    @Operation(summary = "지급 이체 대사 결과", description = "그 정산월에 마지막으로 돌린 대사 결과. 돌린 적이 없으면 data 가 null 이다.")
+    @Operation(summary = "지급 이체 대사 결과", description = "그 정산월에 마지막으로 돌린 대사 결과. 돌린 적이 없으면 data 가 null 이다.",
+            responses = @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OK",
+                    content = @Content(schema = @Schema(implementation = LatestBankReconciliationEnvelope.class))))
     @GetMapping("/bank-reconciliations")
     @PreAuthorize(Roles.ANY_ROLE)
     public ApiResponse<BankReconciliationResponse> latest(
             @Parameter(description = "정산월(YYYY-MM)", example = "2026-07") @RequestParam String month) {
         return ApiResponse.success(reconciliationService.latest(month));
     }
+
+    /** IF-API-99 조회 전용 응답 스키마. 실행 성공 응답(IF-API-98)은 항상 결과가 있다. */
+    record LatestBankReconciliationEnvelope(BankReconciliationResponse data, ApiError error, String requestId) {}
 }

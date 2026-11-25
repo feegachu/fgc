@@ -4,11 +4,17 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.AndRequestMatcher;
+import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 
 /**
  * 설명 : 모의 은행 주소(/api/v1/mock-bank/**)만 맡는 보안 체인. 모의 은행을 켰을 때만 생긴다.
@@ -28,6 +34,15 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 @ConditionalOnProperty(name = "fgc.openbanking.mock.enabled", havingValue = "true")
 public class MockBankSecurityConfig {
 
+    /** 쿠키와 브라우저 출처가 없는 서버 간 토큰 교환만 공통 무상태 API 체인에 맡긴다. */
+    @Bean
+    RequestMatcher mockBankServerTokenExchange() {
+        return new AndRequestMatcher(
+                PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/mock-bank/oauth/2.0/token"),
+                request -> request.getHeader(HttpHeaders.COOKIE) == null && request.getCookies() == null
+                        && request.getHeader(HttpHeaders.ORIGIN) == null && request.getHeader("Sec-Fetch-Mode") == null);
+    }
+
     @Bean
     @Order(0)
     public SecurityFilterChain mockBankFilterChain(HttpSecurity http) throws Exception {
@@ -35,12 +50,11 @@ public class MockBankSecurityConfig {
         CookieCsrfTokenRepository formTokens = new CookieCsrfTokenRepository();
         formTokens.setCookieName("MOCK-BANK-XSRF");
         formTokens.setCookiePath("/api/v1/mock-bank");
-        http.securityMatcher("/api/v1/mock-bank/**")
+        http.securityMatcher(new AndRequestMatcher(
+                        PathPatternRequestMatcher.withDefaults().matcher("/api/v1/mock-bank/**"),
+                        new NegatedRequestMatcher(mockBankServerTokenExchange())))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // 토큰 발급만 뺀다. 브라우저가 아니라 FGC 서버가 client_secret 을 실어 부르는 요청이라 쿠키와 숨은 값이 없다.
-                // 나머지 요청은 기본으로 모두 검사한다. 검사할 주소를 직접 비교해 고르면 주소를 퍼센트 부호로 바꿔 비켜 갈 수 있다.
-                .csrf(csrf -> csrf.csrfTokenRepository(formTokens)
-                        .ignoringRequestMatchers("/api/v1/mock-bank/oauth/2.0/token"))
+                .csrf(csrf -> csrf.csrfTokenRepository(formTokens))
                 .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();

@@ -143,10 +143,14 @@ public class OpenBankingClient {
             for (JsonNode row : list(TRANSACTION_LIST_API, json)) {
                 withdrawals.add(withdrawal(TRANSACTION_LIST_API, row));
             }
-            if (!"Y".equals(json.path("next_page_yn").asText())) {
+            String nextPage = json.path("next_page_yn").asText();
+            if ("N".equals(nextPage)) {
                 return withdrawals;
             }
-            trace = json.path("befor_inquiry_trace_info").asText();
+            trace = json.path("befor_inquiry_trace_info").asText("");
+            if (!"Y".equals(nextPage) || trace.isBlank()) {
+                throw failed(TRANSACTION_LIST_API, BAD_RESPONSE);
+            }
         }
         throw failed(TRANSACTION_LIST_API, "TOO_MANY_PAGES");
     }
