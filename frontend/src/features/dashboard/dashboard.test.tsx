@@ -303,8 +303,8 @@ describe('DASH-W01 업무 대시보드', () => {
       'href',
       '/app/exceptions?status=OPEN&validationMonth=2026-07-01&month=2026-07',
     )
-    expect(callsTo('/exceptions/counts')).toEqual(['/api/v1/exceptions/counts?status=OPEN&validationMonth=2026-07-01'])
-    expect(screen.getByRole('link', { name: '전체 기간 미처리 예외 보기' })).toHaveAttribute(
+    expect(callsTo('/exceptions/counts')).toContain('/api/v1/exceptions/counts?status=OPEN&validationMonth=2026-07-01')
+    expect(await screen.findByRole('link', { name: '전체 기간 미처리 예외 보기 (5건)' })).toHaveAttribute(
       'href', '/app/exceptions?status=OPEN&month=2026-07',
     )
   })

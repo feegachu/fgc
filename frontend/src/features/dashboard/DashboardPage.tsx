@@ -51,6 +51,8 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
     meta: { errorToast: false },
   })
   const openCounts = useQuery(openExceptionCountsQueryOptions(month))
+  const allOpenCounts = useQuery(openExceptionCountsQueryOptions())
+  const allOpenLabel = allOpenCounts.data && !allOpenCounts.isError ? ` (${int(allOpenCounts.data.total)}건)` : ''
   const summaryReady = !error && !isPending
   const href = (path: string, params: Record<string, string> = {}) => {
     const search = new URLSearchParams(params).toString()
@@ -214,7 +216,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
           className="run-list-link"
           to={href('/exceptions', { status: OPEN_STATUS })}
         >
-          전체 기간 미처리 예외 보기
+          전체 기간 미처리 예외 보기{allOpenLabel}
         </Link>
       </header>
       <div className="priority-table">
@@ -368,7 +370,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
               <div className="dashboard-recent-panels" data-guide-target="dashboard.recent-activity">
                 <Fragment key={replay('dashboard.recent-activity')}>
                   {revised ? (
-                    <RecentExceptionTicker rows={data?.recentExceptions ?? []} month={month} />
+                    <RecentExceptionTicker rows={data?.recentExceptions ?? []} month={month} countLabel={allOpenLabel} />
                   ) : (
                     compositionPanel
                   )}

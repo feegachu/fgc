@@ -9,7 +9,7 @@ import type { RecentException } from './api'
 import { exceptionStatusTone, severityTone } from './tones'
 
 /** 두 예외 행을 유지하며 한 행씩 위로 순환한다. 조작 중·백그라운드·동작 줄이기 설정에서는 자동 진행을 멈춘다. */
-export function RecentExceptionTicker({ rows, month }: { rows: RecentException[]; month: string }) {
+export function RecentExceptionTicker({ rows, month, countLabel }: { rows: RecentException[]; month: string; countLabel: string }) {
   const [index, setIndex] = useState(0)
   const [sliding, setSliding] = useState(false)
   const [hovered, setHovered] = useState(false)
@@ -64,7 +64,7 @@ export function RecentExceptionTicker({ rows, month }: { rows: RecentException[]
           className="run-list-link"
           to={withMonth(`/exceptions?status=${OPEN_STATUS}`, month)}
         >
-          전체 기간 미처리 예외 보기
+          전체 기간 미처리 예외 보기{countLabel}
         </Link>
       </header>
       <div className="data-table-viewport">
