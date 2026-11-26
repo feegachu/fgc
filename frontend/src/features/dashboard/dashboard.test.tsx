@@ -162,7 +162,7 @@ describe('DASH-W01 업무 대시보드', () => {
     const kpis = await screen.findByRole('region', { name: '주요 검증 지표' })
     expect(within(kpis).getAllByRole('link')).toHaveLength(6)
     expect(within(kpis).getByRole('link', { name: '미처리 예외 5건' })).toHaveAttribute(
-      'href', '/app/exceptions?status=OPEN&month=2026-07',
+      'href', '/app/exceptions?status=OPEN&validationMonth=2026-07-01&month=2026-07',
     )
     expect(screen.getByRole('heading', { name: '검증 항목별 건수 비중' })).toBeInTheDocument()
     expect(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' })).toHaveTextContent('1,234건')
@@ -223,6 +223,10 @@ describe('DASH-W01 업무 대시보드', () => {
     await actions.click(screen.getByRole('gridcell', { name: '8월' }))
     await actions.click(screen.getByRole('button', { name: '적용' }))
     await waitFor(() => expect(summaryCalls()).toContain('/api/v1/dashboard/summary?month=2026-08'))
+    expect(await screen.findByRole('link', { name: '미처리 예외 5건' })).toHaveAttribute(
+      'href', '/app/exceptions?status=OPEN&validationMonth=2026-08-01&month=2026-08',
+    )
+    expect(callsTo('/exceptions/counts')).toContain('/api/v1/exceptions/counts?status=OPEN&validationMonth=2026-08-01')
     expect(router.state.location.search).toContain('month=2026-08')
   })
 
@@ -297,9 +301,12 @@ describe('DASH-W01 업무 대시보드', () => {
     const kpis = await screen.findByRole('region', { name: '주요 검증 지표' })
     expect(await within(kpis).findByRole('link', { name: '미처리 예외 5건' })).toHaveAttribute(
       'href',
-      '/app/exceptions?status=OPEN&month=2026-07',
+      '/app/exceptions?status=OPEN&validationMonth=2026-07-01&month=2026-07',
     )
-    expect(callsTo('/exceptions/counts')).toEqual(['/api/v1/exceptions/counts?status=OPEN'])
+    expect(callsTo('/exceptions/counts')).toContain('/api/v1/exceptions/counts?status=OPEN&validationMonth=2026-07-01')
+    expect(await screen.findByRole('link', { name: '전체 기간 미처리 예외 보기 (5건)' })).toHaveAttribute(
+      'href', '/app/exceptions?status=OPEN&month=2026-07',
+    )
   })
 
   it('미처리 예외가 0건이면 0건과 안내를 보이고, 건수를 받기 전과 실패했을 때는 0을 보이지 않는다', async () => {

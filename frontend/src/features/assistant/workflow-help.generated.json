@@ -11577,8 +11577,8 @@
         "stepId": "help.7ea194e548b12145127b666a88e9d5db",
         "screenId": "DASH-W01",
         "targetId": "features.dashboard.dashboard-page.link-3",
-        "title": "업무 대시보드, 예외함 전체 보기",
-        "instruction": "‘예외함 전체 보기’ 위치입니다.",
+        "title": "업무 대시보드, 전체 기간 미처리 예외 보기",
+        "instruction": "‘전체 기간 미처리 예외 보기’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -11952,8 +11952,8 @@
         "stepId": "help.e9e3da0844f0b5d2125f44ead8c329d1",
         "screenId": "DASH-W01",
         "targetId": "features.dashboard.exception-ticker.all",
-        "title": "업무 대시보드, 전체 보기",
-        "instruction": "‘전체 보기’ 위치입니다.",
+        "title": "업무 대시보드, 전체 기간 미처리 예외 보기",
+        "instruction": "‘전체 기간 미처리 예외 보기’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
