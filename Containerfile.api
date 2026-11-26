@@ -16,8 +16,8 @@ COPY . .
 RUN chmod +x gradlew && ./gradlew bootWar -x test --no-daemon
 
 # ---------- 2단계: 실행 ----------
-# 태그를 고정한다 — "10.1-jre21" 은 날마다 다른 이미지라 스캔 결과가 재현되지 않는다 (교안: 리허설 후 Digest 고정)
-FROM docker.io/library/tomcat:10.1.60-jre21 AS runtime-base
+# CVE-2026-114938: amd64 런타임에 Temurin 21.0.13.1+2를 제공하는 공식 이미지 인덱스.
+FROM docker.io/library/tomcat:10.1.62-jre21@sha256:465ea45da84a7414252f3b85b1aeda06e3cc09d506a9fc9f79c890dbb9d81acc AS runtime-base
 # base OS(Ubuntu) 패키지 CVE — 빌드 시점의 보안 패치 반영
 # /usr/bin/pebble: 베이스 이미지의 Go 프로세스 관리자. 실행 명령은 catalina.sh 이고 쓰는 곳이 없는데 Trivy HIGH 4건(Go stdlib)이 이 파일에서만 나와 지운다 (#677)
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
