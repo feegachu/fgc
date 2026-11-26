@@ -205,6 +205,14 @@ public enum FgcErrorCode {
             "error.reconciliation.notCompleted"
     ),
 
+    // FUN-090 지급 이체 대사(IF-EXT-06). 은행이 멈춰도 다른 업무는 그대로 진행한다.
+    BANK_001("FGC-BANK-001", HttpStatus.CONFLICT, "error.bank.linkRequired"),
+    BANK_002("FGC-BANK-002", HttpStatus.CONFLICT, "error.bank.monthNotFinalized"),
+    BANK_003("FGC-BANK-003", HttpStatus.SERVICE_UNAVAILABLE, "error.bank.unavailable"),
+    BANK_004("FGC-BANK-004", HttpStatus.CONFLICT, "error.bank.authorizationExpired"),
+    BANK_005("FGC-BANK-005", HttpStatus.UNPROCESSABLE_ENTITY, "error.bank.noInquiryAccount"),
+    BANK_006("FGC-BANK-006", HttpStatus.CONFLICT, "error.bank.paymentsChanged"),
+
     EXCP_001(
             "FGC-EXCP-001",
             HttpStatus.BAD_REQUEST,

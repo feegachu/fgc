@@ -159,6 +159,14 @@ export const screens: ScreenDefinition[] = [
     icon: 'payments',
   },
   {
+    id: 'BANK-W01',
+    path: '/bank-reconciliations',
+    title: '지급 이체 대사',
+    menu: '/bank-reconciliations',
+    section: 'contracts',
+    icon: 'payments',
+  },
+  {
     id: 'VRUN-W02',
     path: '/validation-runs/:id',
     title: '월 통합검증 상세',

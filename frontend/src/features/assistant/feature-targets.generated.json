@@ -1200,6 +1200,26 @@
     "element": "input"
   },
   {
+    "id": "features.bank-reconciliation.bank-reconciliation-page.button",
+    "file": "features/bank-reconciliation/BankReconciliationPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.bank-reconciliation.bank-reconciliation-page.button-2",
+    "file": "features/bank-reconciliation/BankReconciliationPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.bank-reconciliation.bank-reconciliation-page.section",
+    "file": "features/bank-reconciliation/BankReconciliationPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.bank-reconciliation.bank-reconciliation-page.section-2",
+    "file": "features/bank-reconciliation/BankReconciliationPage.tsx",
+    "element": "section"
+  },
+  {
     "id": "features.base.base-page.input",
     "file": "features/base/BasePage.tsx",
     "element": "input"
@@ -3976,6 +3996,11 @@
   },
   {
     "id": "navigation.menu.audt-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.bank-w01",
     "file": "app/shell/Sidebar.tsx",
     "element": "Link"
   },

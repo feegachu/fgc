@@ -50,6 +50,18 @@ fgc:
   storage:
     root: ${FGC_STORAGE_ROOT:./files}
     max-file-bytes: ${FGC_UPLOAD_MAX_BYTES:20971520}
+  # 은행 거래내역 조회(FUN-090·IF-EXT-06, 금융결제원 오픈뱅킹 규격). 기본값은 저장소에 들어 있는 모의 은행을 가리킨다.
+  # 실제 테스트베드나 운영에 붙이려면 주소와 키를 환경변수로 넣고 mock 을 끈다. 실제 키는 커밋하지 않는다.
+  openbanking:
+    base-url: ${FGC_OPENBANKING_BASE_URL:http://localhost:${server.port}/api/v1/mock-bank}     # 서버가 부르는 주소
+    authorize-url: ${FGC_OPENBANKING_AUTHORIZE_URL:/api/v1/mock-bank/oauth/2.0/authorize}      # 브라우저가 가는 동의 화면
+    client-id: ${FGC_OPENBANKING_CLIENT_ID:fgc-mock-client}
+    client-secret: ${FGC_OPENBANKING_CLIENT_SECRET:${random.uuid}}     # 넣지 않으면 기동할 때마다 새로 만든다. 저장소에 고정된 비밀값을 두지 않는다
+    redirect-uri: ${FGC_OPENBANKING_REDIRECT_URI:/bank-reconciliations}  # 동의 뒤 돌아오는 화면
+    client-use-code: ${FGC_OPENBANKING_CLIENT_USE_CODE:M202600001}       # 거래고유번호 앞 10자리(이용기관코드)
+    timeout: 5s
+    mock:
+      enabled: ${FGC_OPENBANKING_MOCK_ENABLED:true}
   # 2차 JWT 공존 모드(#400, 인터페이스정의서 §2-1-1). 키는 커밋하지 않는다 — 비어 있으면 기동마다 임의 키(JwtConfig).
   jwt:
     secret: ${FGC_JWT_SECRET:}
