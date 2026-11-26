@@ -504,7 +504,7 @@ export interface paths {
         put?: never;
         /**
          * 은행 계좌 연결
-         * @description 동의 뒤 은행이 돌려준 code 와 state 로 토큰을 받고, 조회에 동의한 첫 계좌를 수수료 지급 계좌로 연결한다.
+         * @description 동의 뒤 은행이 돌려준 code 와 state 로 토큰을 받고, 유효한 조회 동의 계좌가 하나일 때만 수수료 지급 계좌로 연결한다.
          */
         post: operations["link"];
         delete?: never;

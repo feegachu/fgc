@@ -72,6 +72,7 @@ public class BankReconciliationService {
         LocalDate from = finalized.finalizedOn();
         LocalDate to = from.plusDays(INQUIRY_DAYS).isAfter(today) ? today : from.plusDays(INQUIRY_DAYS);
 
+        var expectedTransfers = repository.findExpectedTransfers(month);
         // 모의 은행은 이 알림을 받아 그 달의 이체를 준비한다. 실제 은행에 붙였을 때는 받는 곳이 없다.
         events.publishEvent(new BankInquiryStarting(month));
         List<BankWithdrawal> withdrawals;
@@ -86,7 +87,10 @@ public class BankReconciliationService {
         }
 
         Long runId = transaction.execute(status -> {
-            List<Expected> expected = repository.findExpectedTransfers(month).stream()
+            if (!expectedTransfers.equals(repository.findExpectedTransfers(month))) {
+                throw new FgcBusinessException(FgcErrorCode.BANK_006);
+            }
+            List<Expected> expected = expectedTransfers.stream()
                     .map(transfer -> new Expected(transfer.agentId(), transfer.amount())).toList();
             List<Matched> items = BankTransferMatcher.match(month, expected, withdrawals);
             Long id = repository.insertRun(month, finalized.validationRunId(), from, to, session.link(),

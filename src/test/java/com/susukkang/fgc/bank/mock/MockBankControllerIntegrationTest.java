@@ -12,9 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.bank.openbanking.OpenBankingProperties;
+import com.susukkang.fgc.bank.repository.BankReconciliationRepository;
+import com.susukkang.fgc.bank.repository.BankReconciliationRepository.ExpectedTransfer;
 import com.susukkang.fgc.bank.service.BankInquiryStarting;
 import com.susukkang.fgc.bank.service.BankLinkService;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -25,12 +28,15 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -230,13 +236,28 @@ class MockBankControllerIntegrationTest {
                 .andExpect(jsonPath("$.res_list[0].transfer_agree_yn").value("N"));
     }
 
+    @ParameterizedTest
+    @CsvSource({"1,1", "10000,10000", "10001,1"})
+    @DisplayName("FGC-FUN-090 모의 원장은 둘째 설계사의 순액이 1만 원을 넘을 때만 차감한다")
+    void plantsShortPaymentOnlyAboveThreshold(BigDecimal netAmount, BigDecimal bankAmount) {
+        finalizeMonth(MARCH, OffsetDateTime.now());
+        var repository = mock(BankReconciliationRepository.class);
+        when(repository.findExpectedTransfers(MARCH)).thenReturn(List.of(new ExpectedTransfer(1L, BigDecimal.TEN),
+                new ExpectedTransfer(2L, netAmount), new ExpectedTransfer(3L, BigDecimal.TEN)));
+        new MockBankLedger(jdbc, repository).recordTransfers(new BankInquiryStarting(MARCH));
+        assertThat(jdbc.queryForObject("""
+                SELECT tran_amt FROM fgc.mock_bank_transaction
+                 WHERE settlement_month = ? AND print_content = 'FGC2603-000002'
+                """, BigDecimal.class, MARCH)).isEqualByComparingTo(bankAmount);
+    }
+
     @Test
     @DisplayName("확정된 달의 확정 지급대로 이체한 출금을 만들어 주되, 세 건은 일부러 어긋나게 한다")
     void generatesTransfersForFinalizedMonthsWithThreePlantedDifferences() throws Exception {
         // 다른 테스트가 남긴 확정 실행과 섞이지 않게, 아무도 쓰지 않는 옛 날짜에 확정한 것으로 만든다.
         LocalDate today = LocalDate.of(2001, 3, 10);
         finalizeMonth(MARCH, OffsetDateTime.of(2001, 3, 10, 10, 0, 0, 0, ZoneOffset.ofHours(9)));
-        List<Map<String, Object>> payees = payees(MARCH);
+        List<ExpectedTransfer> payees = payees(MARCH);
         assertThat(payees).hasSize(3);
         String token = accessToken();
 
@@ -259,10 +280,10 @@ class MockBankControllerIntegrationTest {
         JsonNode rows = first.path("res_list");
         // 첫 사람은 그대로, 둘째는 10,000원 덜, 마지막 사람은 보내지 않고, 참조코드 없는 출금 한 건을 섞는다.
         assertThat(rows.get(0).path("print_content").asText()).isEqualTo(reference(payees.get(0)));
-        assertThat(new BigDecimal(rows.get(0).path("tran_amt").asText())).isEqualByComparingTo(net(payees.get(0)));
+        assertThat(new BigDecimal(rows.get(0).path("tran_amt").asText())).isEqualByComparingTo(payees.get(0).amount());
         assertThat(rows.get(1).path("print_content").asText()).isEqualTo(reference(payees.get(1)));
         assertThat(new BigDecimal(rows.get(1).path("tran_amt").asText()))
-                .isEqualByComparingTo(net(payees.get(1)).subtract(new BigDecimal("10000")));
+                .isEqualByComparingTo(payees.get(1).amount().subtract(new BigDecimal("10000")));
         assertThat(rows.get(2).path("print_content").asText()).isEqualTo("관리비");
         assertThat(rows.get(2).path("tran_amt").asText()).isEqualTo("55000");
         for (JsonNode row : rows) {
@@ -390,22 +411,22 @@ class MockBankControllerIntegrationTest {
         return json.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
     }
 
-    private static String reference(Map<String, Object> payee) {
-        return "FGC2603-%06d".formatted((Long) payee.get("agent_id"));
+    private static String reference(ExpectedTransfer payee) {
+        return "FGC2603-%06d".formatted(payee.agentId());
     }
 
-    private static BigDecimal net(Map<String, Object> payee) {
-        return (BigDecimal) payee.get("net");
-    }
-
-    private List<Map<String, Object>> payees(LocalDate month) {
-        return jdbc.queryForList("""
-                SELECT recipient_agent_id AS agent_id, SUM(amount) AS net
-                  FROM fgc.commission_transaction
-                 WHERE payment_stage = 'GA_TO_FC' AND status = 'CONFIRMED' AND cashflow_type = 'PAYMENT'
-                   AND settlement_month = ?
-                 GROUP BY recipient_agent_id ORDER BY recipient_agent_id
-                """, month);
+    private List<ExpectedTransfer> payees(LocalDate month) {
+        var totals = new TreeMap<Long, BigDecimal>();
+        jdbc.query("""
+                SELECT recipient_agent_id, cashflow_type, amount FROM fgc.commission_transaction
+                 WHERE payment_stage = 'GA_TO_FC' AND status = 'CONFIRMED' AND settlement_month = ?
+                """, row -> {
+            BigDecimal amount = row.getBigDecimal("amount").setScale(0, RoundingMode.HALF_UP);
+            boolean payment = "PAYMENT".equals(row.getString("cashflow_type"));
+            totals.merge(row.getLong("recipient_agent_id"), payment ? amount : amount.negate(), BigDecimal::add);
+        }, month);
+        return totals.entrySet().stream().filter(entry -> entry.getValue().signum() > 0)
+                .map(entry -> new ExpectedTransfer(entry.getKey(), entry.getValue())).toList();
     }
 
     private void finalizeMonth(LocalDate month, OffsetDateTime finalizedAt) {

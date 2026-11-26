@@ -12,9 +12,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.Deque;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,8 +42,8 @@ class OpenBankingClientTest {
                 "bank_name":"모의은행","account_num_masked":"100-***-***002","account_holder_name":"가상지에이",
                 "account_holder_type":"P","account_type":"1","inquiry_agree_yn":"Y","transfer_agree_yn":"N"}]}""";
 
-    private final List<Received> received = new ArrayList<>();
-    private final Map<String, Deque<String>> responses = new HashMap<>();
+    private final List<Received> received = new CopyOnWriteArrayList<>();
+    private final Map<String, Deque<String>> responses = new ConcurrentHashMap<>();
     private HttpServer server;
     // FGC-FUN-090 호출 제한 시간(응답 본문까지 5초)을 확인하려고 느린 은행을 흉내 내는 문.
     // 닫아 두면 가짜 은행이 그 자리에서 테스트가 끝날 때까지 답하지 않는다.
@@ -195,6 +195,17 @@ class OpenBankingClientTest {
 
         assertThat(client().withdrawals(token(), "199000000000000000000002",
                 LocalDate.of(2026, 11, 18), LocalDate.of(2026, 11, 18))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("FGC-FUN-090 다음 쪽 A0018은 이미 읽은 출금을 보존한다")
+    void keepsWithdrawalsWhenTheNextPageHasNoTransactions() {
+        respond("/v2.0/account/transaction_list/fin_num", page("Y", "NEXT", """
+                {"tran_date":"20261118","tran_time":"100001","print_content":"이체","tran_amt":"100"}"""),
+                "{\"rsp_code\":\"A0018\"}");
+        LocalDate day = LocalDate.of(2026, 11, 18);
+        assertThat(client().withdrawals(token(), "account", day, day)).containsExactly(
+                new BankWithdrawal(day, "100001", "이체", new BigDecimal("100")));
     }
 
     @Test

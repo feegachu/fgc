@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -127,12 +127,13 @@ function renderAt(path: string, roleCode = 'SETTLEMENT') {
     throw new Error(`unexpected ${url}`)
   })
   const router = createMemoryRouter(routes, { initialEntries: [path] })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, actions: userEvent.setup() }
+  return { router, client, actions: userEvent.setup() }
 }
 const posts = (url: string) => requested.filter((request) => request.url === url && request.method === 'POST')
 
@@ -238,17 +239,16 @@ describe('BANK-W01 지급 이체 대사', () => {
     runGate = new Promise<void>((resolve) => {
       finish = resolve
     })
-    const { actions, router } = renderAt('/bank-reconciliations')
+    const { actions, router, client } = renderAt('/bank-reconciliations')
     await actions.click(await screen.findByRole('button', { name: '은행 거래내역으로 대사' }))
     await waitFor(() => expect(posts('/api/v1/bank-reconciliations')).toHaveLength(1))
 
     await router.navigate('/bank-reconciliations?month=2026-09')
     await waitFor(() => expect(requested.map((request) => request.url)).toContain('/api/v1/bank-reconciliations?month=2026-09'))
     finish()
-    await waitFor(() => expect(latest).toBe(result))
+    await waitFor(() => expect(client.getQueryData(['bank', 'reconciliation', '2026-10'])).toEqual(result))
 
-    // 10월 결과가 9월 화면에 보이면 안 된다.
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    // 10월 결과가 캐시에 들어간 뒤에도 9월 화면은 비어 있다.
     expect(screen.getByText('아직 대사하지 않았습니다.')).toBeInTheDocument()
     expect(screen.queryByRole('table', { name: '지급 이체 대사 결과' })).not.toBeInTheDocument()
   })
@@ -265,8 +265,10 @@ describe('BANK-W01 지급 이체 대사', () => {
     await waitFor(() => expect(posts('/api/v1/bank/link')).toHaveLength(1))
     expect(await screen.findByText('모의은행 110-***-***001')).toBeInTheDocument()
     // 화면을 열 때 보낸 조회가 이제야 "연결 전"으로 답한다.
-    finish()
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await act(async () => {
+      finish()
+      await linkGate
+    })
 
     expect(screen.getByText('모의은행 110-***-***001')).toBeInTheDocument()
     expect(screen.queryByText('연결한 계좌가 없습니다.')).not.toBeInTheDocument()

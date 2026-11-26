@@ -110,7 +110,7 @@ public class OpenBankingClient {
         requireSuccess(USER_ME_API, json);
         List<BankAccount> accounts = new ArrayList<>();
         for (JsonNode row : list(USER_ME_API, json)) {
-            accounts.add(new BankAccount(row.path("fintech_use_num").asText(), row.path("bank_name").asText(),
+            accounts.add(new BankAccount(row.path("fintech_use_num").asText(""), row.path("bank_name").asText(),
                     row.path("account_num_masked").asText(), row.path("account_holder_name").asText(),
                     "Y".equals(row.path("inquiry_agree_yn").asText())));
         }

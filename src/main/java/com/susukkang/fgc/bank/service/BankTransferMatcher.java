@@ -27,7 +27,7 @@ public final class BankTransferMatcher {
     static final String NOT_TRANSFERRED = "NOT_TRANSFERRED";
     static final String UNKNOWN_WITHDRAWAL = "UNKNOWN_WITHDRAWAL";
 
-    private static final Pattern REFERENCE = Pattern.compile("^FGC\\d{4}-\\d{6}$");
+    private static final Pattern REFERENCE = Pattern.compile("^FGC\\d{2}(?:0[1-9]|1[0-2])-\\d{6}$");
     /** 사람이 볼 것부터 보이게 어긋난 것을 앞에 둔다. */
     private static final List<String> ORDER = List.of(AMOUNT_MISMATCH, NOT_TRANSFERRED, UNKNOWN_WITHDRAWAL, MATCHED);
 

@@ -17,9 +17,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,6 +45,7 @@ public class BankLinkService {
     static final Duration AUTHORIZATION_TTL = Duration.ofMinutes(10);
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    private final Clock clock;
     private final OpenBankingClient client;
     private final OpenBankingProperties properties;
     private final BankLinkRepository links;
@@ -66,7 +69,8 @@ public class BankLinkService {
     }
 
     public BankLinkService(OpenBankingClient client, OpenBankingProperties properties, BankLinkRepository links,
-                           AuditLogService auditLogService, PlatformTransactionManager transactionManager) {
+                           AuditLogService auditLogService, PlatformTransactionManager transactionManager, Clock clock) {
+        this.clock = clock;
         this.client = client;
         this.properties = properties;
         this.links = links;
@@ -84,7 +88,7 @@ public class BankLinkService {
 
     /** 은행 동의 화면 주소를 만든다. 주소에 넣은 state 를 이 사용자에게 묶어 둔다. */
     public BankAuthorizeUrlResponse authorizeUrl(Long userId) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         pending.values().removeIf(request -> request.expiresAt().isBefore(now));
         byte[] random = new byte[16];
         RANDOM.nextBytes(random);
@@ -93,28 +97,37 @@ public class BankLinkService {
         return new BankAuthorizeUrlResponse(client.authorizeUrl(state));
     }
 
-    /** 동의 뒤 은행이 돌려준 코드로 토큰을 받고, 조회에 동의한 첫 계좌를 수수료 지급 계좌로 연결한다. */
+    /** 동의 뒤 은행이 돌려준 코드로 토큰을 받고, 유효한 조회 동의 계좌가 하나일 때만 연결한다. */
     public BankLinkResponse link(Long userId, String code, String state) {
         // 누가 시도했든 한 번 쓰인 state 는 버린다.
         Pending requested = pending.remove(state);
-        if (requested == null || !requested.userId().equals(userId) || requested.expiresAt().isBefore(Instant.now())) {
+        if (requested == null || !requested.userId().equals(userId) || requested.expiresAt().isBefore(clock.instant())) {
             throw new FgcBusinessException(FgcErrorCode.BANK_004);
         }
         BankToken token;
-        Optional<BankAccount> agreed;
+        List<BankAccount> agreed;
+        Instant exchangeStarted = clock.instant();
         try {
             token = client.exchange(code);
-            // shortcut: 조회에 동의한 계좌가 여럿이어도 첫 계좌를 쓴다. 계좌를 고르는 화면이 필요해지면 그때 만든다.
-            agreed = client.accounts(token).stream().filter(BankAccount::inquiryAgreed).findFirst();
+            agreed = client.accounts(token).stream()
+                    .filter(BankAccount::inquiryAgreed)
+                    .filter(account -> !account.fintechUseNum().isBlank())
+                    .toList();
         } catch (OpenBankingException failure) {
             throw new FgcBusinessException(FgcErrorCode.BANK_003, Map.of("bankCode", failure.code()));
         }
-        BankAccount account = agreed.orElseThrow(() -> new FgcBusinessException(FgcErrorCode.BANK_005));
+        if (agreed.size() != 1) {
+            throw new FgcBusinessException(FgcErrorCode.BANK_005);
+        }
+        BankAccount account = agreed.getFirst();
+        Instant expiresAt = exchangeStarted.plusSeconds(token.expiresInSeconds());
         // 계좌 저장과 토큰 교체를 한 번에 한 연결씩 한다. 두 사람이 동시에 연결해도 나중에 끝난 쪽의 계좌와 토큰이 함께 남는다.
         synchronized (linking) {
+            if (!expiresAt.isAfter(clock.instant())) {
+                throw new FgcBusinessException(FgcErrorCode.BANK_001);
+            }
             saveLink(userId, account);
-            connected.set(new Connected(account.fintechUseNum(), token,
-                    Instant.now().plusSeconds(token.expiresInSeconds())));
+            connected.set(new Connected(account.fintechUseNum(), token, expiresAt));
         }
         return status();
     }
@@ -122,7 +135,7 @@ public class BankLinkService {
     /** 지금 동의 화면에 가 있는 연결 요청인지. 모의 은행이 FGC가 낸 요청으로만 동의 화면을 열도록 묻는다. */
     public boolean isPending(String state) {
         Pending requested = pending.get(state);
-        return requested != null && requested.expiresAt().isAfter(Instant.now());
+        return requested != null && requested.expiresAt().isAfter(clock.instant());
     }
 
     private void saveLink(Long userId, BankAccount account) {
@@ -161,7 +174,7 @@ public class BankLinkService {
     private Optional<BankToken> liveTokenFor(Link link) {
         Connected current = connected.get();
         return current != null && current.fintechUseNum().equals(link.fintechUseNum())
-                && current.expiresAt().isAfter(Instant.now())
+                && current.expiresAt().isAfter(clock.instant())
                 ? Optional.of(current.token()) : Optional.empty();
     }
 

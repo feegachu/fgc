@@ -21,8 +21,8 @@ import java.util.List;
  * 설명 : 모의 은행의 수수료 지급 계좌 원장. 실제 은행이 아니라, 재무 담당자가 확정일에 확정 지급대로 이체한 것을 흉내 낸다.
  *
  * - 확정된 달의 이체를 그 달의 대사를 처음 실행할 때 한 번 만들어 저장한다. 그 뒤 FGC의 지급이 바뀌어도 은행 기록은 그대로다.
- * - 대사가 어긋난 건을 잡아내는 것을 보이려고, 받는 사람이 세 명 이상인 달에는 세 건을 일부러 어긋나게 만든다.
- *   둘째 사람에게 10,000원 덜 보내고, 마지막 사람에게는 보내지 않고, 참조코드 없는 출금 한 건을 섞는다.
+ * - 대사가 어긋난 건을 잡아내는 것을 보이려고, 받는 사람이 세 명 이상인 달에는 아래 시연용 출금을 만든다.
+ *   둘째 사람의 순액이 10,000원을 넘으면 10,000원 덜 보내고, 마지막 사람에게는 보내지 않고, 참조코드 없는 출금 한 건을 섞는다.
  *
  * @author yslee
  * @version 1.0
@@ -76,7 +76,7 @@ public class MockBankLedger {
         List<FinalizedMonth> months = jdbc.query("""
                 SELECT vr.validation_month, (vr.finalized_at AT TIME ZONE 'Asia/Seoul')::date
                   FROM fgc.validation_run vr
-                 WHERE vr.status = 'FINALIZED' AND vr.validation_month = ?
+                 WHERE vr.status = 'FINALIZED' AND vr.run_type = 'MONTHLY' AND vr.validation_month = ?
                    AND NOT EXISTS (SELECT 1 FROM fgc.mock_bank_transaction made
                                     WHERE made.settlement_month = vr.validation_month)
                  ORDER BY vr.validation_run_id DESC

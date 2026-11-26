@@ -77,6 +77,17 @@ class BankTransferMatcherTest {
     }
 
     @Test
+    @DisplayName("FGC-FUN-090 13월은 미확인 출금으로 남고 유효한 다른 월만 제외한다")
+    void keepsInvalidMonthReferences() {
+        var result = BankTransferMatcher.match(JULY, List.of(),
+                List.of(withdrawal("FGC2613-000001", "100"), withdrawal("FGC2610-000001", "100")));
+        assertThat(result).singleElement().satisfies(item -> {
+            assertThat(item.printContent()).isEqualTo("FGC2613-000001");
+            assertThat(item.result()).isEqualTo("UNKNOWN_WITHDRAWAL");
+        });
+    }
+
+    @Test
     @DisplayName("같은 참조코드로 나눠 보낸 출금은 합쳐서 비교하고 마지막 출금일을 남긴다")
     void sumsSplitTransfers() {
         List<Matched> result = BankTransferMatcher.match(JULY, List.of(new Expected(1L, new BigDecimal("890000"))),

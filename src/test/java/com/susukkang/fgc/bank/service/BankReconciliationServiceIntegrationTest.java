@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -20,6 +21,8 @@ import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.DateUtil;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -33,6 +36,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,12 +60,14 @@ class BankReconciliationServiceIntegrationTest {
     private JdbcTemplate jdbc;
     @MockitoBean
     private OpenBankingClient client;
+    @MockitoSpyBean
+    private Clock clock;
     @Autowired
     private ApplicationEvents applicationEvents;
 
     @Test
-    @DisplayName("은행 동의 뒤 조회에 동의한 첫 계좌를 연결하고 가린 번호만 감사로그에 남긴다")
-    void linksTheFirstAccountThatAgreedToInquiry() {
+    @DisplayName("은행 동의 뒤 유일한 조회 동의 계좌를 연결하고 가린 번호만 감사로그에 남긴다")
+    void linksTheOnlyAccountThatAgreedToInquiry() {
         assertThat(linkService.status().linked()).isFalse();
 
         BankLinkResponse linked = link("settle01");
@@ -80,6 +86,42 @@ class BankReconciliationServiceIntegrationTest {
                 """, String.class);
         assertThat(audited).contains("100-***-***002").contains("모의은행")
                 .doesNotContain(FINTECH_USE_NUM).doesNotContain("ACCESS-1");
+    }
+
+    @Test
+    @DisplayName("FGC-FUN-090 복수 동의 계좌나 빈 식별자로 기존 연결을 교체하지 않는다")
+    void preservesThePreviousLinkOnInvalidSelection() {
+        BankLinkResponse previous = link("settle01");
+        BankAccount second = new BankAccount("SECOND", "은행", "***002", "가상지에이", true);
+        BankAccount blank = new BankAccount(" ", "은행", "***003", "가상지에이", true);
+        for (List<BankAccount> invalid : List.of(List.of(accounts().getLast(), second), List.of(blank))) {
+            when(client.accounts(TOKEN)).thenReturn(invalid);
+            Long user = userId("settle01");
+            String state = stateOf(linkService.authorizeUrl(user).authorizeUrl());
+            assertBank(FgcErrorCode.BANK_005, () -> linkService.link(user, "CODE-1", state));
+            assertThat(linkService.status()).isEqualTo(previous);
+        }
+    }
+
+    @Test
+    @DisplayName("FGC-FUN-090 계좌 조회가 늦어져도 교환 시점 기준 만료를 연장하지 않는다")
+    void keepsTheOriginalTokenDeadline() {
+        Instant start = Instant.parse("2026-11-18T00:00:00Z");
+        doReturn(start).when(clock).instant();
+        Long user = userId("settle01");
+        when(client.authorizeUrl(anyString())).thenAnswer(call -> "/bank?state=" + call.getArgument(0));
+        String state = stateOf(linkService.authorizeUrl(user).authorizeUrl());
+        BankToken shortToken = new BankToken("SHORT", "1", 60);
+        when(client.exchange("CODE")).thenReturn(shortToken);
+        when(client.accounts(shortToken)).thenAnswer(call -> {
+            doReturn(start.plusSeconds(5)).when(clock).instant();
+            return accounts();
+        });
+        assertThat(linkService.link(user, "CODE", state).connected()).isTrue();
+        doReturn(start.plusSeconds(59)).when(clock).instant();
+        assertThat(linkService.status().connected()).isTrue();
+        doReturn(start.plusSeconds(60)).when(clock).instant();
+        assertBank(FgcErrorCode.BANK_001, linkService::requireSession);
     }
 
     @Test
@@ -204,7 +246,8 @@ class BankReconciliationServiceIntegrationTest {
         // 운영정책서 제17조의2: 상세행을 먼저 원 단위로 반올림하고 합계는 그 값을 더한다. 100.50 + 100.50 은 201 이 아니라 202 다.
         confirmedLine((Long) first.get("agent_id"), MARCH, "100.50", "PAYMENT");
         confirmedLine((Long) first.get("agent_id"), MARCH, "100.50", "PAYMENT");
-        // 차감도 건마다 반올림한다. 0.40 은 0 이라 202 그대로다. 차감을 반올림하지 않으면 201.60, 합계를 낸 뒤 반올림하면 201 이 된다.
+        // 0.40원 두 건은 각각 0원이므로 순증가는 202원이다. 차감을 먼저 합쳐 반올림하면 201원이 된다.
+        confirmedDeduction((Long) first.get("agent_id"), MARCH, "0.40");
         confirmedDeduction((Long) first.get("agent_id"), MARCH, "0.40");
         LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
         when(client.withdrawals(TOKEN, FINTECH_USE_NUM, today, today)).thenReturn(List.of());
@@ -377,6 +420,28 @@ class BankReconciliationServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("FGC-FUN-090 은행 조회 도중 지급 순액이 바뀌면 대사 결과를 저장하지 않는다")
+    void rejectsChangedExpectedPayments() {
+        finalizeMonth(MARCH, DateUtil.nowSeoul());
+        link("settle01");
+        Long agent = (Long) expectedTransfers(MARCH).getFirst().get("agent_id");
+        when(client.withdrawals(eq(TOKEN), eq(FINTECH_USE_NUM), any(), any())).thenAnswer(call -> {
+            confirmedDeduction(agent, MARCH, "100");
+            return List.of();
+        });
+        assertBank(FgcErrorCode.BANK_006, () -> reconciliationService.run(userId("settle01"), "2026-03"));
+        assertThat(reconciliationService.latest("2026-03")).isNull();
+    }
+
+    @Test
+    @DisplayName("FGC-FUN-090 사전확정 실행만 있는 달은 은행 조회를 시작하지 않는다")
+    void rejectsPreConfirmRuns() {
+        finalizeMonth(MARCH, DateUtil.nowSeoul(), "PRE_CONFIRM");
+        assertBank(FgcErrorCode.BANK_002, () -> reconciliationService.run(userId("settle01"), "2026-03"));
+        verify(client, never()).withdrawals(any(), anyString(), any(), any());
+    }
+
+    @Test
     @DisplayName("대사한 적 없는 달은 결과가 없다")
     void hasNoResultBeforeTheFirstRun() {
         assertThat(reconciliationService.latest("2026-03")).isNull();
@@ -444,7 +509,7 @@ class BankReconciliationServiceIntegrationTest {
 
     private BigDecimal sum(LocalDate month, Long agentId, String cashflowType) {
         return jdbc.queryForObject("""
-                SELECT COALESCE(SUM(amount), 0) FROM fgc.commission_transaction
+                SELECT COALESCE(SUM(ROUND(amount, 0)), 0) FROM fgc.commission_transaction
                  WHERE payment_stage = 'GA_TO_FC' AND status = 'CONFIRMED' AND settlement_month = ?
                    AND recipient_agent_id = ? AND cashflow_type = ?
                 """, BigDecimal.class, month, agentId, cashflowType);
@@ -485,10 +550,14 @@ class BankReconciliationServiceIntegrationTest {
 
     /** 계산이 끝난 실행을 만들어 확정 상태로 올린다(상태 전이 가드가 허용하는 순서). */
     private Long finalizeMonth(LocalDate month, OffsetDateTime finalizedAt) {
+        return finalizeMonth(month, finalizedAt, "MONTHLY");
+    }
+
+    private Long finalizeMonth(LocalDate month, OffsetDateTime finalizedAt, String runType) {
         Long runId = jdbc.queryForObject("""
                 INSERT INTO fgc.validation_run (validation_month, run_no, run_type)
-                VALUES (?, ?, 'MONTHLY') RETURNING validation_run_id
-                """, Long.class, month, ThreadLocalRandom.current().nextInt(1_000_000, 2_000_000));
+                VALUES (?, ?, ?) RETURNING validation_run_id
+                """, Long.class, month, ThreadLocalRandom.current().nextInt(1_000_000, 2_000_000), runType);
         jdbc.update("""
                 UPDATE fgc.validation_run SET status = 'RUNNING', current_step = 1, started_at = clock_timestamp()
                  WHERE validation_run_id = ?

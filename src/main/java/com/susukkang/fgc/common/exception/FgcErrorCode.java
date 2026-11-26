@@ -211,6 +211,7 @@ public enum FgcErrorCode {
     BANK_003("FGC-BANK-003", HttpStatus.SERVICE_UNAVAILABLE, "error.bank.unavailable"),
     BANK_004("FGC-BANK-004", HttpStatus.CONFLICT, "error.bank.authorizationExpired"),
     BANK_005("FGC-BANK-005", HttpStatus.UNPROCESSABLE_ENTITY, "error.bank.noInquiryAccount"),
+    BANK_006("FGC-BANK-006", HttpStatus.CONFLICT, "error.bank.paymentsChanged"),
 
     EXCP_001(
             "FGC-EXCP-001",

@@ -40,7 +40,7 @@ public class BankReconciliationRepository {
         return jdbc.query("""
                 SELECT validation_run_id, (finalized_at AT TIME ZONE 'Asia/Seoul')::date
                   FROM fgc.validation_run
-                 WHERE validation_month = ? AND status = 'FINALIZED'
+                 WHERE validation_month = ? AND run_type = 'MONTHLY' AND status = 'FINALIZED'
                  ORDER BY validation_run_id DESC
                  LIMIT 1
                 """, (rs, row) -> new FinalizedRun(rs.getLong(1), rs.getObject(2, LocalDate.class)), settlementMonth)
