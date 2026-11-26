@@ -84,10 +84,16 @@ jobs:
 
       - name: Verify API image from tested WAR
         if: needs.changes.outputs.run_checks == 'true'
+        shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/api-image"
           cp build/libs/fgc-0.0.1-SNAPSHOT.war "$RUNNER_TEMP/api-image/"
           docker build --pull --target ci-runtime -f Containerfile.api -t fgc-api:ci "$RUNNER_TEMP/api-image"
+          runtime=$(docker run --rm --entrypoint java fgc-api:ci -XshowSettings:properties -version 2>&1 \
+            | awk '$1 == "java.runtime.version" { print $3 }')
+          echo "FGC API java.runtime.version=$runtime (Temurin 21.0.13.1+2 or later required)"
+          [[ "$runtime" == 21.* ]]
+          dpkg --compare-versions "$runtime" ge '21.0.13.1+2'
           docker run --rm --entrypoint cat fgc-api:ci /usr/local/tomcat/webapps/ROOT.war \
             | cmp - build/libs/fgc-0.0.1-SNAPSHOT.war
 
