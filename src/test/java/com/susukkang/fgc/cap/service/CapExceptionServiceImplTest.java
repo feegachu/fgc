@@ -4,6 +4,7 @@ import com.susukkang.fgc.cap.dto.CapExceptionCreateCommand;
 import com.susukkang.fgc.cap.dto.CapExceptionInsertDTO;
 import com.susukkang.fgc.cap.dto.CapExceptionResolveCommand;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseActionTarget;
+import com.susukkang.fgc.exceptioncase.event.ExceptionCaseClosed;
 import com.susukkang.fgc.cap.repository.CapExceptionRepository;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.ExceptionActionType;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -41,11 +43,14 @@ class CapExceptionServiceImplTest {
     @Mock
     private CapExceptionRepository capExceptionRepository;
 
+    @Mock
+    private ApplicationEventPublisher events;
+
     private CapExceptionServiceImpl capExceptionService;
 
     @BeforeEach
     void setUp() {
-        capExceptionService = new CapExceptionServiceImpl(capExceptionRepository);
+        capExceptionService = new CapExceptionServiceImpl(capExceptionRepository, events);
     }
 
     @Test
@@ -156,6 +161,8 @@ class CapExceptionServiceImplTest {
 
         verify(capExceptionRepository).insertExceptionAction(command, exception);
         verify(capExceptionRepository).updateExceptionResolved(exception);
+        // FGC-FUN-089: 마감 알림이 확정 조건을 바로 다시 보도록 예외 종결을 알린다(IF-EVT-08).
+        verify(events).publishEvent(new ExceptionCaseClosed(5L));
     }
 
     @Test

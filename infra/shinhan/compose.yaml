@@ -53,6 +53,10 @@ services:
       FGC_JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
       # Server-owned runtime secret only; absent key keeps the fixed-guide fallback.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # 마감 알림 문자(FUN-089). 셋 중 하나라도 비면 문자만 건너뛰고 알림 이력은 남는다.
+      SOLAPI_API_KEY: ${SOLAPI_API_KEY:-}
+      SOLAPI_API_SECRET: ${SOLAPI_API_SECRET:-}
+      SOLAPI_SENDER: ${SOLAPI_SENDER:-}
       JAVA_TOOL_OPTIONS: "-Xms256m -Xmx1024m -XX:MaxMetaspaceSize=384m"
       TZ: Asia/Seoul
       # 환수 통지서 PDF 원본(#671). 이미지 밖 볼륨이어야 재배포 뒤에도 과거 판이 남는다

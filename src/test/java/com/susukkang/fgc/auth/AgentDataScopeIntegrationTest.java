@@ -448,7 +448,9 @@ class AgentDataScopeIntegrationTest {
             "GET /api/v1/contracts/{id}/status-events/{eventId}/effects",
             "GET /api/v1/transactions", "GET /api/v1/transactions/{paymentId}",
             "GET /api/v1/agent/me/home", "POST /api/v1/agent/me/contract-checks",
-            "GET /api/v1/agent/me/statements", "GET /api/v1/agent/me/statements/{entryKey}");
+            "GET /api/v1/agent/me/statements", "GET /api/v1/agent/me/statements/{entryKey}",
+            // FUN-089: 본인 마감 알림 수신 설정. 사용자 ID 를 세션에서만 얻어 가리킬 대상이 본인뿐이다.
+            "GET /api/v1/notification-settings/me", "PUT /api/v1/notification-settings/me");
 
     @Test
     void everyApiRouteOutsideTheAgentListIsForbidden() throws Exception {
