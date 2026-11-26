@@ -62,6 +62,10 @@ public final class Roles {
     public static final String CAN_FINALIZE_VALIDATION =
             HAS_ANY_ROLE + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
 
+    /** IF-API-91·92 마감 알림 수신 설정. 알림을 받는 역할만 쓴다 — 확정 권한자(확정 대기 알림)와 설계사(확정 통지). */
+    public static final String CAN_RECEIVE_CLOSING_NOTIFICATION =
+            HAS_ANY_ROLE + GA_ADMIN + "','" + SYSTEM_ADMIN + "','" + AGENT + "')";
+
     /**
      * "전체 조회" API용(기준정보 등). 사실상 authenticated()와 같지만, 역할 4종을 명시해
      * 새 역할이 추가될 때 조회 범위를 다시 판단하도록 강제한다.

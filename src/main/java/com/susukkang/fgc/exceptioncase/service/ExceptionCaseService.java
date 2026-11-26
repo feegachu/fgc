@@ -17,10 +17,12 @@ import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.web.RequestIdContext;
 import com.susukkang.fgc.exceptioncase.dto.*;
 import com.susukkang.fgc.exceptioncase.entity.ExceptionAction;
+import com.susukkang.fgc.exceptioncase.event.ExceptionCaseClosed;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionActionRepository;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseQueryRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Propagation;
@@ -54,6 +56,7 @@ public class ExceptionCaseService {
     private final ExceptionActionRepository exceptionActionRepository;
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 조건에 맞는 예외 한 페이지와 각 예외의 처리 이력을 조회한다.
@@ -424,6 +427,12 @@ public class ExceptionCaseService {
             throw new IllegalStateException(
                     "예외 상태 변경에 실패했습니다."
             );
+        }
+
+        // 2026-11-18 yslee - FGC-FUN-089 예외 종결을 사건으로 알린다(IF-EVT-08).
+        // 마감 알림이 커밋 뒤에 확정 조건을 바로 다시 본다. 받는 쪽이 없거나 실패해도 이 조치에는 영향이 없다.
+        if (isClosed(toStatus)) {
+            eventPublisher.publishEvent(new ExceptionCaseClosed(exceptionCaseId));
         }
 
         // 2026-09-27 hjKang - 예외 조치 감사 저장을 JPA Repository로 전환한다.

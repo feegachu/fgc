@@ -79,12 +79,14 @@ export const homeSummaryQueryOptions = (asOf: string) =>
     meta: { errorToast: false },
   })
 
-/** IF-API-69. 미처리 KPI 를 누르면 여는 예외함(status=OPEN)과 같은 조건이다. */
-export const openExceptionCountsQueryOptions = () =>
+/** IF-API-69. 미처리 KPI 를 누르면 여는 예외함(status=OPEN)과 같은 상태와 검증월을 사용한다. */
+export const openExceptionCountsQueryOptions = (month?: string) =>
   queryOptions({
-    queryKey: ['exceptions', 'counts', OPEN_STATUS],
+    queryKey: ['exceptions', 'counts', OPEN_STATUS, month],
     queryFn: async ({ signal }): Promise<ExceptionCounts> => {
-      const { data } = await apiClient.request<ExceptionCounts>(`/api/v1/exceptions/counts?status=${OPEN_STATUS}`, {
+      const params = new URLSearchParams({ status: OPEN_STATUS })
+      if (month) params.set('validationMonth', `${month}-01`)
+      const { data } = await apiClient.request<ExceptionCounts>(`/api/v1/exceptions/counts?${params}`, {
         signal,
       })
       if (!data) throw new Error('미처리 예외 건수를 확인할 수 없습니다.')

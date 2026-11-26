@@ -1,17 +1,19 @@
 import { expect, login, sql, test } from './fixtures'
 
 /** 시드에 미처리 예외가 없을 수 있어 건수를 직접 넣는다. fixtures 가 시험마다 DB 를 되돌린다. */
-function insertOpenExceptions(count: number) {
-  sql(`INSERT INTO fgc.exception_case(exception_key, exception_type, severity, status, source_entity_type, source_entity_id, title, contract_id)
+function insertOpenExceptions() {
+  sql(`INSERT INTO fgc.exception_case(exception_key, exception_type, severity, status, source_entity_type, source_entity_id, title, contract_id, validation_month)
        SELECT 'E2E-HOME:' || n, 'DATA_QUALITY', 'WARNING', 'NEW', 'E2E', n::text, '홈 시험 예외 ' || n,
-              (SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1)
-         FROM generate_series(1, ${count}) n`)
+              (SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1), validation_month
+         FROM (VALUES (1, DATE '2026-07-01'), (2, DATE '2026-08-01'), (3, NULL)) cases(n, validation_month)`)
 }
 
 test('FUN-080 home: 미처리 숫자를 누르면 같은 건수의 예외함이 열린다', async ({ page }) => {
-  insertOpenExceptions(3)
-  const expected = Number(sql("SELECT count(*) FROM fgc.exception_case WHERE status IN ('NEW','REVIEW_REQUIRED','IN_REVIEW')"))
-  expect(expected).toBeGreaterThanOrEqual(3)
+  insertOpenExceptions()
+  const openCount = "SELECT count(*) FROM fgc.exception_case WHERE status IN ('NEW','REVIEW_REQUIRED','IN_REVIEW')"
+  const expected = Number(sql(openCount + " AND validation_month = DATE '2026-07-01'"))
+  const total = Number(sql(openCount))
+  expect(total).toBeGreaterThan(expected)
 
   await login(page, 'settle01', '/?month=2026-07')
   const kpi = page.getByRole('region', { name: '주요 검증 지표' }).getByRole('link', { name: /^미처리 예외 / })
@@ -20,6 +22,9 @@ test('FUN-080 home: 미처리 숫자를 누르면 같은 건수의 예외함이 
 
   await expect(page).toHaveURL(/\/exceptions\?.*status=OPEN/)
   await expect(page.locator('.exception-page .list-header-total').first()).toHaveText(`총 ${expected.toLocaleString('ko-KR')}건`)
+  await page.goBack()
+  await page.getByRole('link', { name: `전체 기간 미처리 예외 보기 (${total.toLocaleString('ko-KR')}건)` }).click()
+  await expect(page.locator('.exception-page .list-header-total').first()).toHaveText(`총 ${total.toLocaleString('ko-KR')}건`)
 })
 
 test('FUN-080 home: 월별 수수료와 여섯 달 막대는 DB의 확정 계약 귀속 금액과 같다', async ({ page }) => {

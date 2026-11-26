@@ -159,6 +159,14 @@ export const screens: ScreenDefinition[] = [
     icon: 'payments',
   },
   {
+    id: 'BANK-W01',
+    path: '/bank-reconciliations',
+    title: '지급 이체 대사',
+    menu: '/bank-reconciliations',
+    section: 'contracts',
+    icon: 'payments',
+  },
+  {
     id: 'VRUN-W02',
     path: '/validation-runs/:id',
     title: '월 통합검증 상세',
@@ -182,6 +190,15 @@ export const screens: ScreenDefinition[] = [
     section: 'admin',
     icon: 'settings',
     permission: 'canViewAuditLog',
+  },
+  {
+    id: 'NOTI-W01',
+    path: '/notifications',
+    title: '알림 발송 이력',
+    menu: '/notifications',
+    section: 'admin',
+    icon: 'settings',
+    permission: 'canFinalizeValidation',
   },
 ]
 export const screenFor = (pathname: string) =>
