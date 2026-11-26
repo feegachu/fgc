@@ -234,6 +234,9 @@
   min-height: 4rem;
   flex: 0 0 auto;
   grid-template-columns: 2rem minmax(0, 1fr) 1.25rem;
+  /* 알림 설정 버튼이 있으면 로그아웃 앞에 한 칸이 더 생긴다. */
+  grid-auto-flow: column;
+  grid-auto-columns: 1.25rem;
   gap: var(--space-2);
   align-items: center;
   padding: var(--space-3) var(--space-4);
@@ -317,6 +320,7 @@
 .app-shell.is-sidebar-collapsed .sidebar-nav-chevron,
 .app-shell.is-sidebar-collapsed .sidebar-subnav,
 .app-shell.is-sidebar-collapsed .sidebar-user-copy,
+.app-shell.is-sidebar-collapsed .sidebar-notification-button,
 .app-shell.is-sidebar-collapsed .sidebar-user-panel form {
   display: none;
 }

@@ -205,6 +205,21 @@
     ]
   },
   {
+    "screenId": "BANK-W01",
+    "title": "지급 이체 대사",
+    "page": "bank-reconciliation/BankReconciliationPage.tsx",
+    "steps": [
+      {
+        "targetId": "bank.link",
+        "instruction": "수수료 지급 계좌가 연결되어 있는지 확인하세요. 처음이거나 다시 연결하라는 안내가 보이면 은행 연결을 누릅니다."
+      },
+      {
+        "targetId": "bank.result",
+        "instruction": "정산월을 확인하고 은행 거래내역으로 대사를 누르세요. 확정된 달만 할 수 있고, 어긋난 줄이 위에 나옵니다."
+      }
+    ]
+  },
+  {
     "screenId": "EXCP-W01",
     "title": "예외 처리",
     "page": "exception/ExceptionPage.tsx",
@@ -301,6 +316,17 @@
       {
         "targetId": "audit.overview",
         "instruction": "기간, 사용자 및 대상 조건으로 조회하고 변경 전후를 확인하세요. 감사 이력은 조회용이며 수정할 수 없습니다."
+      }
+    ]
+  },
+  {
+    "screenId": "NOTI-W01",
+    "title": "알림 발송 이력",
+    "page": "notification/NotificationHistoryPage.tsx",
+    "steps": [
+      {
+        "targetId": "notification.history",
+        "instruction": "마감 알림 문자가 누구에게 갔는지 확인하세요. 실패했거나 건너뛴 알림은 다시 보내기를 누릅니다."
       }
     ]
   },
@@ -504,6 +530,22 @@
       {
         "targetId": "reconciliation.history",
         "instruction": "이전 실행 이력을 고르면 그 실행의 결과를 볼 수 있습니다."
+      }
+    ]
+  },
+  {
+    "screenId": "BANK-W01",
+    "variant": "reader",
+    "title": "지급 이체 대사",
+    "page": "bank-reconciliation/BankReconciliationPage.tsx",
+    "steps": [
+      {
+        "targetId": "bank.link",
+        "instruction": "연결된 수수료 지급 계좌를 확인하세요. 은행 연결은 정산담당자가 합니다."
+      },
+      {
+        "targetId": "bank.result",
+        "instruction": "그 달의 확정 지급과 은행 출금이 맞는지 확인하세요. 어긋난 줄이 위에 나옵니다."
       }
     ]
   },

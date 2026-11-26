@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useSidebarStore } from '../../stores/sidebar'
+import { NotificationSettingsModal } from '../../features/notification/NotificationSettingsModal'
 import { canOpen, screens } from '../screens'
 import type { ScreenDefinition } from '../screens'
 export interface ShellUser {
@@ -9,6 +10,7 @@ export interface ShellUser {
   roleCode: string
   canProcess: boolean
   canViewAuditLog: boolean
+  canFinalizeValidation?: boolean
 }
 import { roleLabels } from './labels'
 const groups = [
@@ -16,7 +18,7 @@ const groups = [
     id: 'contracts',
     title: '계약/지급',
     icon: 'payments',
-    paths: ['/contracts', '/transactions', '/agent/statements', '/schedules', '/clawbacks'],
+    paths: ['/contracts', '/transactions', '/agent/statements', '/schedules', '/clawbacks', '/bank-reconciliations'],
   },
   {
     id: 'compliance',
@@ -25,7 +27,7 @@ const groups = [
     paths: ['/cap-checks', '/arbitrage-checks', '/acquisition-cost-checks', '/validation-runs'],
   },
   { id: 'ledger', title: '원장/대사', icon: 'menu_book', paths: ['/journals', '/reconciliations'] },
-  { id: 'admin', title: '관리', icon: 'settings', paths: ['/base', '/policies', '/audit-logs'] },
+  { id: 'admin', title: '관리', icon: 'settings', paths: ['/base', '/policies', '/audit-logs', '/notifications'] },
 ]
 /** 권한에 맞는 업무 메뉴와 접힘 상태를 표시한다. */
 export function Sidebar({
@@ -45,6 +47,10 @@ export function Sidebar({
   const openSections = useSidebarStore((state) => state.openSections)
   const setCollapsed = useSidebarStore((state) => state.setCollapsed)
   const setSection = useSidebarStore((state) => state.setSection)
+  const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false)
+  // 마감 알림을 받는 역할(확정 권한자, 설계사)에게만 알림 설정을 보인다(FUN-089).
+  const agent = user.roleCode === 'AGENT'
+  const receivesNotifications = agent || user.canFinalizeValidation === true
   useEffect(() => {
     if (current?.section) setSection(current.section, true)
   }, [current?.section, setSection])
@@ -191,6 +197,18 @@ export function Sidebar({
           <p className="sidebar-user-name">{user.userName}</p>
           <p className="sidebar-user-role">{roleLabels[user.roleCode] ?? '업무 사용자'}</p>
         </div>
+        {receivesNotifications && (
+          <button data-guide-feature="app.shell.sidebar.button-4"
+            className="sidebar-logout-button sidebar-notification-button"
+            type="button"
+            aria-label="알림 설정"
+            onClick={() => setNotificationSettingsOpen(true)}
+          >
+            <span className="material-symbols-rounded" aria-hidden="true">
+              notifications
+            </span>
+          </button>
+        )}
         <button data-guide-feature="app.shell.sidebar.button-3"
           className="sidebar-logout-button"
           type="button"
@@ -203,6 +221,9 @@ export function Sidebar({
           </span>
         </button>
       </div>
+      {notificationSettingsOpen && (
+        <NotificationSettingsModal agent={agent} onClose={() => setNotificationSettingsOpen(false)} />
+      )}
     </aside>
   )
 }

@@ -905,6 +905,48 @@
         },
         "type" : "object"
       },
+      "ApiResponseBankAuthorizeUrlResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/BankAuthorizeUrlResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseBankLinkResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/BankLinkResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseBankReconciliationResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/BankReconciliationResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseBranchDashboardResponse" : {
         "properties" : {
           "data" : {
@@ -1730,6 +1772,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseNotificationSettingResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/NotificationSettingResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponsePageResponseAcquisitionCostCheckResponse" : {
         "properties" : {
           "data" : {
@@ -1804,6 +1860,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/PageResponseClawbackNoticeDocumentResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponsePageResponseClosingNotificationResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PageResponseClosingNotificationResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -2694,6 +2764,187 @@
           },
           "userId" : {
             "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "BankAuthorizeUrlResponse" : {
+        "properties" : {
+          "authorizeUrl" : {
+            "description" : "은행 동의 화면 주소. 10분 안에 동의를 마쳐야 한다",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "BankLinkRequest" : {
+        "properties" : {
+          "code" : {
+            "description" : "은행이 돌려준 인가 코드",
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "state" : {
+            "description" : "IF-API-96 이 주소에 넣어 보낸 값",
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "code", "state" ],
+        "type" : "object"
+      },
+      "BankLinkResponse" : {
+        "properties" : {
+          "accountHolderName" : {
+            "type" : [ "string", "null" ]
+          },
+          "accountNumMasked" : {
+            "description" : "은행이 가려서 준 계좌번호",
+            "type" : [ "string", "null" ]
+          },
+          "bankName" : {
+            "type" : [ "string", "null" ]
+          },
+          "connected" : {
+            "description" : "지금 은행을 부를 수 있는지. 서버를 다시 띄우면 false 가 되어 다시 연결해야 한다",
+            "type" : "boolean"
+          },
+          "linked" : {
+            "description" : "수수료 지급 계좌를 연결한 적이 있는지",
+            "type" : "boolean"
+          },
+          "linkedAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "mock" : {
+            "description" : "저장소에 들어 있는 모의 은행에 연결되어 있는지",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "BankReconciliationItem" : {
+        "properties" : {
+          "agentCode" : {
+            "description" : "확인 안 된 출금이면 null",
+            "type" : [ "string", "null" ]
+          },
+          "agentName" : {
+            "description" : "확인 안 된 출금이면 null",
+            "type" : [ "string", "null" ]
+          },
+          "bankAmount" : {
+            "description" : "같은 참조코드로 나간 출금 합계",
+            "type" : "number"
+          },
+          "bankReconciliationItemId" : {
+            "description" : "결과 줄의 번호. 내용이 같은 출금 두 건도 이 번호로 구분한다",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "bankTranDate" : {
+            "description" : "이체가 없으면 null",
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "differenceAmount" : {
+            "description" : "은행 출금액에서 확정 지급 순액을 뺀 값",
+            "type" : "number"
+          },
+          "expectedAmount" : {
+            "description" : "그 달 확정 지급 합계에서 확정 차감 합계를 뺀 금액(원 단위 반올림)",
+            "type" : "number"
+          },
+          "printContent" : {
+            "description" : "은행 거래내역의 통장인자내용. 이체가 없으면 null",
+            "type" : [ "string", "null" ]
+          },
+          "referenceCode" : {
+            "description" : "이체할 때 내 통장 표시에 적는 값. FGC + 정산월(yyMM) + - + 설계사 번호 6자리. 확인 안 된 출금이면 null",
+            "type" : [ "string", "null" ]
+          },
+          "result" : {
+            "description" : "MATCHED 일치, AMOUNT_MISMATCH 금액 다름, NOT_TRANSFERRED 이체 없음, UNKNOWN_WITHDRAWAL 확인 안 된 출금",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "BankReconciliationRequest" : {
+        "properties" : {
+          "settlementMonth" : {
+            "description" : "대사할 정산월(YYYY-MM). 확정된 달이어야 한다",
+            "example" : "2026-07",
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "settlementMonth" ],
+        "type" : "object"
+      },
+      "BankReconciliationResponse" : {
+        "properties" : {
+          "accountNumMasked" : {
+            "type" : "string"
+          },
+          "amountMismatchCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "bankName" : {
+            "type" : "string"
+          },
+          "bankReconciliationRunId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "createdBy" : {
+            "description" : "대사를 돌린 사용자의 로그인 ID",
+            "type" : "string"
+          },
+          "inquiryFrom" : {
+            "description" : "은행에서 조회한 기간의 첫날(확정일)",
+            "format" : "date",
+            "type" : "string"
+          },
+          "inquiryTo" : {
+            "description" : "은행에서 조회한 기간의 끝날(확정일부터 31일, 오늘을 넘지 않음)",
+            "format" : "date",
+            "type" : "string"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/BankReconciliationItem"
+            },
+            "type" : "array"
+          },
+          "matchedCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "notTransferredCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "settlementMonth" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "unknownWithdrawalCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "withdrawalCount" : {
+            "description" : "그 기간에 은행에서 받은 출금 건수",
+            "format" : "int32",
             "type" : "integer"
           }
         },
@@ -3941,6 +4192,61 @@
           }
         },
         "required" : [ "clawbackBasisCode", "clawbackRatePct", "elapsedMonthFrom", "elapsedMonthTo" ],
+        "type" : "object"
+      },
+      "ClosingNotificationResponse" : {
+        "properties" : {
+          "attemptCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "closingNotificationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "errorCode" : {
+            "description" : "실패하거나 건너뛴 사유. 없으면 null",
+            "type" : [ "string", "null" ]
+          },
+          "eventType" : {
+            "type" : "string"
+          },
+          "messageText" : {
+            "type" : "string"
+          },
+          "recipientLoginId" : {
+            "description" : "수신 대상이 없던 사건이면 null",
+            "type" : [ "string", "null" ]
+          },
+          "recipientName" : {
+            "description" : "수신 대상이 없던 사건이면 null",
+            "type" : [ "string", "null" ]
+          },
+          "recipientPhone" : {
+            "description" : "가운데를 가린 번호. 수신 대상이 없거나 수신을 해제했으면 null",
+            "type" : [ "string", "null" ]
+          },
+          "sentAt" : {
+            "description" : "보내지 않았으면 null",
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "validationMonth" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "validationRunId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
         "type" : "object"
       },
       "CommissionItemResponse" : {
@@ -7772,6 +8078,24 @@
         "type" : "object"
       },
       "JsonNode" : { },
+      "LatestBankReconciliationEnvelope" : {
+        "properties" : {
+          "data" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/BankReconciliationResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "LedgerSummary" : {
         "properties" : {
           "imbalanceCount" : {
@@ -7979,6 +8303,35 @@
           },
           "title" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "NotificationSettingRequest" : {
+        "properties" : {
+          "consent" : {
+            "type" : "boolean"
+          },
+          "mobilePhone" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "consent" ],
+        "type" : "object"
+      },
+      "NotificationSettingResponse" : {
+        "properties" : {
+          "consentedAt" : {
+            "description" : "수신 동의하지 않았으면 null",
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "mobilePhone" : {
+            "description" : "수신 동의하지 않았으면 null",
+            "type" : [ "string", "null" ]
+          },
+          "smsConfigured" : {
+            "type" : "boolean"
           }
         },
         "type" : "object"
@@ -8258,6 +8611,36 @@
           "content" : {
             "items" : {
               "$ref" : "#/components/schemas/ClawbackNoticeDocumentResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PageResponseClosingNotificationResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ClosingNotificationResponse"
             },
             "type" : "array"
           },
@@ -12653,6 +13036,132 @@
         "tags" : [ "auth-token-controller" ]
       }
     },
+    "/api/v1/bank-reconciliations" : {
+      "get" : {
+        "description" : "그 정산월에 마지막으로 돌린 대사 결과. 돌린 적이 없으면 data 가 null 이다.",
+        "operationId" : "latest",
+        "parameters" : [ {
+          "description" : "정산월(YYYY-MM)",
+          "example" : "2026-07",
+          "in" : "query",
+          "name" : "month",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LatestBankReconciliationEnvelope"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "지급 이체 대사 결과",
+        "tags" : [ "지급 이체 대사" ]
+      },
+      "post" : {
+        "description" : "확정된 정산월의 설계사별 확정 지급 순액과, 확정일부터 31일 사이에 연결 계좌에서 나간 출금을 맞춰 결과를 남긴다.",
+        "operationId" : "run",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BankReconciliationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBankReconciliationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "지급 이체 대사 실행",
+        "tags" : [ "지급 이체 대사" ]
+      }
+    },
+    "/api/v1/bank/link" : {
+      "get" : {
+        "description" : "연결한 수수료 지급 계좌(가린 번호)와 지금 은행을 부를 수 있는지 돌려준다.",
+        "operationId" : "linkStatus",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBankLinkResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "은행 연결 상태",
+        "tags" : [ "지급 이체 대사" ]
+      },
+      "post" : {
+        "description" : "동의 뒤 은행이 돌려준 code 와 state 로 토큰을 받고, 유효한 조회 동의 계좌가 하나일 때만 수수료 지급 계좌로 연결한다.",
+        "operationId" : "link",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BankLinkRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBankLinkResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "은행 계좌 연결",
+        "tags" : [ "지급 이체 대사" ]
+      }
+    },
+    "/api/v1/bank/link/authorize-url" : {
+      "post" : {
+        "description" : "브라우저를 보낼 은행 동의 화면 주소를 만든다. 주소에 넣은 state 는 요청한 사용자에게 10분 동안 묶인다.",
+        "operationId" : "authorizeUrl",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBankAuthorizeUrlResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "은행 동의 화면 주소",
+        "tags" : [ "지급 이체 대사" ]
+      }
+    },
     "/api/v1/base/agents" : {
       "get" : {
         "description" : "기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. 계약 이력 조회에서 includeTerminated=true를 지정하면 기준일 이전에 해촉된 설계사도 포함합니다. includeHistorical=true이면 위촉기간 제한을 해제하고 조직별 기존 계약의 모집 설계사도 포함합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.",
@@ -15329,6 +15838,124 @@
         "tags" : [ "보험 뉴스" ]
       }
     },
+    "/api/v1/notification-settings/me" : {
+      "get" : {
+        "description" : "로그인한 사용자의 휴대폰 번호와 수신 동의 시각을 돌려준다. 동의하지 않았으면 둘 다 null 이다.",
+        "operationId" : "mySetting",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationSettingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "본인 마감 알림 수신 설정 조회",
+        "tags" : [ "마감 알림" ]
+      },
+      "put" : {
+        "description" : "consent 가 true 면 휴대폰 번호를 저장하고, false 면 번호를 지운다. 사용자 ID는 로그인 정보에서만 얻는다.",
+        "operationId" : "changeMySetting",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/NotificationSettingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationSettingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "본인 마감 알림 수신 설정 저장",
+        "tags" : [ "마감 알림" ]
+      }
+    },
+    "/api/v1/notifications" : {
+      "get" : {
+        "description" : "최신순. 수신번호는 가운데를 가려 돌려준다.",
+        "operationId" : "notifications",
+        "parameters" : [ {
+          "description" : "페이지(1-base)",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "페이지 크기(최대 100)",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePageResponseClosingNotificationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "마감 알림 발송 이력",
+        "tags" : [ "마감 알림" ]
+      }
+    },
+    "/api/v1/notifications/{id}/resend" : {
+      "post" : {
+        "description" : "실패했거나 건너뛴 알림을 대기로 되돌린다. 다음 발송 주기에 다시 보낸다.",
+        "operationId" : "resend",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "마감 알림 다시 보내기",
+        "tags" : [ "마감 알림" ]
+      }
+    },
     "/api/v1/policies" : {
       "get" : {
         "description" : "정책 유형·기준일·상태로 정책 버전 목록을 조회합니다. 기준일(asOf)은 해당 일자에 유효한 버전만 남깁니다 — 정책은 계약일 기준으로 고르는 경우가 많습니다. 조건에 맞는 자료가 없으면 200과 빈 배열을 반환합니다.",
@@ -17384,8 +18011,14 @@
     "description" : "FUN-079 상품 비교·참고 순위 API",
     "name" : "상품 비교 챗봇"
   }, {
+    "description" : "확정된 정산월의 확정 지급 순액과 은행 계좌의 실제 출금을 맞춘다",
+    "name" : "지급 이체 대사"
+  }, {
     "description" : "FUN-065 수수료 지급 건 등록·수정·확정 API",
     "name" : "수수료 지급 건"
+  }, {
+    "description" : "월 마감에서 일이 넘어가는 순간을 문자로 알리는 기능의 수신 설정과 발송 이력",
+    "name" : "마감 알림"
   }, {
     "description" : "계약 상세 통합조회 및 재검증 API",
     "name" : "계약"

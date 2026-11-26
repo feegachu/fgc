@@ -46,6 +46,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
     workspace.initialize(user.loginId, defaultMonth, requestedMonth, {
       canProcess: user.canProcess,
       canViewAuditLog: user.canViewAuditLog,
+      canFinalizeValidation: user.canFinalizeValidation === true,
       isAgent: user.roleCode === 'AGENT',
     })
     // 포트폴리오 전환과 이 셸의 월 URL 정규화가 서로 덮어쓰지 않게 한다.
@@ -70,6 +71,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
     user.loginId,
     user.canProcess,
     user.canViewAuditLog,
+    user.canFinalizeValidation,
     user.roleCode,
     defaultMonth,
     navigate,

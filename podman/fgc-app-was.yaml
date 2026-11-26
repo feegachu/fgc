@@ -30,6 +30,12 @@ spec:
           valueFrom: {secretKeyRef: {name: fgc-app, key: FGC_JWT_SECRET}}
         - name: SPRING_AI_OPENAI_API_KEY
           valueFrom: {secretKeyRef: {name: fgc-app, key: SPRING_AI_OPENAI_API_KEY, optional: true}}
+        - name: SOLAPI_API_KEY
+          valueFrom: {secretKeyRef: {name: fgc-app, key: SOLAPI_API_KEY, optional: true}}
+        - name: SOLAPI_API_SECRET
+          valueFrom: {secretKeyRef: {name: fgc-app, key: SOLAPI_API_SECRET, optional: true}}
+        - name: SOLAPI_SENDER
+          valueFrom: {secretKeyRef: {name: fgc-app, key: SOLAPI_SENDER, optional: true}}
       resources:
         limits: {memory: __API_MEMORY__}
       volumeMounts:

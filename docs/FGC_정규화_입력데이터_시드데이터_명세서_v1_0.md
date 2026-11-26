@@ -1481,6 +1481,8 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 | 담당자·환수 | agent_history, contract_manager_assignment, policy_approval_action, clawback_rule, clawback_candidate, clawback_case, clawback_line, recovery_transaction |
 | 원장 | journal_account, journal_header, journal_line |
 | 대사 | reconciliation_run, reconciliation_result, reconciliation_match |
+| 지급 이체 대사 | bank_account_link, bank_reconciliation_run, bank_reconciliation_item, mock_bank_transaction |
+| 마감 문자 | user_notification_setting, closing_notification |
 | 예외 | exception_case, exception_occurrence, exception_action |
 | 감사 | audit_log |
 
@@ -1506,6 +1508,8 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 | 월 검증 | FUN-041~044 |
 | 원장 | FUN-046~047 |
 | 대사 | FUN-048~052 |
+| 지급 이체 대사 | FUN-090 |
+| 마감 문자 | FUN-089 |
 | 예외 | FUN-053, FUN-061 |
 | 2차 분급 | FUN-037~038, FUN-062, FUN-064 |
 | 환수 | FUN-054~056, FUN-084 |

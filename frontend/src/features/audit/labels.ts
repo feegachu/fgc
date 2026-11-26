@@ -28,6 +28,8 @@ export const actionLabels = {
   JOURNAL_CORRECTION_REQUESTED: '원장 정정 요청',
   JOURNAL_REVERSED: '원분개 역분개',
   JOURNAL_REVERSED_AND_REPOSTED: '원분개 역분개 및 재기표',
+  BANK_ACCOUNT_LINKED: '은행 계좌 연결',
+  BANK_RECONCILIATION_RUN: '지급 이체 대사 실행',
   VALIDATION_RUN_STARTED: '검증 실행 시작',
   VALIDATION_RUN_COMPLETED: '검증 실행 완료',
   VALIDATION_RUN_STEP_ADVANCED: '검증 실행 단계 진행',
@@ -43,6 +45,8 @@ export const actionLabels = {
   POLICY_REJECT: '정책 반려',
   POLICY_ACTIVATE: '정책 시행',
   POLICY_RETIRE: '정책 종료',
+  NOTIFICATION_SETTING_CHANGED: '알림 설정 변경',
+  CLOSING_NOTIFICATION_RESEND: '마감 알림 다시 보내기',
 } as const
 
 export const entityTypeLabels = {
@@ -52,6 +56,8 @@ export const entityTypeLabels = {
   COMMISSION_TRANSACTION: '수수료 거래',
   SCHEDULE: '지급 스케줄',
   ARBITRAGE_CHECK: '차익거래 검증',
+  BANK_ACCOUNT_LINK: '은행 계좌 연결',
+  BANK_RECONCILIATION_RUN: '지급 이체 대사',
   VALIDATION_RUN: '검증 실행',
   BATCH_JOB_EXECUTION: '자동 처리 실행',
   JOURNAL_HEADER: '회계전표',
@@ -59,6 +65,8 @@ export const entityTypeLabels = {
   SCHEDULE_LINE: '예상 스케줄',
   POLICY_VERSION: '정책 버전',
   CLAWBACK_CASE: '환수 건',
+  USER_NOTIFICATION_SETTING: '알림 설정',
+  CLOSING_NOTIFICATION: '마감 알림',
 } as const
 
 function label(code: string | null | undefined, labels: Record<string, string>) {
@@ -153,6 +161,14 @@ export function diffFieldLabel(field: string): string {
     actualAmount: '실제액',
     differenceAmount: '차액',
     paymentStage: '지급단계',
+    // 지급 이체 대사 감사행(BankLinkService·BankReconciliationService)의 항목
+    bankName: '은행',
+    accountNumMasked: '계좌번호(가림)',
+    settlementMonth: '정산월',
+    inquiryFrom: '조회 시작일',
+    inquiryTo: '조회 종료일',
+    withdrawalCount: '출금 건수',
+    mismatchCount: '어긋난 건수',
     // 계약 수정 감사행(ContractServiceImpl.toAuditSnapshot)의 항목
     contractId: '계약',
     insurerId: '보험회사',
@@ -173,6 +189,9 @@ export function diffFieldLabel(field: string): string {
     createdBy: '등록자',
     updatedAt: '수정 시각',
     statusEventId: '상태 변경',
+    // 알림 설정 감사행(NotificationSettingService)의 항목
+    consented: '수신 동의',
+    mobilePhone: '휴대폰 번호',
   }
   return field
     .replace(/\[(\d+)]/g, (_, index: string) => `.${Number(index) + 1}번째.`)

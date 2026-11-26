@@ -11,6 +11,7 @@ import com.susukkang.fgc.common.security.AgentRequestAuthorization;
 import com.susukkang.fgc.common.web.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -29,6 +30,7 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.IOException;
@@ -112,6 +114,7 @@ public class SecurityConfig {
             HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler,
             ObjectProvider<JwtDecoder> jwtDecoder,
             ObjectProvider<FgcJwtAuthenticationConverter> jwtConverter,
+            @Qualifier("mockBankServerTokenExchange") ObjectProvider<RequestMatcher> bankTokenExchange,
             AuthenticationEntryPoint bearerAuthenticationEntryPoint) throws Exception {
         http
                 .oauth2ResourceServer(resource -> resource
@@ -125,6 +128,8 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, AUTH_TOKEN_ENDPOINTS).permitAll()
+                        // 모의 은행을 켰을 때만 서버 간 토큰 교환을 허용한다. 은행이 client_secret과 일회용 코드를 검증한다.
+                        .requestMatchers(bankTokenExchange.getIfAvailable(() -> request -> false)).permitAll()
                         // API 문서는 공개하고 실제 호출은 Swagger UI [Authorize]의 Bearer 로 한다(#419).
                         .requestMatchers("/error", "/actuator/health", "/actuator/health/**",
                                 "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()

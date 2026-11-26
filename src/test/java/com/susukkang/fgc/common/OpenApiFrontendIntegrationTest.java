@@ -90,6 +90,9 @@ class OpenApiFrontendIntegrationTest {
             assertThat(nullType.asText()).isEqualTo("null");
         }
         JsonNode schemas = root.path("components").path("schemas");
+        JsonNode latestBankData = schemas.path("LatestBankReconciliationEnvelope").path("properties").path("data").path("anyOf");
+        assertThat(latestBankData.path(0).path("$ref").asText()).isEqualTo("#/components/schemas/BankReconciliationResponse");
+        assertThat(latestBankData.path(1).path("type").toString()).contains("\"null\"");
         String statementSourceRef = schemas.path("StatementEntry").path("properties")
                 .path("source").path("$ref").asText();
         assertThat(statementSourceRef).startsWith("#/components/schemas/");

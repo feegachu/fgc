@@ -465,6 +465,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bank-reconciliations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 지급 이체 대사 결과
+         * @description 그 정산월에 마지막으로 돌린 대사 결과. 돌린 적이 없으면 data 가 null 이다.
+         */
+        get: operations["latest"];
+        put?: never;
+        /**
+         * 지급 이체 대사 실행
+         * @description 확정된 정산월의 설계사별 확정 지급 순액과, 확정일부터 31일 사이에 연결 계좌에서 나간 출금을 맞춰 결과를 남긴다.
+         */
+        post: operations["run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bank/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 은행 연결 상태
+         * @description 연결한 수수료 지급 계좌(가린 번호)와 지금 은행을 부를 수 있는지 돌려준다.
+         */
+        get: operations["linkStatus"];
+        put?: never;
+        /**
+         * 은행 계좌 연결
+         * @description 동의 뒤 은행이 돌려준 code 와 state 로 토큰을 받고, 유효한 조회 동의 계좌가 하나일 때만 수수료 지급 계좌로 연결한다.
+         */
+        post: operations["link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bank/link/authorize-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 은행 동의 화면 주소
+         * @description 브라우저를 보낼 은행 동의 화면 주소를 만든다. 주소에 넣은 state 는 요청한 사용자에게 10분 동안 묶인다.
+         */
+        post: operations["authorizeUrl"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/base/agents": {
         parameters: {
             query?: never;
@@ -1431,6 +1499,70 @@ export interface paths {
         get: operations["headlines"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notification-settings/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 본인 마감 알림 수신 설정 조회
+         * @description 로그인한 사용자의 휴대폰 번호와 수신 동의 시각을 돌려준다. 동의하지 않았으면 둘 다 null 이다.
+         */
+        get: operations["mySetting"];
+        /**
+         * 본인 마감 알림 수신 설정 저장
+         * @description consent 가 true 면 휴대폰 번호를 저장하고, false 면 번호를 지운다. 사용자 ID는 로그인 정보에서만 얻는다.
+         */
+        put: operations["changeMySetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 마감 알림 발송 이력
+         * @description 최신순. 수신번호는 가운데를 가려 돌려준다.
+         */
+        get: operations["notifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 마감 알림 다시 보내기
+         * @description 실패했거나 건너뛴 알림을 대기로 되돌린다. 다음 발송 주기에 다시 보낸다.
+         */
+        post: operations["resend"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2464,6 +2596,21 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseBankAuthorizeUrlResponse: {
+            data?: components["schemas"]["BankAuthorizeUrlResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseBankLinkResponse: {
+            data?: components["schemas"]["BankLinkResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseBankReconciliationResponse: {
+            data?: components["schemas"]["BankReconciliationResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseBranchDashboardResponse: {
             data?: components["schemas"]["BranchDashboardResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2745,6 +2892,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseNotificationSettingResponse: {
+            data?: components["schemas"]["NotificationSettingResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponsePageResponseAcquisitionCostCheckResponse: {
             data?: components["schemas"]["PageResponseAcquisitionCostCheckResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2772,6 +2924,11 @@ export interface components {
         };
         ApiResponsePageResponseClawbackNoticeDocumentResponse: {
             data?: components["schemas"]["PageResponseClawbackNoticeDocumentResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePageResponseClosingNotificationResponse: {
+            data?: components["schemas"]["PageResponseClosingNotificationResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -3152,6 +3309,101 @@ export interface components {
             loginId?: string;
             /** Format: int64 */
             userId?: number;
+        };
+        BankAuthorizeUrlResponse: {
+            /** @description 은행 동의 화면 주소. 10분 안에 동의를 마쳐야 한다 */
+            authorizeUrl?: string;
+        };
+        BankLinkRequest: {
+            /** @description 은행이 돌려준 인가 코드 */
+            code: string;
+            /** @description IF-API-96 이 주소에 넣어 보낸 값 */
+            state: string;
+        };
+        BankLinkResponse: {
+            accountHolderName?: string | null;
+            /** @description 은행이 가려서 준 계좌번호 */
+            accountNumMasked?: string | null;
+            bankName?: string | null;
+            /** @description 지금 은행을 부를 수 있는지. 서버를 다시 띄우면 false 가 되어 다시 연결해야 한다 */
+            connected?: boolean;
+            /** @description 수수료 지급 계좌를 연결한 적이 있는지 */
+            linked?: boolean;
+            /** Format: date-time */
+            linkedAt?: string | null;
+            /** @description 저장소에 들어 있는 모의 은행에 연결되어 있는지 */
+            mock?: boolean;
+        };
+        BankReconciliationItem: {
+            /** @description 확인 안 된 출금이면 null */
+            agentCode?: string | null;
+            /** @description 확인 안 된 출금이면 null */
+            agentName?: string | null;
+            /** @description 같은 참조코드로 나간 출금 합계 */
+            bankAmount?: number;
+            /**
+             * Format: int64
+             * @description 결과 줄의 번호. 내용이 같은 출금 두 건도 이 번호로 구분한다
+             */
+            bankReconciliationItemId?: number;
+            /**
+             * Format: date
+             * @description 이체가 없으면 null
+             */
+            bankTranDate?: string | null;
+            /** @description 은행 출금액에서 확정 지급 순액을 뺀 값 */
+            differenceAmount?: number;
+            /** @description 그 달 확정 지급 합계에서 확정 차감 합계를 뺀 금액(원 단위 반올림) */
+            expectedAmount?: number;
+            /** @description 은행 거래내역의 통장인자내용. 이체가 없으면 null */
+            printContent?: string | null;
+            /** @description 이체할 때 내 통장 표시에 적는 값. FGC + 정산월(yyMM) + - + 설계사 번호 6자리. 확인 안 된 출금이면 null */
+            referenceCode?: string | null;
+            /** @description MATCHED 일치, AMOUNT_MISMATCH 금액 다름, NOT_TRANSFERRED 이체 없음, UNKNOWN_WITHDRAWAL 확인 안 된 출금 */
+            result?: string;
+        };
+        BankReconciliationRequest: {
+            /**
+             * @description 대사할 정산월(YYYY-MM). 확정된 달이어야 한다
+             * @example 2026-07
+             */
+            settlementMonth: string;
+        };
+        BankReconciliationResponse: {
+            accountNumMasked?: string;
+            /** Format: int32 */
+            amountMismatchCount?: number;
+            bankName?: string;
+            /** Format: int64 */
+            bankReconciliationRunId?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** @description 대사를 돌린 사용자의 로그인 ID */
+            createdBy?: string;
+            /**
+             * Format: date
+             * @description 은행에서 조회한 기간의 첫날(확정일)
+             */
+            inquiryFrom?: string;
+            /**
+             * Format: date
+             * @description 은행에서 조회한 기간의 끝날(확정일부터 31일, 오늘을 넘지 않음)
+             */
+            inquiryTo?: string;
+            items?: components["schemas"]["BankReconciliationItem"][];
+            /** Format: int32 */
+            matchedCount?: number;
+            /** Format: int32 */
+            notTransferredCount?: number;
+            /** Format: date */
+            settlementMonth?: string;
+            /** Format: int32 */
+            unknownWithdrawalCount?: number;
+            /**
+             * Format: int32
+             * @description 그 기간에 은행에서 받은 출금 건수
+             */
+            withdrawalCount?: number;
         };
         Basis: {
             asOfDate?: string;
@@ -3707,6 +3959,34 @@ export interface components {
             insurerId?: number;
             /** Format: int64 */
             productOfferingId?: number;
+        };
+        ClosingNotificationResponse: {
+            /** Format: int32 */
+            attemptCount?: number;
+            /** Format: int64 */
+            closingNotificationId?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** @description 실패하거나 건너뛴 사유. 없으면 null */
+            errorCode?: string | null;
+            eventType?: string;
+            messageText?: string;
+            /** @description 수신 대상이 없던 사건이면 null */
+            recipientLoginId?: string | null;
+            /** @description 수신 대상이 없던 사건이면 null */
+            recipientName?: string | null;
+            /** @description 가운데를 가린 번호. 수신 대상이 없거나 수신을 해제했으면 null */
+            recipientPhone?: string | null;
+            /**
+             * Format: date-time
+             * @description 보내지 않았으면 null
+             */
+            sentAt?: string | null;
+            status?: string;
+            /** Format: date */
+            validationMonth?: string;
+            /** Format: int64 */
+            validationRunId?: number;
         };
         /** @description 수수료 항목 기준정보 */
         CommissionItemResponse: {
@@ -5224,6 +5504,11 @@ export interface components {
             totalPages?: number;
         };
         JsonNode: unknown;
+        LatestBankReconciliationEnvelope: {
+            data?: components["schemas"]["BankReconciliationResponse"] | null;
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         LedgerSummary: {
             /** Format: int64 */
             imbalanceCount?: number;
@@ -5313,6 +5598,20 @@ export interface components {
             link?: string;
             publishedAt?: string;
             title?: string;
+        };
+        NotificationSettingRequest: {
+            consent: boolean;
+            mobilePhone?: string;
+        };
+        NotificationSettingResponse: {
+            /**
+             * Format: date-time
+             * @description 수신 동의하지 않았으면 null
+             */
+            consentedAt?: string | null;
+            /** @description 수신 동의하지 않았으면 null */
+            mobilePhone?: string | null;
+            smsConfigured?: boolean;
         };
         Option: {
             code?: string;
@@ -5457,6 +5756,18 @@ export interface components {
         };
         PageResponseClawbackNoticeDocumentResponse: {
             content?: components["schemas"]["ClawbackNoticeDocumentResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageResponseClosingNotificationResponse: {
+            content?: components["schemas"]["ClosingNotificationResponse"][];
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -7602,6 +7913,120 @@ export interface operations {
             };
         };
     };
+    latest: {
+        parameters: {
+            query: {
+                /**
+                 * @description 정산월(YYYY-MM)
+                 * @example 2026-07
+                 */
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LatestBankReconciliationEnvelope"];
+                };
+            };
+        };
+    };
+    run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankReconciliationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBankReconciliationResponse"];
+                };
+            };
+        };
+    };
+    linkStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBankLinkResponse"];
+                };
+            };
+        };
+    };
+    link: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBankLinkResponse"];
+                };
+            };
+        };
+    };
+    authorizeUrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBankAuthorizeUrlResponse"];
+                };
+            };
+        };
+    };
     search_9: {
         parameters: {
             query: {
@@ -9269,6 +9694,97 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListNewsHeadline"];
+                };
+            };
+        };
+    };
+    mySetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNotificationSettingResponse"];
+                };
+            };
+        };
+    };
+    changeMySetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationSettingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNotificationSettingResponse"];
+                };
+            };
+        };
+    };
+    notifications: {
+        parameters: {
+            query?: {
+                /** @description 페이지(1-base) */
+                page?: number;
+                /** @description 페이지 크기(최대 100) */
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseClosingNotificationResponse"];
+                };
+            };
+        };
+    };
+    resend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
                 };
             };
         };

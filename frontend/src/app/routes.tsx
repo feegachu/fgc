@@ -29,6 +29,7 @@ const pages: Record<string, ComponentType> = {
   '/agent/statements': lazy(() => import('../features/agent-statement/AgentStatementPage')),
   '/transactions/new': lazy(() => import('../features/transaction/TransactionFormPage')),
   '/audit-logs': lazy(() => import('../features/audit/AuditLogPage')),
+  '/notifications': lazy(() => import('../features/notification/NotificationHistoryPage')),
   '/journals': lazy(() => import('../features/ledger/LedgerPage')),
   '/validation-runs': lazy(() => import('../features/validation/ValidationRunListPage')),
   '/validation-runs/:id': lazy(() => import('../features/validation/ValidationRunDetailPage')),
@@ -39,6 +40,7 @@ const pages: Record<string, ComponentType> = {
   '/contracts/:id/edit': lazy(() => import('../features/contract/ContractFormPage')),
   '/contracts/:id': lazy(() => import('../features/contract/ContractDetailPage')),
   '/reconciliations': lazy(() => import('../features/reconciliation/ReconciliationPage')),
+  '/bank-reconciliations': lazy(() => import('../features/bank-reconciliation/BankReconciliationPage')),
 }
 export const screenRoutes: RouteObject[] = screens.map((screen) => {
   const Page = pages[screen.path]
