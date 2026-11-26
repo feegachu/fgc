@@ -45,6 +45,8 @@ export const actionLabels = {
   POLICY_REJECT: '정책 반려',
   POLICY_ACTIVATE: '정책 시행',
   POLICY_RETIRE: '정책 종료',
+  NOTIFICATION_SETTING_CHANGED: '알림 설정 변경',
+  CLOSING_NOTIFICATION_RESEND: '마감 알림 다시 보내기',
 } as const
 
 export const entityTypeLabels = {
@@ -63,6 +65,8 @@ export const entityTypeLabels = {
   SCHEDULE_LINE: '예상 스케줄',
   POLICY_VERSION: '정책 버전',
   CLAWBACK_CASE: '환수 건',
+  USER_NOTIFICATION_SETTING: '알림 설정',
+  CLOSING_NOTIFICATION: '마감 알림',
 } as const
 
 function label(code: string | null | undefined, labels: Record<string, string>) {
@@ -185,6 +189,9 @@ export function diffFieldLabel(field: string): string {
     createdBy: '등록자',
     updatedAt: '수정 시각',
     statusEventId: '상태 변경',
+    // 알림 설정 감사행(NotificationSettingService)의 항목
+    consented: '수신 동의',
+    mobilePhone: '휴대폰 번호',
   }
   return field
     .replace(/\[(\d+)]/g, (_, index: string) => `.${Number(index) + 1}번째.`)

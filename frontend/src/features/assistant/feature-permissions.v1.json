@@ -47,6 +47,11 @@
       "SYSTEM_ADMIN",
       "GA_ADMIN"
     ],
+    "CAN_RECEIVE_CLOSING_NOTIFICATION": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "AGENT"
+    ],
     "CAN_VIEW_AUDIT_LOG": [
       "SYSTEM_ADMIN",
       "COMPLIANCE"
@@ -72,6 +77,7 @@
     "app.shell.sidebar.button": "OWN_OR_INTERNAL_READ",
     "app.shell.sidebar.button-2": "OWN_OR_INTERNAL_READ",
     "app.shell.sidebar.button-3": "OWN_OR_INTERNAL_READ",
+    "app.shell.sidebar.button-4": "CAN_RECEIVE_CLOSING_NOTIFICATION",
     "app.shell.sidebar.fgc": "OWN_OR_INTERNAL_READ",
     "app.shell.workspace-tabs.button": "OWN_OR_INTERNAL_READ",
     "app.shell.workspace-tabs.button-2": "OWN_OR_INTERNAL_READ",
@@ -583,6 +589,12 @@
     "features.ledger.ledger-page.section": "INTERNAL_READ",
     "features.ledger.ledger-page.section-2": "INTERNAL_READ",
     "features.ledger.ledger-page.textarea": "CAN_REVERSE_JOURNAL",
+    "features.notification.notification-history-page.button": "CAN_FINALIZE_VALIDATION",
+    "features.notification.notification-history-page.section": "CAN_FINALIZE_VALIDATION",
+    "features.notification.notification-settings-modal.button": "CAN_RECEIVE_CLOSING_NOTIFICATION",
+    "features.notification.notification-settings-modal.button-2": "CAN_RECEIVE_CLOSING_NOTIFICATION",
+    "features.notification.notification-settings-modal.input": "CAN_RECEIVE_CLOSING_NOTIFICATION",
+    "features.notification.notification-settings-modal.input-2": "CAN_RECEIVE_CLOSING_NOTIFICATION",
     "features.policies.policies-page.button": "INTERNAL_READ",
     "features.policies.policies-page.button-2": "CAN_WRITE_POLICY",
     "features.policies.policies-page.button-3": "INTERNAL_READ",
@@ -846,6 +858,7 @@
     "navigation.menu.dash-w01": "INTERNAL_READ",
     "navigation.menu.excp-w01": "INTERNAL_READ",
     "navigation.menu.ledg-w01": "INTERNAL_READ",
+    "navigation.menu.noti-w01": "CAN_FINALIZE_VALIDATION",
     "navigation.menu.pol-w01": "INTERNAL_READ",
     "navigation.menu.reco-w01": "INTERNAL_READ",
     "navigation.menu.sche-w01": "INTERNAL_READ",

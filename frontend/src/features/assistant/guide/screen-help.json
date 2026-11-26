@@ -320,6 +320,17 @@
     ]
   },
   {
+    "screenId": "NOTI-W01",
+    "title": "알림 발송 이력",
+    "page": "notification/NotificationHistoryPage.tsx",
+    "steps": [
+      {
+        "targetId": "notification.history",
+        "instruction": "마감 알림 문자가 누구에게 갔는지 확인하세요. 실패했거나 건너뛴 알림은 다시 보내기를 누릅니다."
+      }
+    ]
+  },
+  {
     "screenId": "POL-W01",
     "variant": "editor",
     "title": "정책 초안 작성",
